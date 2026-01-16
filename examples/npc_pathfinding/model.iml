@@ -1,0 +1,122 @@
+(* NPC Pathfinding *)
+
+(* Core types *)
+type npc_type = Civilian | Guard | Merchant | Warrior | Scout
+
+type terrain = Open | Rough | Difficult | Water | Blocked
+
+type obstacle_type = Static | Dynamic | Temporary
+
+type path_decision = {
+  path_valid: bool;
+  requires_replanning: bool;
+  avoidance_needed: bool;
+  estimated_cost: int;
+}
+
+(* Terrain traversal cost *)
+let terrain_cost terrain =
+  match terrain with
+  | Open -> 1
+  | Rough -> 2
+  | Difficult -> 4
+  | Water -> 8
+  | Blocked -> 100
+
+(* NPC speed modifier *)
+let npc_speed npc_type =
+  match npc_type with
+  | Civilian -> 1
+  | Guard -> 2
+  | Merchant -> 1
+  | Warrior -> 3
+  | Scout -> 4
+
+(* Check if NPC can traverse terrain *)
+let can_traverse npc_type terrain =
+  match npc_type, terrain with
+  | _, Blocked -> false
+  | Civilian, Water -> false
+  | Merchant, Water -> false
+  | Merchant, Difficult -> false
+  | _, _ -> true
+
+(* Obstacle blocks path *)
+let obstacle_blocks obstacle_type distance =
+  match obstacle_type with
+  | Static -> distance <= 1
+  | Dynamic -> distance <= 2
+  | Temporary -> distance <= 1
+
+(* Check if path needs replanning *)
+let needs_replan stuck_count last_replan_time current_time =
+  stuck_count >= 3 || (current_time - last_replan_time) >= 10
+
+(* Core pathfinding decision *)
+let determine_path_validity
+    npc_type
+    terrain
+    obstacle_type
+    obstacle_distance
+    stuck_count
+    last_replan_time
+    current_time
+    path_length =
+
+  (* Check if NPC can traverse this terrain *)
+  let can_go = can_traverse npc_type terrain in
+
+  if not can_go then
+    { path_valid = false;
+      requires_replanning = true;
+      avoidance_needed = false;
+      estimated_cost = 0 }
+  else
+    (* Check obstacle *)
+    let blocked = obstacle_blocks obstacle_type obstacle_distance in
+
+    if blocked then
+      { path_valid = false;
+        requires_replanning = false;
+        avoidance_needed = true;
+        estimated_cost = 0 }
+    else
+      (* Check if stuck/need replan *)
+      let replan = needs_replan stuck_count last_replan_time current_time in
+
+      if replan then
+        { path_valid = false;
+          requires_replanning = true;
+          avoidance_needed = false;
+          estimated_cost = 0 }
+      else
+        (* Path valid *)
+        let base_cost = terrain_cost terrain in
+        let speed = npc_speed npc_type in
+        let total_cost = (base_cost * path_length) / speed in
+
+        { path_valid = true;
+          requires_replanning = false;
+          avoidance_needed = false;
+          estimated_cost = total_cost }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All pathfinding scenarios *)
+let all_path_scenarios = determine_path_validity
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Civilians ever path through Water? *)
+let civilian_water npc_type terrain obstacle_type obstacle_distance stuck_count last_replan_time current_time path_length =
+  let decision = determine_path_validity npc_type terrain obstacle_type obstacle_distance stuck_count last_replan_time current_time path_length in
+  npc_type = Civilian && terrain = Water && decision.path_valid
+[@@decomp top ()]
+
+(* Q3: Scout speed advantage *)
+verify (fun terrain obstacle_type obstacle_distance stuck_count last_replan_time current_time path_length ->
+  let civilian_decision = determine_path_validity Civilian terrain obstacle_type obstacle_distance stuck_count last_replan_time current_time path_length in
+  let scout_decision = determine_path_validity Scout terrain obstacle_type obstacle_distance stuck_count last_replan_time current_time path_length in
+  (civilian_decision.path_valid && scout_decision.path_valid) ==> (scout_decision.estimated_cost <= civilian_decision.estimated_cost)
+)

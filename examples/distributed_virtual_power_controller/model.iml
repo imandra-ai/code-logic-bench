@@ -1,0 +1,130 @@
+(* Distributed Virtual Power Controller *)
+
+(* Core types *)
+type resource_type = Solar | Battery | EV_Charger | Load
+
+type grid_condition = Normal | Congestion | Emergency
+
+type dispatch_command = Charge | Discharge | Curtail | Maintain
+
+type control_decision = {
+  command: dispatch_command;
+  power_level: int;
+  participate: bool;
+}
+
+(* Dead zone for SOC/price combinations *)
+let in_price_dead_zone battery_soc electricity_price =
+  battery_soc >= 48 && battery_soc <= 52 && electricity_price >= 18 && electricity_price <= 22
+
+(* grid condition changes price interpretation *)
+let price_threshold_adjusted grid_condition base_price =
+  match grid_condition with
+  | Normal -> base_price
+  | Congestion -> (base_price * 13) / 10  (* 30% premium *)
+  | Emergency -> (base_price * 2)         (* 100% premium *)
+
+(* need 2 out of 3 dispatch conditions *)
+let dispatch_quorum_met price_favorable soc_adequate grid_needs_support =
+  let count =
+    (if price_favorable then 1 else 0) +
+    (if soc_adequate then 1 else 0) +
+    (if grid_needs_support then 1 else 0)
+  in
+  count >= 2
+
+(* Core decision function *)
+let determine_dispatch
+    resource_type
+    grid_condition
+    battery_soc
+    electricity_price
+    solar_generation
+    grid_frequency =
+
+  (* Dead zone check *)
+  if in_price_dead_zone battery_soc electricity_price then
+    { command = Maintain; power_level = 0; participate = false }
+  else
+    (* Emergency condition overrides normal dispatch *)
+    if grid_condition = Emergency then
+      (* Emergency: discharge batteries, curtail loads *)
+      match resource_type with
+      | Battery -> { command = Discharge; power_level = 50; participate = true }
+      | Load -> { command = Curtail; power_level = 30; participate = true }
+      | _ -> { command = Maintain; power_level = 0; participate = true }
+    else
+      (* Normal dispatch logic *)
+      let base_price_threshold = 25 in
+      let adjusted_threshold = price_threshold_adjusted grid_condition base_price_threshold in
+      let high_price = electricity_price >= adjusted_threshold in
+      let low_price = electricity_price < 15 in
+
+      (* Resource-specific logic *)
+      match resource_type with
+      | Solar ->
+        (* Solar always generates when available *)
+        if solar_generation > 0 then
+          { command = Discharge; power_level = solar_generation; participate = true }
+        else
+          { command = Maintain; power_level = 0; participate = false }
+
+      | Battery ->
+        (* Check dispatch quorum *)
+        let price_favorable = high_price && battery_soc > 20 in
+        let soc_adequate = battery_soc >= 30 && battery_soc <= 90 in
+        let grid_needs = grid_frequency < 59 || grid_frequency > 61 in
+        let quorum = dispatch_quorum_met price_favorable soc_adequate grid_needs in
+
+        if quorum then
+          if high_price && battery_soc > 40 then
+            { command = Discharge; power_level = 40; participate = true }
+          else if low_price && battery_soc < 80 then
+            { command = Charge; power_level = 30; participate = true }
+          else
+            { command = Maintain; power_level = 0; participate = true }
+        else
+          { command = Maintain; power_level = 0; participate = false }
+
+      | EV_Charger ->
+        if low_price then
+          { command = Charge; power_level = 20; participate = true }
+        else
+          { command = Curtail; power_level = 0; participate = false }
+
+      | Load ->
+        if high_price && grid_condition = Congestion then
+          { command = Curtail; power_level = 15; participate = true }
+        else
+          { command = Maintain; power_level = 0; participate = false }
+
+(* Analysis
+====================
+ *)
+
+let assume_reasonable_inputs
+    (resource_type : resource_type)
+    (grid_condition : grid_condition)
+    (battery_soc : int)
+    (electricity_price : int)
+    (solar_generation : int)
+    (grid_frequency : int) : bool =
+  battery_soc >= 0 && battery_soc <= 100 &&
+  electricity_price >= 5 && electricity_price <= 50 &&
+  solar_generation >= 0 && solar_generation <= 100 &&
+  grid_frequency >= 58 && grid_frequency <= 62
+
+let dispatch_scenarios = determine_dispatch
+[@@decomp top ~prune:true ~assuming:[%id assume_reasonable_inputs] ()]
+
+let triggers_discharge resource_type grid_condition battery_soc electricity_price solar_generation grid_frequency =
+  let decision = determine_dispatch resource_type grid_condition battery_soc electricity_price solar_generation grid_frequency in
+  decision.command = Discharge
+[@@decomp top ~assuming:[%id assume_reasonable_inputs] ()]
+
+verify (fun resource_type grid_condition battery_soc electricity_price solar_generation grid_frequency ->
+  let decision = determine_dispatch resource_type grid_condition battery_soc electricity_price solar_generation grid_frequency in
+
+  (assume_reasonable_inputs resource_type grid_condition battery_soc electricity_price solar_generation grid_frequency &&
+   grid_condition = Emergency && resource_type = Battery) ==> (decision.command = Discharge)
+)

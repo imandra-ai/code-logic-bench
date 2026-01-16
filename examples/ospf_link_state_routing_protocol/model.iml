@@ -1,0 +1,116 @@
+(* OSPF Link State Routing Protocol *)
+
+(* Core types *)
+type router_state = Down | Init | TwoWay | ExStart | Exchange | Loading | Full
+
+type lsa_age_category = Fresh | Valid | MaxAge
+
+type neighbor_decision = {
+  establish_adjacency: bool;
+  become_full: bool;
+  priority_higher: bool;
+  dead_timer_expired: bool;
+}
+
+(* LSA age categorization *)
+let categorize_lsa_age age_seconds =
+  if age_seconds < 300 then Fresh      (* < 5 min *)
+  else if age_seconds < 3600 then Valid  (* < 1 hour *)
+  else MaxAge                           (* >= 1 hour, needs refresh *)
+
+(* Check if neighbor is dead *)
+let neighbor_dead last_hello_seconds dead_interval =
+  last_hello_seconds >= dead_interval
+
+(* State progression allows Full state *)
+let state_allows_full current_state =
+  match current_state with
+  | Full -> true
+  | Loading -> true
+  | Exchange -> true
+  | _ -> false
+
+(* Priority determines DR election *)
+let has_higher_priority my_priority neighbor_priority my_id neighbor_id =
+  if my_priority > neighbor_priority then true
+  else if my_priority < neighbor_priority then false
+  else my_id > neighbor_id  (* Tiebreaker: higher ID wins *)
+
+(* Check if adjacency should form *)
+let should_establish_adjacency current_state =
+  current_state = Init || current_state = TwoWay
+
+(* Core neighbor management decision *)
+let determine_neighbor_status
+    current_state
+    my_priority
+    neighbor_priority
+    my_router_id
+    neighbor_router_id
+    last_hello_seconds
+    dead_interval
+    lsa_age_seconds =
+
+  (* Check dead timer first *)
+  let is_dead = neighbor_dead last_hello_seconds dead_interval in
+
+  if is_dead then
+    { establish_adjacency = false;
+      become_full = false;
+      priority_higher = false;
+      dead_timer_expired = true }
+  else
+    (* Check if should establish adjacency *)
+    let adjacency_ok = should_establish_adjacency current_state in
+
+    if adjacency_ok then
+      let higher_prio = has_higher_priority my_priority neighbor_priority my_router_id neighbor_router_id in
+      { establish_adjacency = true;
+        become_full = false;
+        priority_higher = higher_prio;
+        dead_timer_expired = false }
+    else
+      (* Check if can reach Full state *)
+      let can_be_full = state_allows_full current_state in
+
+      if can_be_full then
+        (* Check LSA freshness *)
+        let lsa_category = categorize_lsa_age lsa_age_seconds in
+        let lsa_ok = lsa_category <> MaxAge in
+
+        if lsa_ok then
+          let higher_prio = has_higher_priority my_priority neighbor_priority my_router_id neighbor_router_id in
+          { establish_adjacency = false;
+            become_full = true;
+            priority_higher = higher_prio;
+            dead_timer_expired = false }
+        else
+          { establish_adjacency = false;
+            become_full = false;
+            priority_higher = false;
+            dead_timer_expired = false }
+      else
+        { establish_adjacency = false;
+          become_full = false;
+          priority_higher = false;
+          dead_timer_expired = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All neighbor status scenarios *)
+let all_neighbor_scenarios = determine_neighbor_status
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can become_full=true when lsa_age >= 3600 (MaxAge)? *)
+let full_with_maxage current_state my_priority neighbor_priority my_router_id neighbor_router_id last_hello_seconds dead_interval lsa_age_seconds =
+  let decision = determine_neighbor_status current_state my_priority neighbor_priority my_router_id neighbor_router_id last_hello_seconds dead_interval lsa_age_seconds in
+  lsa_age_seconds >= 3600 && decision.become_full
+[@@decomp top ()]
+
+(* Q3: Dead timer property *)
+verify (fun current_state my_priority neighbor_priority my_router_id neighbor_router_id lsa_age_seconds dead_interval ->
+  let decision = determine_neighbor_status current_state my_priority neighbor_priority my_router_id neighbor_router_id dead_interval dead_interval lsa_age_seconds in
+  decision.dead_timer_expired
+)

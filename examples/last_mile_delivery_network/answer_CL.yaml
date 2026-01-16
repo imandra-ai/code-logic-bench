@@ -1,0 +1,88 @@
+model: "last_mile_delivery_network"
+q1:
+  question: "How many distinct vehicle assignment decision scenarios exist?"
+  answer: "248 total scenarios: 108 Assigned, 77 Waitlist, 63 Rejected"
+  state_space_breakdown: |
+    Total: 248 scenarios
+    Assigned: 108 (44%) - All conditions satisfied
+    Waitlist: 77 (31%) - Borderline or dead zone
+    Rejected: 63 (25%) - Insufficient conditions
+  key_thresholds:
+    battery_level: [15, 20, 25, 30, 35, 40]
+    capacity_utilization: [80]
+    distance: [30, 50, 200]
+    assignment_score: [3, 4]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), assigned_count: ([.[0].regions_str[] | select(.invariant_str == \"Assigned\")] | length), waitlist_count: ([.[0].regions_str[] | select(.invariant_str == \"Waitlist\")] | length), rejected_count: ([.[0].regions_str[] | select(.invariant_str == \"Rejected\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Drones be assigned in Storm weather?"
+  answer: "YES - 13 scenarios where Drone + Storm → Assigned (SAFETY ISSUE)"
+  safety_bug_exposed:
+    issue: "Drones can be assigned during storms via quorum path"
+    example:
+      vehicle_type: "Drone"
+      weather: "Storm"
+      priority: "Urgent"
+      battery_level: 40
+      distance: 30
+      result: "Assigned"
+  why_bug_occurs: |
+    The quorum system requires 4 out of 6 conditions:
+    1. weather_ok = FALSE (Drone not Storm-compatible)
+    2. battery_ok = TRUE (40 >= 35)
+    3. capacity_ok = TRUE
+    4. distance_ok = TRUE (30 <= 30)
+    5. priority_ok = TRUE (Urgent with battery >= 40)
+    6. not_overloaded = TRUE
+
+    Score = 5/6 (only weather fails) → 5 >= 4 → Assigned!
+
+    The emergency_override path correctly rejects Drones in storms,
+    but the QUORUM path allows it if other conditions compensate.
+  correct_behavior: "Drones should NEVER fly in storms (hard constraint, not quorum-able)"
+  fix_needed: |
+    Add hard safety constraint before quorum:
+      if vehicle_type = Drone && weather = Storm then Rejected
+  key_insight: "Quorum patterns can dilute critical safety constraints - some conditions should be hard requirements"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_drone_storm.json'
+q3:
+  question: "Can vehicles in battery dead zone be directly assigned?"
+  answer: "PROVEN - Dead zone vehicles NEVER directly assigned"
+  property: "in_battery_dead_zone ==> result != Assigned"
+  why_proven: |
+    The dead zone check has highest precedence:
+
+    if in_dead_zone then
+      Waitlist
+    else
+      ... (* emergency override and quorum *)
+
+    This ensures vehicles with marginal battery (Truck 20-25%, Drone 25-35%, Robot 15-20%)
+    always go to Waitlist for recharge consideration, never direct assignment.
+  dead_zone_ranges:
+    Truck: "20-25% battery"
+    Drone: "25-35% battery (wider safety margin)"
+    Robot: "15-20% battery"
+  key_insight: "Dead zone correctly prioritized above all other logic, including emergency override"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_battery_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 248
+  drone_storm_assignments: 13
+  property_result: "PROVEN"
+  patterns_demonstrated:
+    pattern_1_override: "Emergency + battery>15 bypasses quorum"
+    pattern_2_multiplexer: "vehicle_weather_compatible varies by type"
+    pattern_3_dead_zone: "Vehicle-specific battery ranges correctly handled"
+    pattern_6_quorum: "4/6 conditions BUT exposes safety flaw"
+  model_insights:
+    - "248 scenarios with reasonable 3-way distribution"
+    - "CRITICAL BUG FOUND: Drones assigned in storms via quorum (13 scenarios)"
+    - "Dead zone safety correctly implemented (proven)"
+    - "Quorum pattern's flexibility can undermine critical safety requirements"
+  design_lessons:
+    issue: "Hard safety constraints vs soft optimization"
+    problem: "Using quorum for weather compatibility treats it as negotiable"
+    solution: "Weather constraints should be hard checks, not quorum factors"
+    principle: "Safety-critical conditions should be guard clauses, not scored factors"

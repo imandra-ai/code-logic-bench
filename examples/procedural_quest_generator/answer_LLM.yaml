@@ -1,0 +1,440 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:09'
+  q1:
+    answer: '4 distinct quest availability scenarios exist for RivalFaction quests:
+      TEMPORARILY_LOCKED, PERMANENTLY_BLOCKED, HIDDEN_QUESTLINE, and CONDITIONAL_UNLOCK.'
+    reasoning: >-
+      - The _apply_faction_override function for CharacterFaction.RIVAL_FACTION can
+      return 4 possible QuestAvailability values based on conditions.
+
+      - TEMPORARILY_LOCKED is default if player_reputation < 80 or completed_faction_quests
+      < 5, or if player_reputation >= 80 and completed_faction_quests >= 5 and not
+      PlayerClass.WARRIOR and quest_type == QuestType.COMBAT_ENCOUNTER.
+
+      - PERMANENTLY_BLOCKED if player_class == PlayerClass.WARRIOR and player_reputation
+      >= 80 and completed_faction_quests >= 5.
+
+      - HIDDEN_QUESTLINE if player_class == PlayerClass.ROGUE and (quest_type == QuestType.MAIN_STORY
+      or QuestType.SIDE_QUEST) and player_reputation >= 80 and completed_faction_quests
+      >= 5.
+
+      - CONDITIONAL_UNLOCK if Elif not COMBAT_ENCOUNTER and not (WARRIOR and rep>=80
+      quests>=5) and not (ROGUE with MAIN/SIDE and rep>=80 quests>=5), i.e., for non-WARRIOR,
+      and for ROGUE only if FETCH or PUZZLE, and rep>=80 quests>=5.
+
+      - The numeric thresholds are: player_reputation >= 80 and completed_faction_quests
+      >= 5.
+  q2:
+    answer: No, HostileEmpire can never offer FetchQuests as FullyAvailable, ConditionalUnlock,
+      or HiddenQuestline. They are always PermanentlyBlocked.
+    reasoning: >-
+      - For QuestType.FETCH_QUEST and CharacterFaction.HOSTILE_EMPIRE, _apply_faction_override
+      always returns QuestAvailability.PERMANENTLY_BLOCKED if the conditions for unlocking
+      are met (reputation >=90 and completed_faction_quests >=10) and does not proceed
+      to other availability checks that might allow FullyAvailable, ConditionalUnlock,
+      or HiddenQuestline for FetchQuests.
+
+      - Otherwise, if the unlocking conditions are not met, it's also PERMANENTLY_BLOCKED,
+      so no scenario allows positive availability for FetchQuests from HostileEmpire.
+  q3:
+    answer: No, it does not always result in HiddenQuestline for non-FetchQuest types;
+      other factors can prevent it, such as being in the reputation overflow zone
+      or failing the player level check for PuzzleQuests.
+    reasoning: >-
+      - The reputation overflow zone check (_in_reputation_overflow_zone) occurs first
+      and blocks all quests if reputation is 85-95, player_level 4-6, and completed_faction_quests
+      8-12, which includes exactly reputation=90 and completed_faction_quests ≥10
+      in that range.
+
+      - For QuestType.PUZZLE_QUEST, even if reputation=90 and completed_faction_quests≥10
+      and not in overflow, it returns TEMPORARILY_LOCKED if player_level < 8 instead
+      of HIDDEN_QUESTLINE.
+
+      - For other non-FetchQuest types (MAIN_STORY, SIDE_QUEST, COMBAT_ENCOUNTER),
+      it would proceed to HIDDEN_QUESTLINE unless overflow blocks it.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:14'
+  q1:
+    answer: >-
+      There are 5 distinct quest availability scenarios for RivalFaction quests:
+
+      1. PERMANENTLY_BLOCKED (Warriors with reputation≥80 and completed_faction_quests≥5)
+
+      2. HIDDEN_QUESTLINE (Rogues with reputation≥80, completed_faction_quests≥5,
+      and quest_type is MAIN_STORY or SIDE_QUEST)
+
+      3. CONDITIONAL_UNLOCK (Mages/Clerics with reputation≥80, completed_faction_quests≥5,
+      quest_type is not COMBAT_ENCOUNTER)
+
+      4. TEMPORARILY_LOCKED (All other conditions including reputation<80 or completed_faction_quests<5,
+      or Mages/Clerics attempting COMBAT_ENCOUNTER even with high reputation)
+
+      5. PERMANENTLY_BLOCKED (from reputation overflow zone: reputation 85-95, level
+      4-6, completed_faction_quests 8-12)
+
+
+      Exact numeric thresholds: reputation≥80, completed_faction_quests≥5, overflow
+      zone (reputation 85-95, level 4-6, quests 8-12)
+    reasoning: >-
+      - Analyzed _apply_faction_override for CharacterFaction.RIVAL_FACTION branch
+
+      - First check: reputation overflow zone can permanently block (rep 85-95, level
+      4-6, quests 8-12)
+
+      - Main RivalFaction logic requires: player_reputation >= 80 AND completed_faction_quests
+      >= 5
+
+      - If requirements met:
+        * Warriors → PERMANENTLY_BLOCKED (no exceptions)
+        * Rogues with MAIN_STORY or SIDE_QUEST → HIDDEN_QUESTLINE
+        * Mages/Clerics with non-COMBAT_ENCOUNTER → CONDITIONAL_UNLOCK
+        * All other combinations → TEMPORARILY_LOCKED
+      - If requirements not met: TEMPORARILY_LOCKED
+
+      - Total scenarios: 5 (including overflow zone permanent block)
+  q2:
+    answer: >-
+      No, HostileEmpire can NEVER offer FetchQuests as available (FullyAvailable,
+      ConditionalUnlock, or HiddenQuestline). FetchQuests from HostileEmpire are ALWAYS
+      either PERMANENTLY_BLOCKED or blocked by reputation overflow zone.
+
+
+      Exact conditions: When completed_faction_quests≥10 AND player_reputation≥90,
+      FetchQuests are explicitly set to PERMANENTLY_BLOCKED. In all other cases (not
+      meeting these thresholds), HostileEmpire returns PERMANENTLY_BLOCKED for all
+      quest types. The overflow zone can also block before reaching faction override
+      logic.
+    reasoning: >-
+      - Analyzed _apply_faction_override for CharacterFaction.HOSTILE_EMPIRE branch
+
+      - HostileEmpire has two main paths:
+        1. If completed_faction_quests >= 10 AND player_reputation >= 90:
+           * FETCH_QUEST → PERMANENTLY_BLOCKED (explicitly stated)
+           * Other quest types can become HIDDEN_QUESTLINE (with conditions)
+        2. Otherwise: PERMANENTLY_BLOCKED for all quest types
+      - Therefore FetchQuests from HostileEmpire are:
+        * PERMANENTLY_BLOCKED when meeting the 10 quests/90 rep threshold
+        * PERMANENTLY_BLOCKED when not meeting the threshold
+        * PERMANENTLY_BLOCKED in overflow zone
+      - No path exists for FetchQuests to be available from HostileEmpire
+  q3:
+    answer: >-
+      No, this does NOT always result in HiddenQuestline. Two factors can prevent
+      it:
+
+
+      1. PUZZLE_QUEST type with player_level<8 results in TEMPORARILY_LOCKED instead
+      of HIDDEN_QUESTLINE
+
+      2. Reputation overflow zone (if reputation=90, level 4-6, and completed_faction_quests=10,
+      which meets 8-12 range) results in PERMANENTLY_BLOCKED before faction override
+      logic even executes
+
+
+      For all other non-FetchQuest types (MAIN_STORY, SIDE_QUEST, COMBAT_ENCOUNTER,
+      and PUZZLE_QUEST with level≥8), the result IS HiddenQuestline, assuming the
+      overflow zone doesn't apply.
+    reasoning: >-
+      - Given: HostileEmpire, reputation=90, completed_faction_quests≥10 (specifically
+      10 in question)
+
+      - First check: _in_reputation_overflow_zone
+        * If level is 4-6 and completed_faction_quests is 8-12 (10 qualifies), returns
+      PERMANENTLY_BLOCKED
+        * Reputation 90 is in range 85-95 (exploitable range)
+      - If not in overflow zone, _apply_faction_override executes:
+        * completed_faction_quests >= 10: TRUE
+        * player_reputation >= 90: TRUE
+        * For FETCH_QUEST: PERMANENTLY_BLOCKED
+        * For PUZZLE_QUEST: checks if player_level < 8
+          - If level < 8: TEMPORARILY_LOCKED
+          - If level >= 8: HIDDEN_QUESTLINE
+        * For all other types: HIDDEN_QUESTLINE
+      - Two prevention factors identified: overflow zone and PUZZLE_QUEST with low
+      level
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:18'
+  q1:
+    answer: >-
+      6 distinct scenarios (including the global anti-exploit block).
+
+
+      RIVAL_FACTION outcomes are determined by these numeric thresholds + class/quest-type
+      exceptions:
+
+      1) PERMANENTLY_BLOCKED (anti-exploit overflow dead zone): reputation 85–95 inclusive
+      AND player_level 4–6 inclusive AND completed_faction_quests 8–12 inclusive.
+
+      2) TEMPORARILY_LOCKED (default rival lock): player_reputation < 80 OR completed_faction_quests
+      < 5.
+
+      3) PERMANENTLY_BLOCKED (rivals never trust Warriors): player_reputation ≥ 80
+      AND completed_faction_quests ≥ 5 AND player_class == WARRIOR.
+
+      4) HIDDEN_QUESTLINE (Rogue exception): player_reputation ≥ 80 AND completed_faction_quests
+      ≥ 5 AND player_class == ROGUE AND quest_type ∈ {MAIN_STORY, SIDE_QUEST}.
+
+      5) CONDITIONAL_UNLOCK (high-rep access for any non-combat quest not captured
+      by #4): player_reputation ≥ 80 AND completed_faction_quests ≥ 5 AND quest_type
+      != COMBAT_ENCOUNTER AND player_class != WARRIOR. (Includes MAGE/CLERIC and also
+      ROGUE for FETCH_QUEST/PUZZLE_QUEST.)
+
+      6) TEMPORARILY_LOCKED (combat quests at high rep for non-Warriors): player_reputation
+      ≥ 80 AND completed_faction_quests ≥ 5 AND quest_type == COMBAT_ENCOUNTER AND
+      player_class != WARRIOR.
+    reasoning: >-
+      - `determine_quest_availability` first checks `_in_reputation_overflow_zone(...)`
+      and immediately returns `PERMANENTLY_BLOCKED` if it matches (applies to RivalFaction
+      too).
+
+      - Otherwise RivalFaction logic is entirely decided inside `_apply_faction_override`.
+
+      - The key gate is `player_reputation >= 80` and `completed_faction_quests >=
+      5`; failing either yields `TEMPORARILY_LOCKED`.
+
+      - Passing the gate produces mutually exclusive branches by `player_class` and
+      then by `quest_type` (Warrior hard-block; Rogue hidden only for MAIN_STORY/SIDE_QUEST;
+      non-combat conditional unlock; combat temporarily locked).
+  q2:
+    answer: >-
+      No. HOSTILE_EMPIRE can never offer FETCH_QUESTs as `FULLY_AVAILABLE`, `CONDITIONAL_UNLOCK`,
+      or `HIDDEN_QUESTLINE`.
+
+
+      Exact conditions:
+
+      - If completed_faction_quests < 10 OR player_reputation < 90 ⇒ `_apply_faction_override`
+      returns `PERMANENTLY_BLOCKED` for all quest types (including FETCH_QUEST).
+
+      - If completed_faction_quests ≥ 10 AND player_reputation ≥ 90 ⇒ FETCH_QUEST
+      hits the explicit exception and is still `PERMANENTLY_BLOCKED`.
+
+      - Additionally, the overflow dead-zone (rep 85–95, level 4–6, quests 8–12) also
+      forces `PERMANENTLY_BLOCKED` before any override, reinforcing that FETCH_QUEST
+      is never offered.
+    reasoning: >-
+      - For HOSTILE_EMPIRE, `_apply_faction_override` only returns `HIDDEN_QUESTLINE`,
+      `TEMPORARILY_LOCKED` (puzzle low-level), or `PERMANENTLY_BLOCKED`.
+
+      - The FetchQuest exception explicitly returns `PERMANENTLY_BLOCKED` even when
+      the hidden-questline gate is met.
+
+      - Any `PERMANENTLY_BLOCKED` result short-circuits in `determine_quest_availability`,
+      so later quorum/time/resource logic never gets a chance to make it available.
+  q3:
+    answer: >-
+      No, it does not ALWAYS result in `HIDDEN_QUESTLINE` for non-Fetch quests.
+
+
+      With HOSTILE_EMPIRE, reputation=90 and completed_faction_quests ≥ 10:
+
+      - It becomes `HIDDEN_QUESTLINE` for all non-FETCH quest types EXCEPT:
+        1) PUZZLE_QUEST with player_level < 8 ⇒ `TEMPORARILY_LOCKED`.
+        2) If the anti-exploit overflow dead zone triggers first (reputation 85–95
+      inclusive, player_level 4–6 inclusive, completed_faction_quests 8–12 inclusive)
+      ⇒ `PERMANENTLY_BLOCKED` even though the hidden gate is met. - If neither exception
+      applies, `HIDDEN_QUESTLINE` is returned and then short-circuited (no later checks
+      can prevent it).
+    reasoning: >-
+      - The function checks `_in_reputation_overflow_zone` before applying HostileEmpire
+      overrides; rep=90 is inside 85–95 and completed≥10 can be inside 8–12, so level
+      4–6 can force a hard block.
+
+      - Inside `_apply_faction_override` for HOSTILE_EMPIRE, the hidden gate is `completed_faction_quests
+      >= 10` and `player_reputation >= 90`.
+
+      - Even when that gate is met, PUZZLE_QUEST has an additional `player_level <
+      8` lock.
+
+      - When `_apply_faction_override` returns `HIDDEN_QUESTLINE`, `determine_quest_availability`
+      immediately returns it (no difficulty/time/gold/quorum checks can override it).
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:46'
+  q1:
+    answer: There are 6 distinct availability scenarios (logic paths) for RivalFaction
+      quests, determined by reputation, completed quests, player class, quest type,
+      and gold.
+    reasoning: >-
+      **Scenario 1: Anti-Exploit Block (Global)**
+
+      *   **Thresholds:** Player Reputation 85-95, Player Level 4-6, Completed Quests
+      8-12.
+
+      *   **Result:** `PERMANENTLY_BLOCKED` (Triggered before faction logic).
+
+
+      **Scenario 2: Low Standing (Untrusted)**
+
+      *   **Thresholds:** Player Reputation < 80 OR Completed Faction Quests < 5.
+
+      *   **Result:** `TEMPORARILY_LOCKED`.
+
+
+      **Scenario 3: Warrior Class Exclusion (High Standing)**
+
+      *   **Thresholds:** Reputation ≥ 80, Completed Quests ≥ 5, Player Class = `WARRIOR`.
+
+      *   **Result:** `PERMANENTLY_BLOCKED` (Warriors are never trusted).
+
+
+      **Scenario 4: Rogue Infiltration (High Standing)**
+
+      *   **Thresholds:** Reputation ≥ 80, Completed Quests ≥ 5, Player Class = `ROGUE`,
+      Quest Type = `MAIN_STORY` or `SIDE_QUEST`.
+
+      *   **Result:** `HIDDEN_QUESTLINE`.
+
+
+      **Scenario 5: Non-Combat Negotiation (High Standing)**
+
+      *   **Thresholds:** Reputation ≥ 80, Completed Quests ≥ 5, Quest Type is NOT
+      `COMBAT_ENCOUNTER`. (Applies to Mages/Clerics, and Rogues on non-Main/Side quests).
+
+      *   **Result:** `CONDITIONAL_UNLOCK` if Player Gold ≥ (Difficulty × 50), otherwise
+      `TEMPORARILY_LOCKED`.
+
+
+      **Scenario 6: Combat Restriction (High Standing)**
+
+      *   **Thresholds:** Reputation ≥ 80, Completed Quests ≥ 5, Quest Type = `COMBAT_ENCOUNTER`,
+      Player Class is NOT `WARRIOR`.
+
+      *   **Result:** `TEMPORARILY_LOCKED`.
+  q2:
+    answer: No, HostileEmpire can never offer FetchQuests in a playable state; they
+      are always permanently blocked.
+    reasoning: >-
+      *   **Default State:** For `HostileEmpire`, if the high-status prerequisites
+      (Quests ≥ 10, Reputation ≥ 90) are **not** met, the system defaults to `PERMANENTLY_BLOCKED`.
+
+      *   **High-Status Exception:** Even when the player meets the high-status prerequisites,
+      the code explicitly checks `if quest_type == QuestType.FETCH_QUEST`.
+
+      *   **Hard-Coded Block:** If it is a `FETCH_QUEST`, the system immediately returns
+      `PERMANENTLY_BLOCKED` (commented in code as "seen as beneath them").
+
+      *   **Implicit Availability:** Because `_apply_faction_override` only returns
+      Blocked, Hidden, or Locked states for the Hostile Empire, strictly "Fully Available"
+      is never an outcome for this faction regardless of quest type.
+  q3:
+    answer: No, meeting the general requirements does not always result in HiddenQuestline;
+      the request can be blocked or locked by two specific exception cases.
+    reasoning: >-
+      *   **Exception 1: Puzzle Quest Level Gate:** Even with high standing, if the
+      quest type is `PUZZLE_QUEST` and the `player_level < 8`, the result is downgraded
+      from `HIDDEN_QUESTLINE` to `TEMPORARILY_LOCKED`.
+
+      *   **Exception 2: Reputation Overflow Zone:** The function `_in_reputation_overflow_zone`
+      runs *before* the faction logic. If the player possesses `reputation=90` (which
+      falls in the 85-95 range) and `completed_faction_quests` is between 10 and 12
+      (inclusive), **AND** the `player_level` is between 4 and 6, the result will
+      be `PERMANENTLY_BLOCKED` regardless of the quest type.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:44'
+  q1:
+    answer: >-
+      There are 6 distinct quest availability scenarios for RivalFaction quests, determined
+      by these thresholds:
+
+
+      1. **PERMANENTLY_BLOCKED** (via overflow zone): reputation 85-95 AND player_level
+      4-6 AND completed_faction_quests 8-12
+
+      2. **PERMANENTLY_BLOCKED** (Warrior class): reputation ≥80 AND completed_faction_quests
+      ≥5 AND player_class=WARRIOR
+
+      3. **HIDDEN_QUESTLINE** (Rogue special): reputation ≥80 AND completed_faction_quests
+      ≥5 AND player_class=ROGUE AND quest_type in {MAIN_STORY, SIDE_QUEST}
+
+      4. **CONDITIONAL_UNLOCK** (Mage/Cleric/Rogue non-combat): reputation ≥80 AND
+      completed_faction_quests ≥5 AND quest_type ≠ COMBAT_ENCOUNTER AND (player_class
+      in {MAGE, CLERIC} OR (player_class=ROGUE AND quest_type not in {MAIN_STORY,
+      SIDE_QUEST})) — requires player_gold ≥ quest_difficulty*50 or falls to TEMPORARILY_LOCKED
+
+      5. **TEMPORARILY_LOCKED** (high rep but combat quest): reputation ≥80 AND completed_faction_quests
+      ≥5 AND quest_type = COMBAT_ENCOUNTER AND player_class ≠ WARRIOR
+
+      6. **TEMPORARILY_LOCKED** (insufficient rep/quests): reputation < 80 OR completed_faction_quests
+      < 5
+    reasoning: >-
+      - First check: _in_reputation_overflow_zone() blocks if reputation 85-95 AND
+      level 4-6 AND faction_quests 8-12
+
+      - Then _apply_faction_override() handles RivalFaction with nested logic:
+        - Base case: returns TEMPORARILY_LOCKED if reputation < 80 OR completed_faction_quests
+      < 5
+        - If reputation ≥ 80 AND completed_faction_quests ≥ 5:
+          - Warriors: PERMANENTLY_BLOCKED (never trusted)
+          - Rogues with MAIN_STORY or SIDE_QUEST: HIDDEN_QUESTLINE
+          - Non-COMBAT_ENCOUNTER quests (for Mage, Cleric, or Rogue with other quest
+      types): CONDITIONAL_UNLOCK
+          - COMBAT_ENCOUNTER quests: TEMPORARILY_LOCKED
+      - CONDITIONAL_UNLOCK then requires gold check (gold ≥ difficulty*50) in main
+      function
+
+      - The numeric thresholds are: reputation=80, completed_faction_quests=5, and
+      the overflow zone thresholds (85-95, 4-6, 8-12)
+  q2:
+    answer: >-
+      No, HostileEmpire can NEVER offer FetchQuests with a positive availability status.
+      FetchQuests from HostileEmpire always result in PERMANENTLY_BLOCKED.
+
+
+      The exact conditions are:
+
+      - If in overflow zone (reputation 85-95, level 4-6, faction_quests 8-12): PERMANENTLY_BLOCKED
+
+      - If NOT meeting hidden questline requirements (completed_faction_quests < 10
+      OR reputation < 90): PERMANENTLY_BLOCKED
+
+      - If meeting hidden questline requirements (completed_faction_quests ≥ 10 AND
+      reputation ≥ 90): FetchQuests are explicitly PERMANENTLY_BLOCKED because "they
+      are seen as beneath them"
+    reasoning: >-
+      - In _apply_faction_override() for HOSTILE_EMPIRE:
+        - First branch: if completed_faction_quests >= 10 AND player_reputation >=
+      90
+          - Inside this branch: FetchQuest is explicitly checked and returns PERMANENTLY_BLOCKED
+      ("seen as beneath them")
+        - Else branch: returns PERMANENTLY_BLOCKED for all quest types
+      - There is no code path where HostileEmpire + FetchQuest results in anything
+      other than PERMANENTLY_BLOCKED
+
+      - The only way to get positive outcomes (HIDDEN_QUESTLINE) from HostileEmpire
+      is with non-FetchQuest types
+
+      - Additionally, the overflow zone check happens before faction override and
+      would also block with PERMANENTLY_BLOCKED
+  q3:
+    answer: >-
+      No, this does NOT always result in HiddenQuestline. There are two factors that
+      can prevent it:
+
+
+      1. **Reputation Overflow Zone**: If player_level is 4-6 AND completed_faction_quests
+      is 8-12 (which includes 10, 11, 12), AND reputation is 85-95 (which includes
+      90-95), the quest is PERMANENTLY_BLOCKED before faction override logic is evaluated.
+
+
+      2. **PuzzleQuest with low level**: If quest_type is PUZZLE_QUEST and player_level
+      < 8, the result is TEMPORARILY_LOCKED instead of HIDDEN_QUESTLINE.
+    reasoning: >-
+      - The main function first checks _in_reputation_overflow_zone() BEFORE _apply_faction_override()
+
+      - Overflow zone triggers when: reputation 85-95 AND level 4-6 AND faction_quests
+      8-12
+
+      - With reputation=90 (in 85-95 range), completed_faction_quests=10 (in 8-12
+      range), if level is 4-6, it hits overflow zone → PERMANENTLY_BLOCKED
+
+      - Example: reputation=90, completed_faction_quests=10, level=5 → PERMANENTLY_BLOCKED
+      (not HiddenQuestline)
+
+      - Inside _apply_faction_override() for HOSTILE_EMPIRE when rep≥90 and quests≥10:
+        - FetchQuest → PERMANENTLY_BLOCKED (but question excludes this)
+        - PuzzleQuest with level<8 → TEMPORARILY_LOCKED
+        - All other non-FetchQuest types → HIDDEN_QUESTLINE
+      - So for MAIN_STORY, SIDE_QUEST, COMBAT_ENCOUNTER: would be HIDDEN_QUESTLINE
+      if not in overflow zone
+
+      - For PUZZLE_QUEST: need level≥8 AND not in overflow zone to get HIDDEN_QUESTLINE

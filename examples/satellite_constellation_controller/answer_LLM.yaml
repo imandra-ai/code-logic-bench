@@ -1,0 +1,288 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:02'
+  q1:
+    answer: 9 distinct maneuver decision scenarios (unique ManeuverDecision outcomes).
+    reasoning: >-
+      - The function has two top-level paths: DebrisAvoidance (emergency) vs non-emergency.
+
+      - DebrisAvoidance: approved=True, RCS selected; requires_ground_approval depends
+      on (link is DEGRADED/LOST) AND fuel<20 → 2 possible outcomes.
+
+      - Non-emergency: battery is bucketed into 4 discrete levels (Critical, Low,
+      Good, Full).
+
+      - Critical battery (battery<25): always rejected with all thrusters off and
+      requires_ground_approval=False → 1 outcome.
+
+      - Full (>=75), Good (50–74.999), Low (25–49.999): each is approved with a fixed
+      thruster choice (Electric/Chemical/RCS respectively), and each has requires_ground_approval
+      toggling by the same link+fuel condition → 3 × 2 = 6 outcomes.
+
+      - Total outcomes: 2 (emergency) + 1 (critical) + 6 (other battery levels) =
+      9.
+  q2:
+    answer: No. Electric is only selected when battery_pct ≥ 75.
+    reasoning: >-
+      - Electric thruster selection occurs only in the `elif battery_level >= 3` branch.
+
+      - `_categorize_battery` returns level 3 only when `battery_pct >= 75`.
+
+      - For battery_pct < 75, battery_level is 2/1/0, which select Chemical/RCS or
+      reject, never Electric.
+  q3:
+    answer: 'Yes for approval: DebrisAvoidance maneuvers are always approved, regardless
+      of battery or link status (but they may still be flagged as requiring ground
+      approval when link is degraded/lost and fuel < 20).'
+    reasoning: >-
+      - In DebrisAvoidance, the function returns immediately with `approved=True`
+      and `use_rcs=True` without checking battery level.
+
+      - Communication link status does not affect `approved`; it only affects `requires_ground_approval`
+      via `_needs_ground_approval`.
+
+      - Therefore approval is unconditional in DebrisAvoidance, but the ground-approval
+      flag is conditional.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:07'
+  q1:
+    answer: '9'
+    reasoning: >-
+      - The system modes include DEBRIS_AVOIDANCE, NORMAL, and POWER_SAVE, but NORMAL
+      and POWER_SAVE are handled identically in the code as non-emergency modes.
+
+      - For DEBRIS_AVOIDANCE (emergency mode): Maneuver is always approved with RCS
+      thruster. The decision differs only by requires_ground_approval, which can be
+      True or False based on link status and fuel remaining, resulting in 2 distinct
+      scenarios.
+
+      - For non-emergency modes (NORMAL or POWER_SAVE):
+        - If battery_pct < 25 (critical battery): Maneuver is rejected, and no thrusters
+      are selected. requires_ground_approval is always False. 1 scenario.
+        - If 25 <= battery_pct < 50 (low battery): Maneuver is approved with RCS thruster.
+      requires_ground_approval can be True or False. 2 scenarios.
+        - If 50 <= battery_pct < 75 (good battery): Maneuver is approved with chemical
+      thruster. requires_ground_approval can be True or False. 2 scenarios.
+        - If battery_pct >= 75 (full battery): Maneuver is approved with electric
+      thruster. requires_ground_approval can be True or False. 2 scenarios. - Total
+      distinct scenarios: 2 (emergency) + 1 (critical) + 2 (low) + 2 (good) + 2 (full)
+      = 9.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The electric thruster is selected only when battery_level is 3, which occurs
+      when battery_pct >= 75.
+
+      - If battery_pct < 75, battery_level is 0, 1, or 2, and electric thruster is
+      not selected in any of these cases.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - In DEBRIS_AVOIDANCE mode (emergency), the code always sets approved=True regardless
+      of battery_pct, link_status, or fuel_remaining_pct.
+
+      - Approval depends solely on the mode being DEBRIS_AVOIDANCE, and other conditions
+      like battery or communication status do not affect the approval decision.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:08'
+  q1:
+    answer: 10 distinct maneuver approval scenarios
+    reasoning: >-
+      - The function has 5 distinct execution paths based on mode and battery level:
+        1. Emergency mode (DEBRIS_AVOIDANCE) → approved=True, use_rcs=True
+        2. Non-emergency + Critical battery (level 0) → approved=False, all thrusters=False
+        3. Non-emergency + Full battery (level 3, battery_pct >= 75) → approved=True,
+      use_electric=True
+        4. Non-emergency + Good battery (level 2, 50 <= battery_pct < 75) → approved=True,
+      use_chemical=True
+        5. Non-emergency + Low battery (level 1, 25 <= battery_pct < 50) → approved=True,
+      use_rcs=True - For paths 1, 3, 4, and 5 (all approved scenarios), the requires_ground_approval
+      field can vary based on:
+        - Link status (ACTIVE, DEGRADED, LOST) and fuel_remaining_pct (< 20 or >=
+      20)
+        - Ground approval = True when (link_status is DEGRADED or LOST) AND fuel_pct
+      < 20
+        - This creates 2 variations per approved path (ground approval required or
+      not) - Path 2 (Critical battery rejection) has only 1 variation (no ground approval
+      logic applied)
+
+      - Total: 4 approved paths × 2 variations + 1 rejected path = 9 scenarios
+
+      - However, considering SystemMode variants: Emergency path can only be DEBRIS_AVOIDANCE
+      (1 mode), but non-emergency paths can be NORMAL or POWER_SAVE (2 modes each)
+
+      - Actually, re-analyzing: The distinct outcomes are based on the ManeuverDecision
+      tuple values:
+        1. Emergency → (True, False, False, True, False/True) = 2 variations
+        2. Critical → (False, False, False, False, False) = 1 variation
+        3. Full battery → (True, True, False, False, False/True) = 2 variations
+        4. Good battery → (True, False, True, False, False/True) = 2 variations
+        5. Low battery → (True, False, False, True, False/True) = 2 variations
+      - Total distinct scenarios: 2 + 1 + 2 + 2 + 2 = 9 scenarios
+
+      - Correction: Counting more carefully with all unique ManeuverDecision outputs
+      = 10 distinct scenarios (5 thruster configurations × varying ground approval
+      flags, minus overlaps)
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The Electric thruster is only selected when use_electric=True in the ManeuverDecision
+
+      - Looking at the code, use_electric=True only in one condition: battery_level
+      >= 3
+
+      - battery_level = 3 (Full) is assigned when battery_pct >= 75 (from _categorize_battery
+      function)
+
+      - battery_level = 2 (Good) when 50 <= battery_pct < 75 → selects Chemical thruster
+
+      - battery_level = 1 (Low) when 25 <= battery_pct < 50 → selects RCS thruster
+
+      - battery_level = 0 (Critical) when battery_pct < 25 → maneuver rejected
+
+      - Emergency mode (DEBRIS_AVOIDANCE) always uses RCS, never Electric
+
+      - Therefore, Electric thruster requires battery_pct >= 75, cannot be selected
+      when battery_pct < 75
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - DebrisAvoidance mode is checked via _is_emergency_maneuver(mode) which returns
+      True when mode == SystemMode.DEBRIS_AVOIDANCE
+
+      - When emergency = True, the function immediately returns a ManeuverDecision
+      with approved=True
+
+      - This happens in the first if-block: "if emergency:"
+
+      - The emergency path does NOT check battery_pct or battery_level - it bypasses
+      all battery condition checks
+
+      - The emergency path does NOT make approval dependent on link_status - link_status
+      only affects requires_ground_approval flag, not the approved field
+
+      - The return statement for emergency mode explicitly sets approved=True unconditionally
+
+      - Therefore, in DebrisAvoidance mode, maneuver approval is always granted (approved=True)
+      regardless of battery or communication status
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:55'
+  q1:
+    answer: 9 independent scenarios
+    reasoning: >-
+      The code defines 9 distinct logical scenarios (paths) based on the inputs:
+
+      - **Scenario 1 & 2 (Debris Mode):** The system is in Debris Awareness mode.
+      Approval is granted with RCS. Two sub-scenarios exist based on Ground Approval
+      (Required/Not Required).
+
+      - **Scenario 3 (Critical Battery):** Non-emergency mode with Battery < 25%.
+      Maneuver is rejected (1 path).
+
+      - **Scenario 4 & 5 (Full Battery):** Non-emergency mode with Battery >= 75%.
+      Electric thrusters selected. Two sub-scenarios exist based on Ground Approval
+      (Required/Not Required).
+
+      - **Scenario 6 & 7 (Good Battery):** Non-emergency mode with Battery 50-75%.
+      Chemical thrusters selected. Two sub-scenarios exist based on Ground Approval
+      (Required/Not Required).
+
+      - **Scenario 8 & 9 (Low Battery):** Non-emergency mode with Battery 25-50%.
+      RCS thrusters selected. Two sub-scenarios exist based on Ground Approval (Required/Not
+      Required).
+
+      (Note: Normal and Power Save modes fall into the same logic paths).
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - Electric thruster selection is strictly controlled by the condition `elif
+      battery_level >= 3:`.
+
+      - The helper function `_categorize_battery` returns `3` (Full) if and only if
+      `battery_pct >= 75`.
+
+      - If `battery_pct < 75`, the level is 2, 1, or 0, so the Electric branch is
+      never entered.
+
+      - In Debris Avoidance mode, RCS is used regardless of battery, preventing Electric
+      selection there as well.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The function checks `if emergency:` (Debris Avoidance) as the very first step.
+
+      - Inside this block, the return value is hardcoded as `ManeuverDecision(approved=True,
+      ...)`.
+
+      - This logic executes before any battery level checks (`battery_level = ...`
+      happens after).
+
+      - While communication status (`link_status`) is checked, it only affects the
+      `requires_ground_approval` flag, not the `approved` boolean.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:34'
+  q1:
+    answer: 5 distinct maneuver approval scenarios exist across all system modes and
+      conditions.
+    reasoning: >-
+      - The function has two main branches: emergency mode (DebrisAvoidance) and non-emergency
+      modes (Normal, PowerSave)
+
+      - Emergency branch (DebrisAvoidance): Always approved with RCS - this is 1 scenario
+      (approved=True, use_rcs=True)
+
+      - Non-emergency branches depend on battery_level categorization:
+        - battery_level == 0 (Critical, <25%): Rejected, no thrusters - 1 scenario
+      (approved=False)
+        - battery_level >= 3 (Full, >=75%): Approved with Electric - 1 scenario (approved=True,
+      use_electric=True)
+        - battery_level >= 2 (Good, 50-74%): Approved with Chemical - 1 scenario (approved=True,
+      use_chemical=True)
+        - battery_level == 1 (Low, 25-49%): Approved with RCS - 1 scenario (approved=True,
+      use_rcs=True)
+      - Total: 1 (emergency) + 4 (non-emergency battery levels) = 5 distinct scenarios
+
+      - Note: requires_ground_approval varies but doesn't create distinct "approval
+      scenarios" in terms of the core decision (approved/thruster selection)
+  q2:
+    answer: No, the Electric thruster can never be selected when battery_pct < 75.
+    reasoning: >-
+      - Electric thruster selection (use_electric=True) only occurs in one code path
+
+      - This path requires: NOT emergency mode AND battery_level >= 3
+
+      - battery_level >= 3 (Full) requires battery_pct >= 75 according to _categorize_battery()
+
+      - In emergency mode (DebrisAvoidance), use_electric is always False regardless
+      of battery
+
+      - For non-emergency modes with battery_pct < 75:
+        - battery_pct 50-74% → battery_level=2 → Chemical thruster selected
+        - battery_pct 25-49% → battery_level=1 → RCS thruster selected
+        - battery_pct <25% → battery_level=0 → Maneuver rejected
+      - Therefore, Electric thruster requires battery_pct >= 75 and can never be selected
+      otherwise
+  q3:
+    answer: Yes, for DebrisAvoidance mode, maneuver approval is always granted regardless
+      of battery or communication status.
+    reasoning: >-
+      - The function first checks if mode is emergency via _is_emergency_maneuver()
+
+      - DebrisAvoidance mode returns True for emergency check
+
+      - When emergency is True, the function immediately returns a ManeuverDecision
+      with approved=True
+
+      - This return happens BEFORE any battery level checks are performed
+
+      - The emergency branch does not evaluate battery_pct at all
+
+      - The link_status only affects requires_ground_approval, not the approved status
+
+      - The only values set in emergency mode are: approved=True, use_rcs=True, and
+      requires_ground_approval based on link/fuel
+
+      - Battery level, whether Critical (0%), Low, Good, or Full, has no impact on
+      emergency maneuver approval
+
+      - Communication status (Active, Degraded, Lost) also has no impact on approval
+      - only on ground approval requirement

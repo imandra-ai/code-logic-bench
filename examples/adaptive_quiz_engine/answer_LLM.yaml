@@ -1,0 +1,563 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:23'
+  q1:
+    answer: 'There are 5 distinct progression scenarios: (1) Invalid progression,
+      (2) Emergency reset, (3) Increase difficulty, (4) Maintain difficulty, and (5)
+      Decrease difficulty. The exact numeric thresholds are: for Invalid: total_answered
+      5-7 with correct_answered 2-3 and current_streak 0; for Emergency reset: total_answered
+      >=10 with either correct_answered/total_answered <20 or current_confidence <15;
+      for Increase: if result=CORRECT with current_streak >=3 and response_time <
+      (avg_response_time * 80 // 100) and confidence_level >=7; for Decrease: if result=INCORRECT
+      with current_streak==0 and response_time > (avg_response_time * 150 // 100),
+      or if result=TIMEOUT.'
+    reasoning: >-
+      - The function has early returns for invalid progression (sets difficulty to
+      EASY, intervention=True, valid=False) and emergency reset (sets difficulty to
+      EASY, intervention=True, emergency=True).
+
+      - In normal progression, difficulty increases if conditions met, decreases if
+      others met, otherwise maintains.
+
+      - Thresholds are derived from the helper functions _is_valid_progression, _needs_emergency_reset,
+      _should_increase_difficulty, and _should_decrease_difficulty.
+  q2:
+    answer: Yes, a student with current_streak >= 3 can trigger an emergency reset
+      if total_answered >= 10 and either correct_answered * 100 // total_answered
+      < 20 or current_confidence < 15.
+    reasoning: >-
+      - The emergency reset condition in _needs_emergency_reset does not check current_streak
+      at all.
+
+      - It only depends on total_answered, correct_answered, and current_confidence.
+
+      - Therefore, if a student has a high streak but poor overall performance or
+      very low confidence, emergency reset can occur.
+  q3:
+    answer: No, the safety property 'emergency reset always sets difficulty to Easy
+      and enables intervention' cannot be violated. This holds even at boundary conditions
+      such as total_answered = 10, correct_answered/total_answered = 20 exactly (where
+      <20 is false, but confidence <15 could still trigger), or current_confidence
+      = 15 exactly (where <15 is false, but the other condition could trigger).
+    reasoning: >-
+      - In the code, emergency reset is checked after validity, and if emergency is
+      True, it directly returns ProgressionDecision with new_difficulty=DifficultyLevel.EASY
+      and intervention_needed=True.
+
+      - There are no conditional branches within this return that could alter the
+      difficulty or intervention settings.
+
+      - Boundary cases like exact equality in thresholds still result in the emergency
+      path if any sub-condition is met, and the return remains the same.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:39'
+  q1:
+    answer: >-
+      There are 3 distinct progression scenarios:
+
+      1. Invalid progression (sets difficulty to EASY, intervention=True, confidence_change=0,
+      valid_progression=False, emergency_reset=False)
+
+      2. Emergency reset (sets difficulty to EASY, intervention=True, confidence_change=20,
+      valid_progression=True, emergency_reset=True)
+
+      3. Normal progression (adjusts difficulty based on performance, calculates intervention
+      based on quorum voting, applies confidence changes, valid_progression=True,
+      emergency_reset=False)
+
+
+      Key numeric thresholds:
+
+      - Invalid progression: (5 <= total_answered <= 7) AND (2 <= correct_answered
+      <= 3) AND (current_streak == 0) OR (correct_answered > total_answered) OR (current_streak
+      < 0)
+
+      - Emergency reset: (total_answered >= 10) AND ((correct_answered * 100 // total_answered
+      < 20) OR (current_confidence < 15))
+
+      - Difficulty increase: (result == CORRECT) AND (current_streak >= 3) AND (response_time
+      < avg_time * 0.8) AND (confidence_level >= 7)
+
+      - Difficulty decrease: ((result == INCORRECT) AND (current_streak == 0) AND
+      (response_time > avg_time * 1.5)) OR (result == TIMEOUT)
+    reasoning: >-
+      - The function has three distinct return paths, each representing a different
+      progression scenario
+
+      - First scenario: Invalid progression detected by _is_valid_progression() -
+      returns fixed values
+
+      - Second scenario: Emergency reset detected by _needs_emergency_reset() - returns
+      fixed values with special confidence boost
+
+      - Third scenario: Normal progression - dynamically calculates all values based
+      on performance
+
+      - Invalid progression thresholds: "dead zone" at 5-7 questions with 2-3 correct
+      and 0 streak, OR invalid data (correct > total or streak < 0)
+
+      - Emergency reset thresholds: At least 10 questions answered AND (success rate
+      < 20% OR confidence < 15)
+
+      - Normal progression uses multiple sub-thresholds for difficulty adjustments
+      and intervention decisions
+
+      - Difficulty increase requires: streak >= 3, response time < 80% of average,
+      confidence_level >= 7, and correct answer
+
+      - Difficulty decrease requires: TIMEOUT result OR (INCORRECT with streak ==
+      0 and response time > 150% of average)
+
+      - Intervention uses quorum voting requiring 2 of 4 conditions to be met
+  q2:
+    answer: No, a student with current_streak >= 3 can never trigger an emergency
+      reset.
+    reasoning: >-
+      - Emergency reset is checked via _needs_emergency_reset() which only examines:
+      current_confidence, total_answered, and correct_answered
+
+      - The function does NOT check current_streak at all
+
+      - However, for emergency reset to trigger: total_answered >= 10 AND (correct_answered
+      * 100 // total_answered < 20 OR current_confidence < 15)
+
+      - For current_streak >= 3, the student must have at least 3 consecutive correct
+      answers
+
+      - This means correct_answered must be at least 3
+
+      - If total_answered >= 10 and correct_answered >= 3, the minimum success rate
+      is 3/10 = 30%
+
+      - 30% > 20%, so the first condition (success rate < 20%) cannot be met
+
+      - However, the second condition (current_confidence < 15) could theoretically
+      still trigger
+
+      - BUT: emergency reset is only checked if progression is valid, and with streak
+      >= 3 and enough correct answers to maintain that streak, it's extremely difficult
+      to have confidence < 15
+
+      - More importantly: mathematically, if streak >= 3 and total >= 10, then correct
+      >= 3, giving minimum 30% success rate, which fails the < 20% threshold
+
+      - The only remaining path would be current_confidence < 15, but this would require
+      unusual parameter combinations
+
+      - Actually, re-examining: if current_streak >= 3, then correct_answered >= 3.
+      With total_answered = 10, that's 30% success rate (>= 20%), so the rate check
+      fails. Emergency could still trigger if current_confidence < 15
+
+      - Therefore, YES it's technically possible if current_confidence < 15, regardless
+      of success rate being >= 20%
+  q3:
+    answer: 'Yes, the safety property can be violated in one specific case: when the
+      progression state is invalid (in the "dead zone" or has invalid data), the function
+      returns difficulty=EASY and intervention_needed=True, but sets emergency_reset=False
+      instead of True. This is technically not an emergency reset scenario, but it
+      uses the same recovery strategy without marking it as such.'
+    reasoning: >-
+      - The safety property states: "emergency reset always sets difficulty to Easy
+      and enables intervention"
+
+      - When emergency_reset=True, the code always sets new_difficulty=DifficultyLevel.EASY
+      and intervention_needed=True (lines in emergency block)
+
+      - This appears to always hold for actual emergency resets
+
+      - However, there's an edge case with the invalid progression path
+
+      - When _is_valid_progression() returns False, the function returns difficulty=EASY
+      and intervention_needed=True, BUT emergency_reset=False
+
+      - This creates a scenario where the same "safety" actions are taken (EASY difficulty
+      + intervention) but emergency_reset flag is False
+
+      - The question is whether this violates the property - it depends on interpretation
+
+      - If the property means "whenever emergency_reset=True, then difficulty=EASY
+      and intervention=True", then NO violation occurs
+
+      - If the property means "the only way to get both difficulty=EASY and intervention=True
+      is via emergency reset", then YES violation occurs in invalid progression case
+
+      - The most literal interpretation: "emergency reset always sets difficulty to
+      Easy and enables intervention" - this is never violated
+
+      - The emergency reset path (emergency=True block) always sets both correctly
+
+      - There's no code path where emergency_reset=True but the difficulty is not
+      EASY or intervention is not True
+
+      - Therefore, the safety property as stated is NEVER violated
+
+      - Edge cases checked: all three return paths maintain the property for their
+      respective emergency_reset values
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:40'
+  q1:
+    answer: >-
+      There are 5 distinct progression scenarios (top-level return paths) in determine_student_progression:
+
+      1) Invalid/ambiguous progression → forced Easy + intervention (emergency_reset=False).
+
+      2) Emergency reset → forced Easy + intervention (emergency_reset=True).
+
+      3) Normal progression with difficulty increase.
+
+      4) Normal progression with difficulty decrease.
+
+      5) Normal progression with difficulty unchanged.
+
+
+      Exact numeric thresholds that define these scenarios:
+
+      - Invalid/ambiguous progression (checked first):
+        • “Dead zone” invalid: 5 ≤ total_answered ≤ 7 AND 2 ≤ correct_answered ≤ 3
+      AND current_streak == 0.
+        • Or invalid data: correct_answered > total_answered OR current_streak < 0.
+      - Emergency reset (checked second, only if valid):
+        • total_answered ≥ 10 AND ( floor(correct_answered*100/total_answered) < 20
+      OR current_confidence < 15 ). - Difficulty increase (normal path):
+        • result == CORRECT AND current_streak ≥ 3 AND response_time < floor(avg_time*80/100)
+      AND confidence_level ≥ 7. - Difficulty decrease (normal path):
+        • Either: result == INCORRECT AND current_streak == 0 AND response_time >
+      floor(avg_time*150/100)
+        • Or: result == TIMEOUT (always decreases).
+      - Difficulty unchanged: when neither increase nor decrease condition holds.
+    reasoning: >-
+      - The function has two early returns (invalid-state return, emergency return),
+      then one normal-return block.
+
+      - Inside the normal block, difficulty selection is a 3-way if/elif/else: increase
+      / decrease / unchanged.
+
+      - The numeric thresholds are encoded directly via comparisons and integer math
+      (//) in helper predicates:
+        - Dead zone: total_answered in [5,7], correct_answered in [2,3], streak==0.
+        - Emergency: total_answered>=10 plus accuracy%<20 or confidence<15.
+        - Increase: streak>=3, time < 80% avg, confidence_level>=7, and correct.
+        - Decrease: incorrect with streak==0 and time >150% avg, or timeout unconditional.
+      - Difficulty bounds: increase clamps to max value 4 (EXPERT) and decrease clamps
+      to min value 1 (EASY).
+  q2:
+    answer: >-
+      Yes. A student with current_streak ≥ 3 can trigger an emergency reset.
+
+
+      Exact conditions:
+
+      - The progression state must be valid (i.e., NOT in the dead zone and not invalid
+      data).
+
+      - Then emergency reset triggers whenever:
+        total_answered ≥ 10 AND ( floor(correct_answered*100/total_answered) < 20
+      OR current_confidence < 15 ).
+
+      Note: current_streak is not referenced in the emergency-reset check, so having
+      a streak ≥ 3 does not prevent emergency_reset.
+    reasoning: >-
+      - Emergency is computed by _needs_emergency_reset(current_confidence, total_answered,
+      correct_answered), which ignores current_streak entirely.
+
+      - The only gate before emergency is _is_valid_progression(...), where streak
+      matters only for the dead-zone condition (requires streak==0) or if streak<0.
+
+      - Therefore streak≥3 will typically pass validity, allowing emergency to be
+      evaluated and possibly triggered.
+  q3:
+    answer: >-
+      No—within this function, the safety property is not violated: whenever emergency_reset
+      is True, the function always returns new_difficulty = EASY and intervention_needed
+      = True.
+
+
+      Edge/boundary notes:
+
+      - Validity check happens before emergency. If the data is invalid/ambiguous,
+      the function returns EASY + intervention_needed=True but sets emergency_reset=False.
+      So you can have “severe struggle” inputs that would meet the emergency predicate,
+      but they will not be labeled as an emergency reset because the invalid-state
+      return happens first.
+
+      - Boundary conditions for the emergency predicate:
+        • accuracy exactly 20% does NOT trigger (needs < 20 due to integer floor division).
+        • current_confidence exactly 15 does NOT trigger (needs < 15).
+        • total_answered exactly 10 is sufficient (≥ 10).
+      - No branch sets emergency_reset=True without also setting EASY and intervention_needed=True;
+      both are hardcoded in that return object.
+    reasoning: >-
+      - In the emergency branch, ProgressionDecision is constructed with new_difficulty=EASY
+      and intervention_needed=True unconditionally.
+
+      - There is no later mutation of the returned decision.
+
+      - The only earlier return (invalid progression) also forces EASY + intervention_needed=True,
+      but does not claim emergency_reset=True.
+
+      - The only potential “semantic” surprise is ordering: invalid progression prevents
+      the emergency flag from ever being set, even if the emergency predicate would
+      have been true, but this does not violate the stated property as written (conditioned
+      on emergency_reset being set).
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:38'
+  q1:
+    answer: >-
+      There are 5 distinct progression scenarios in the function logic. The specific
+      numeric thresholds are defined below by the priority in which they are evaluated:
+
+
+      1. **Invalid/Dead Zone (Immediate Return)**
+         - **Thresholds:**
+           - Dead Zone: `5 <= total_answered <= 7` AND `2 <= correct_answered <= 3`
+      AND `current_streak == 0`.
+           - Data Validity: `correct_answered > total_answered` OR `current_streak
+      < 0`.
+
+      2. **Emergency Reset (Immediate Return)**
+         - **Thresholds:** `total_answered >= 10` AND (`(correct_answered / total_answered)
+      < 20%` OR `current_confidence < 15`).
+
+      3. **Increase Difficulty**
+         - **Thresholds:** `result == CORRECT` AND `current_streak >= 3` AND `response_time
+      < (avg_time * 0.8)` AND `confidence_level >= 7` (Self-reported).
+
+      4. **Decrease Difficulty**
+         - **Thresholds:**
+           - Path A: `result == INCORRECT` AND `current_streak == 0` AND `response_time
+      > (avg_time * 1.5)`.
+           - Path B: `result == TIMEOUT` (Absolute condition).
+
+      5. **Maintain Difficulty**
+         - **Thresholds:** Any valid state that does not meet the specific criteria
+      for Emergency, Increase, or Decrease (e.g., partial answers, slow correct answers,
+      or incorrect answers without significant time lag).
+    reasoning: >-
+      - **Scenario 1 (Invalid):** The code first checks `_is_valid_progression`. This
+      isolates the "Dead Zone" (specific questions 5-7 count with 2-3 correct) and
+      invalid arithmetic states.
+
+      - **Scenario 2 (Emergency):** If valid, the code checks `_needs_emergency_reset`.
+      This looks for severe struggle (>10 questions with <20% accuracy or dangerous
+      confidence dip <15). This forces a reset before normal processing.
+
+      - **Scenario 3 (Increase):** Defined in `_should_increase_difficulty`. It requires
+      a strict combination of speed (fast), consistency (streak), and self-confidence.
+
+      - **Scenario 4 (Decrease):** Defined in `_should_decrease_difficulty`. It triggers
+      on specific "struggle" signals (slow incorrects) or timeouts.
+
+      - **Scenario 5 (Maintain):** This is the logical `else` fallback when neither
+      increase nor decrease conditions are met after the validity and emergency checks
+      pass.
+  q2:
+    answer: >-
+      Yes, a student with `current_streak >= 3` can trigger an emergency reset.
+
+
+      **Exact Conditions:**
+
+      1. **Volume:** `total_answered >= 10`.
+
+      2. **Failure Criteria:** The student must satisfy at least one of the emergency
+      logic gates:
+         - **Low Confidence:** `current_confidence < 15`. (A student enters the question
+      with very low confidence from previous history, even if they have recently answered
+      3 in a row correctly).
+         - **Low Cumulative Accuracy:** `(correct_answered * 100 // total_answered)
+      < 20`. (A student has a very poor historical ratio, e.g., `total_answered =
+      16`, `correct_answered = 3`. Here, accuracy is ~18%, but the `current_streak`
+      is exactly 3). 3. **Execution Order:** The `_needs_emergency_reset` function
+      is called **before** the code processes difficulty adjustments or `current_streak`
+      logic, and the reset function itself does not check `current_streak`.
+    reasoning: >-
+      - **Function Logic:** The `determine_student_progression` function calls `_needs_emergency_reset`
+      strictly based on `current_confidence`, `total_answered`, and `correct_answered`.
+      It passes the defined arguments, effectively ignoring `current_streak` for this
+      specific check.
+
+      - **Low Confidence Case:** It is possible to reach `streak >= 3` while `confidence`
+      remains below 15. For example, if a student started with 0 confidence, three
+      Consecutive Correct answers (+3 or +5 boost valid on answer result) might only
+      raise confidence to 9 or 15 (exclusive of the check) depending on previous state.
+      Since the check uses `current_confidence` (the value *before* the current update),
+      the reset triggers.
+
+      - **Low Accuracy Case:** Mathematically, `3 / total < 0.20` is solvable for
+      `total > 15`. If a student has answered 16 questions and only got the last 3
+      correct (Streak=3), their total correct is 3. `3/16 = 18.75%`. This satisfies
+      the condition `< 20%`.
+  q3:
+    answer: >-
+      No, the safety property cannot be violated given the current implementation.
+
+
+      **Edge Cases & Analysis:**
+
+      - **Explicit Definition:** The implementation of the emergency block explicitly
+      hardcodes `new_difficulty=DifficultyLevel.EASY` and `intervention_needed=True`.
+      There is no conditional logic *inside* that block that could alter these values.
+
+      - **Zero Division Protection (Boundary Condition):** There is a potential division
+      by zero in `_needs_emergency_reset` (`correct_answered * 100 // total_answered`).
+      However, because Python uses short-circuit evaluation for boolean `and` operations,
+      the condition `total_answered >= 10` is evaluated first. If `total_answered`
+      is 0 (or any number < 10), the division is never executed, preventing a crash.
+
+      - **Preemption by Invalid State:** If a state is "Invalid" (e.g., `correct >
+      total`), the code returns early via the `valid` check. While this preempts the
+      `emergency_reset` flag (setting it to False), it rigorously upholds the safety
+      outcome: it forces `DifficultyLevel.EASY` and `intervention_needed=True`. Therefore,
+      even in malformed data states, the system fails safe to the intervention/easy
+      state.
+    reasoning: >-
+      - **Code Path:** `if emergency:` returns a `ProgressionDecision` constructor.
+      Arguments are static literals (`DifficultyLevel.EASY`, `True`). There are no
+      variables involved in setting these safety fields.
+
+      - **Short-Circuiting:** The `_needs_emergency_reset` function protects the division
+      operation: `return total_answered >= 10 and (correct_answered * 100 // total_answered
+      < 20 ...)`. If `total_answered` is 0, the first operand is False, and the interpreter
+      skips the division.
+
+      - **Atomic Operations:** The logic ensures there are no ambiguous paths where
+      an emergency is detected but the difficulty remains High or Intervention is
+      False. The only logic that supersedes the emergency check is the `valid` check,
+      which produces the exact same "safe" output configuration (Easy + Intervention).
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:45'
+  q1:
+    answer: >-
+      There are 3 distinct progression scenarios in determine_student_progression:
+      (1) Invalid Progression, (2) Emergency Reset, and (3) Normal Progression. The
+      exact numeric thresholds are:
+
+
+      **Invalid Progression (Dead Zone):**
+
+      - 5 <= total_answered <= 7 AND 2 <= correct_answered <= 3 AND current_streak
+      == 0
+
+      - OR correct_answered > total_answered OR current_streak < 0
+
+
+      **Emergency Reset:**
+
+      - total_answered >= 10 AND (correct_answered * 100 // total_answered < 20 OR
+      current_confidence < 15)
+
+
+      **Normal Progression (with sub-scenarios for difficulty adjustment):**
+
+      - Difficulty Increase: result == CORRECT AND current_streak >= 3 AND response_time
+      < (avg_time * 80 // 100) AND confidence_level >= 7
+
+      - Difficulty Decrease: (result == INCORRECT AND current_streak == 0 AND response_time
+      > (avg_time * 150 // 100)) OR result == TIMEOUT
+
+      - Difficulty Unchanged: all other cases
+    reasoning: >-
+      - The function has three main decision branches that determine the progression
+      scenario
+
+      - First branch: Invalid progression check via _is_valid_progression() - triggers
+      when in "dead zone" (5-7 questions, 2-3 correct, streak 0) or invalid data (correct
+      > total or streak < 0)
+
+      - Second branch: Emergency reset check via _needs_emergency_reset() - requires
+      total_answered >= 10 AND either accuracy < 20% OR confidence < 15
+
+      - Third branch: Normal progression - includes sub-logic for difficulty increase
+      (streak >= 3, fast response < 80% avg, confidence >= 7, correct answer), difficulty
+      decrease (incorrect with streak 0 and slow response > 150% avg, or timeout),
+      or no change
+
+      - The intervention check uses quorum voting with 4 conditions: c1 (accuracy
+      < 40% with 5+ questions), c2 (streak 0 with 5+ questions), c3 (confidence <
+      30), c4 (accuracy < 25% with 8+ questions) - needs 2+ conditions true
+  q2:
+    answer: >-
+      Yes, a student with current_streak >= 3 can trigger an emergency reset. The
+      exact conditions are:
+
+
+      total_answered >= 10 AND (correct_answered * 100 // total_answered < 20 OR current_confidence
+      < 15)
+
+
+      For example: A student with current_streak = 3, total_answered = 10, correct_answered
+      = 1 (10% accuracy), current_confidence = 50 would trigger an emergency reset.
+      This scenario is possible if a student had many incorrect answers initially
+      and then started a correct streak at the end.
+    reasoning: >-
+      - The _needs_emergency_reset() function only checks: total_answered >= 10 AND
+      (correct_answered * 100 // total_answered < 20 OR current_confidence < 15)
+
+      - current_streak is NOT a factor in the emergency reset determination
+
+      - A student could have a high current_streak (e.g., 3 or more consecutive correct
+      answers recently) while still having very low overall statistics
+
+      - Example scenario: Student answers 10 questions, gets 0-1 correct for the first
+      7, then gets 3 correct in a row (current_streak = 3)
+
+      - With total_answered = 10 and correct_answered = 3, accuracy would be 30% which
+      does NOT trigger emergency reset via accuracy
+
+      - However, with correct_answered = 1 and total_answered = 10, accuracy = 10%
+      which DOES trigger reset, even with streak >= 3
+
+      - Alternatively, if current_confidence < 15 (regardless of streak), emergency
+      reset triggers
+
+      - The streak only reflects recent consecutive correct answers, not overall performance
+  q3:
+    answer: >-
+      No, the safety property 'emergency reset always sets difficulty to Easy and
+      enables intervention' cannot be violated under the current implementation. When
+      emergency_reset=True is returned, the code explicitly sets new_difficulty=DifficultyLevel.EASY
+      and intervention_needed=True in the same return statement.
+
+
+      However, there is an important edge case to note: The Invalid Progression scenario
+      sets new_difficulty=EASY and intervention_needed=True but sets emergency_reset=False.
+      This is NOT a violation because these are different scenarios - the safety property
+      only applies when emergency_reset is True.
+
+
+      There are no race conditions, alternate code paths, or boundary conditions that
+      could cause emergency_reset=True to be returned with a different difficulty
+      or intervention_needed=False.
+    reasoning: >-
+      - The emergency reset logic is contained in a single code block starting at
+      line checking `if emergency:`
+
+      - When emergency is True, the function immediately returns a ProgressionDecision
+      with hardcoded values:
+        - new_difficulty=DifficultyLevel.EASY (always)
+        - intervention_needed=True (always)
+        - emergency_reset=True (always)
+      - There is no conditional logic within this return statement that could alter
+      these values
+
+      - The emergency check happens AFTER the validity check, so if validity fails,
+      we get invalid progression (not emergency reset)
+
+      - The validity check returns emergency_reset=False with EASY difficulty and
+      intervention=True, but this is NOT an emergency reset
+
+      - No code path can set emergency_reset=True while setting difficulty to anything
+      other than EASY
+
+      - No code path can set emergency_reset=True while setting intervention_needed=False
+
+      - The confidence_change is set to 20 (boost) during emergency, which is a fixed
+      value
+
+      - Edge case: If both invalid progression AND emergency conditions are met, invalid
+      progression takes precedence (checked first), but this doesn't violate the safety
+      property since emergency_reset would be False
+
+      - Integer division edge case: The accuracy calculation uses integer division
+      (correct_answered * 100 // total_answered), but this doesn't affect the safety
+      property - it only affects WHEN emergency triggers, not WHAT happens during
+      emergency

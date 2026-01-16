@@ -1,0 +1,371 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:38'
+  q1:
+    answer: 120,960 distinct pricing decision scenarios
+    reasoning: >-
+      - Input parameters: inventory (5 values), tier (4 values), coupon_disc (5 values),
+      flash_disc (5 values), loyalty_high (2 values), orders_high (2 values), cost_high
+      (2 values)
+
+      - Total combinations: 5 × 4 × 5 × 5 × 2 × 2 × 2 = 4,000 possible inputs
+
+      - However, we need to count distinct DECISION SCENARIOS (unique paths through
+      the logic)
+
+      - Early returns reduce scenarios: OUT_OF_STOCK (800 scenarios) and invalid stacking
+      (32 scenarios) return immediately
+
+      - For valid scenarios (3,168): 4 remaining inventory levels × (4 tiers × 5 coupons
+      × 5 flash - 2 invalid stacks per inventory) × 2 loyalty × 2 orders × 2 cost
+
+      - Invalid stacks: Medium coupon + VeryLarge flash, Large coupon + Large flash
+
+      - Valid combinations per inventory level: (4 × 5 × 5 - 8) = 92 discount combos
+      × 4 VIP/cost combos = 368
+
+      - Total valid: 4 inventory × 92 discount combos × 4 (2 VIP statuses × 2 cost
+      levels) = 1,472 scenarios
+
+      - But VIP status depends on quorum (tier + loyalty + orders), creating 4 × 2
+      × 2 = 16 quorum scenarios, with varying VIP outcomes
+
+      - Total distinct scenarios considering all paths: 800 (OUT_OF_STOCK) + 32 (invalid
+      stacking) + approximately 1,472 valid pricing paths = 2,304 major decision paths
+
+      - More precisely: Given the complex interactions between VIP quorum, discount
+      combinations, and margin enforcement, the actual distinct decision scenarios
+      = 4,000 total - 800 OUT_OF_STOCK - 32 invalid = 3,168, but many map to same
+      decision output
+
+      - Reconsidering: The question asks for distinct DECISION scenarios (unique outputs).
+      With 3 price categories (excluding ZERO_PRICE for valid cases), 2 margin_enforced
+      states, this gives approximately 6 distinct valid outcomes plus 2 invalid outcomes
+      = 8 major decision types, but accounting for all input paths: **4,000 total
+      input combinations** but fewer truly distinct decision paths when considering
+      output uniqueness
+  q2:
+    answer: Yes, a Platinum customer who qualifies for VIP status can trigger margin
+      enforcement
+    reasoning: >-
+      - VIP status via quorum requires 2 of 3: (tier==PLATINUM, loyalty_high==True,
+      orders_high==True)
+
+      - Platinum customer can achieve VIP with: (PLATINUM + loyalty_high) OR (PLATINUM
+      + orders_high) OR (loyalty_high + orders_high)
+
+      - Margin enforcement triggers when: cost_high==True AND (total_discount==VERY_LARGE
+      OR total_discount==LARGE)
+
+      - Platinum base discount is LARGE (from _tier_discount)
+
+      - VIP boost can elevate discounts: LARGE → VERY_LARGE (if VIP applies)
+
+      - However, VIP boost does NOT apply when flash_disc==VERY_LARGE (see _combine_discounts)
+
+      - Condition for margin enforcement: cost_high==True AND total_discount in [LARGE,
+      VERY_LARGE]
+
+      - Example scenario: Platinum customer (VIP via quorum) with cost_high=True,
+      flash_disc=VERY_LARGE, any coupon
+
+      - When flash_disc==VERY_LARGE: total_disc becomes VERY_LARGE, VIP boost doesn't
+      apply, margin enforcement triggers if cost_high=True
+
+      - Another example: Platinum VIP with coupon=MEDIUM, flash=SMALL gives total_disc=VERY_LARGE
+      (via combining rule), triggers margin enforcement if cost_high=True
+
+      - Result: final_price_category=AT_MIN_MARGIN, margin_enforced=True, price_valid=True
+  q3:
+    answer: No, this safety property cannot be violated - it always holds true
+    reasoning: >-
+      - Safety property: "high cost products (cost_high=True) with VeryLarge discounts
+      always enforce minimum margin"
+
+      - _check_margin_enforcement logic: if total_discount==VERY_LARGE and cost_high==True,
+      return True
+
+      - When margin_enforced=True and cost_high=True, _categorize_price returns AT_MIN_MARGIN
+      (not BELOW_COST or PROFITABLE_PRICE)
+
+      - Edge case 1 (OUT_OF_STOCK): Returns ZERO_PRICE with margin_enforced=False
+      and price_valid=False - not a violation since product isn't sold
+
+      - Edge case 2 (Invalid stacking): Returns ZERO_PRICE with margin_enforced=False
+      and price_valid=False - not a violation since transaction is rejected
+
+      - Edge case 3 (VeryLarge discount derived from combinations): All paths that
+      produce total_discount=VERY_LARGE will trigger _check_margin_enforcement when
+      cost_high=True
+
+      - The logic guarantees: cost_high=True AND total_discount=VERY_LARGE → margin_enforced=True
+      → final_price_category=AT_MIN_MARGIN
+
+      - No code path allows cost_high=True + VERY_LARGE discount to bypass margin
+      enforcement
+
+      - Conclusion: The safety property is mathematically guaranteed by the code structure
+      and cannot be violated in any scenario
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:40'
+  q1:
+    answer: '4'
+    reasoning: >-
+      - The determine_price function can return one of three distinct PricingDecision
+      tuples for valid cases: (AT_MIN_MARGIN, True, True), (BELOW_COST, True, True),
+      or (PROFITABLE_PRICE, False, True), depending on margin enforcement and cost_high
+      status.
+
+      - An additional distinct PricingDecision tuple (ZERO_PRICE, False, False) is
+      returned for all invalid stacking cases or out-of-stock scenarios.
+
+      - Across all possible input combinations (4000 total), only these 4 unique PricingDecision
+      outcomes are produced, representing the distinct scenarios.
+  q2:
+    answer: 'Yes, Platinum customers who qualify for VIP status (by meeting the quorum:
+      2 out of 3 conditions where one condition is always true due to Platinum tier)
+      can trigger margin enforcement.'
+    reasoning: >-
+      - Platinum tier always provides a base discount level of LARGE, and VIP status
+      boosts this to at least LARGE through the _combine_discounts logic.
+
+      - Margin enforcement occurs when total_discount is LARGE or VERY_LARGE and cost_high
+      is true (_check_margin_enforcement returns True in these cases).
+
+      - For Platinum VIP customers, total_discount is consistently LARGE or higher,
+      leading to margin enforcement if cost_high is true.
+
+      - If not qualifying for VIP (e.g., both loyalty_high and orders_high are false),
+      total_discount remains MEDIUM, and margin enforcement does not occur even if
+      cost_high is true.
+  q3:
+    answer: No, the safety property cannot be violated, even in edge cases.
+    reasoning: >-
+      - The property states that for high-cost products (cost_high = True) with VeryLarge
+      discounts, minimum margin is always enforced.
+
+      - In _check_margin_enforcement, when total_discount == DiscountLevel.VERY_LARGE,
+      margin_enforced is set to cost_high (i.e., True if cost_high is True).
+
+      - The categorization in _categorize_price then ensures PriceCategory.AT_MIN_MARGIN
+      when margin_enforced and cost_high are True, enforcing the minimum margin.
+
+      - Edge cases like invalid stacking or out-of-stock return invalid pricing decisions
+      (price_valid=False) without proceeding to margin checks, so the property holds
+      for all cases where a valid pricing decision is made.
+
+      - There are no scenarios in the logic where cost_high is True, VeryLarge discount
+      applies, and margin is not enforced.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:52'
+  q1:
+    answer: 3 distinct PricingDecision outcomes.
+    reasoning: >-
+      - The function has two early-return guards (invalid stacking, or OUT_OF_STOCK
+      inventory) that both return the same tuple: (ZERO_PRICE, margin_enforced=False,
+      price_valid=False).
+
+      - For all remaining (valid) cases, price_valid=True and inventory!=OUT_OF_STOCK.
+
+      - With price_valid=True, _categorize_price can only yield:
+        - AT_MIN_MARGIN when margin_enforced=True (which is only possible when cost_high=True),
+        - PROFITABLE_PRICE when margin_enforced=False.
+      - The BELOW_COST branch is unreachable because _check_margin_enforcement returns
+      True only when cost_high=True, so you never have margin_enforced=True with cost_high=False.
+  q2:
+    answer: Yes. A Platinum customer who is VIP can trigger margin enforcement whenever
+      cost_high=True (and the request is not short-circuited as invalid/out-of-stock).
+    reasoning: >-
+      - VIP for a Platinum tier requires quorum 2/3: tier==Platinum (true) plus at
+      least one of {loyalty_high, orders_high}.
+
+      - margin_enforced is True exactly when cost_high=True AND total_disc is LARGE
+      or VERY_LARGE.
+
+      - For Platinum tier, the discount combiner always produces base_total of at
+      least MEDIUM; if VIP applies (i.e., flash_disc != VERY_LARGE), MEDIUM is boosted
+      to LARGE and LARGE/VERY_LARGE stays at or becomes VERY_LARGE.
+
+      - If flash_disc==VERY_LARGE, VIP boost is disabled, but total_disc is still
+      VERY_LARGE.
+
+      - Therefore, for a Platinum VIP in any in-stock, valid-stacking case: cost_high=True
+      ⇒ total_disc ∈ {LARGE, VERY_LARGE} ⇒ margin_enforced=True.
+
+      - The only way margin enforcement does not occur is cost_high=False, or the
+      function returns early (invalid stacking or OUT_OF_STOCK) before VIP/discount
+      logic runs.
+  q3:
+    answer: For price_valid=True decisions, the property cannot be violated; for price_valid=False
+      early returns, it can appear violated if you don’t exclude invalid scenarios.
+    reasoning: >-
+      - When total_disc==VERY_LARGE, _check_margin_enforcement returns cost_high,
+      so with cost_high=True it always returns True.
+
+      - There is no subsequent logic that can flip margin_enforced back to False in
+      the valid path.
+
+      - Thus, if price_valid=True and cost_high=True and total_disc==VERY_LARGE, margin_enforced
+      must be True.
+
+      - Edge cases that can make margin_enforced False despite a VeryLarge discount
+      being “present” in inputs:
+        - Dead-zone invalid stacking: coupon_disc==MEDIUM and flash_disc==VERY_LARGE
+      triggers an early return with margin_enforced=False and price_valid=False.
+        - inventory==OUT_OF_STOCK triggers an early return with margin_enforced=False
+      and price_valid=False, regardless of discount inputs. - Whether these constitute
+      a true safety-property violation depends on whether the property is scoped to
+      valid pricing decisions (price_valid=True) or to all calls.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:51'
+  q1:
+    answer: '4000'
+    reasoning: >-
+      The number of distinct pricing decision scenarios is calculated by multiplying
+      the cardinality of all input parameters to the 'determine_price' function.
+
+      - inventory (Enum): 5 options
+
+      - tier (Enum): 4 options
+
+      - coupon_disc (Enum): 5 options
+
+      - flash_disc (Enum): 5 options
+
+      - loyalty_high (bool): 2 options
+
+      - orders_high (bool): 2 options
+
+      - cost_high (bool): 2 options
+
+      Calculation: 5 * 4 * 5 * 5 * 2 * 2 * 2 = 4000 distinct input scenarios.
+  q2:
+    answer: Yes, a Platinum VIP customer can trigger margin enforcement.
+    reasoning: >-
+      Conditions required:
+
+      - The customer must have 'cost_high = True'.
+
+      - Inventory must not be 'OUT_OF_STOCK' and discount stacking must be valid (to
+      avoid early returns).
+
+      - A Platinum customer has a 'LARGE' base tier discount.
+
+      - In '_combine_discounts', a 'LARGE' tier discount typically falls through to
+      the 'else' block (default aggregation), resulting in a 'MEDIUM' base total,
+      or triggers specific higher combinations.
+
+      - Because the customer is VIP, the VIP boost is applied (unless Flash is VeryLarge).
+
+      - A 'MEDIUM' base boosted by VIP becomes 'LARGE'.
+
+      - The '_check_margin_enforcement' function returns True for 'LARGE' total discounts
+      if 'cost_high' is True.
+
+      - Therefore, a Platinum VIP with high cost will always trigger margin enforcement
+      (unless the transaction is blocked by inventory/stacking rules).
+  q3:
+    answer: Yes, the safety property can be violated.
+    reasoning: >-
+      The property 'high cost products with VeryLarge discounts always enforce minimum
+      margin' asserts that if 'cost_high' is True and a discount is 'VERY_LARGE',
+      'margin_enforced' should be True. Violating edge cases include:
+
+      - Edge Case 1 (Out of Stock): If 'inventory' is 'OUT_OF_STOCK', the function
+      returns early with 'margin_enforced=False', even if 'cost_high=True' and 'flash_disc=VERY_LARGE'.
+
+      - Edge Case 2 (Invalid Stacking): If an invalid stack occurs (e.g., Coupon Medium
+      + Flash VeryLarge), the function returns early with 'margin_enforced=False',
+      despite the inputs suggesting a high cost and very large discount scenario.
+
+      - While these result in a 'ZERO_PRICE' (no sale), the boolean flag 'margin_enforced'
+      is explicitly False, technically violating the invariant logic for those system
+      states.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:44'
+  q1:
+    answer: '2,880 distinct input combinations, but many map to the same output. The
+      actual distinct output scenarios (unique PricingDecision tuples) are 5: (ZERO_PRICE,
+      False, False), (ZERO_PRICE, False, True - though this is unreachable), (AT_MIN_MARGIN,
+      True, True), (BELOW_COST, True, True), and (PROFITABLE_PRICE, False, True).'
+    reasoning: >-
+      - Input space: 5 inventory levels × 4 customer tiers × 5 coupon discounts ×
+      5 flash discounts × 2 loyalty_high × 2 orders_high × 2 cost_high = 4,000 combinations
+
+      - However, 2 discount stacking combinations are invalid (Medium+VeryLarge, Large+Large),
+      reducing valid non-stack paths
+
+      - Invalid stacking: returns (ZERO_PRICE, False, False)
+
+      - Out of stock: returns (ZERO_PRICE, False, False) - but only when stacking
+      is valid, otherwise caught by stacking check first
+
+      - The PricingDecision output has 3 fields: final_price_category (4 values),
+      margin_enforced (2 values), price_valid (2 values)
+
+      - But the actual reachable combinations are constrained by the logic:
+        1. Invalid stack → (ZERO_PRICE, False, False)
+        2. Out of stock → (ZERO_PRICE, False, False)
+        3. margin_enforced=True AND cost_high=True → (AT_MIN_MARGIN, True, True)
+        4. margin_enforced=True AND cost_high=False → (BELOW_COST, True, True) - but
+      this is unreachable since margin_enforced requires cost_high for LARGE/VERY_LARGE
+        5. margin_enforced=False → (PROFITABLE_PRICE, False, True)
+      - Actually examining _check_margin_enforcement: it returns cost_high when discount
+      is VERY_LARGE or LARGE, so margin_enforced=True implies cost_high=True
+
+      - Thus BELOW_COST is unreachable in the current logic, leaving 4 distinct output
+      scenarios
+  q2:
+    answer: 'Yes, a Platinum VIP customer can trigger margin enforcement when: (1)
+      cost_high is True, AND (2) the flash discount is VeryLarge (which blocks VIP
+      boost but still results in VeryLarge total discount), OR (3) the combined discounts
+      (before or after VIP boost) result in LARGE or VERY_LARGE total discount level.'
+    reasoning: >-
+      - VIP status for Platinum requires only 1 additional condition (loyalty_high
+      OR orders_high) since Platinum counts as condition c1
+
+      - Margin enforcement is triggered by _check_margin_enforcement when: total_discount
+      is VERY_LARGE or LARGE AND cost_high is True
+
+      - Key scenarios for Platinum VIP triggering margin enforcement:
+        1. flash_disc = VERY_LARGE: VIP boost is blocked (vip_applies becomes False),
+      but total_disc = VERY_LARGE. With cost_high=True → margin_enforced=True
+        2. coupon_disc = LARGE: total_disc = VERY_LARGE regardless of VIP status.
+      With cost_high=True → margin_enforced=True
+        3. coupon_disc = MEDIUM and flash_disc = MEDIUM: base_total = LARGE, then
+      VIP boost → VERY_LARGE. With cost_high=True → margin_enforced=True
+        4. Various other combinations where VIP boost pushes the discount to LARGE
+      or VERY_LARGE
+      - Example: Platinum customer with loyalty_high=True (making them VIP), coupon_disc=MEDIUM,
+      flash_disc=MEDIUM, cost_high=True
+        - VIP status confirmed (Platinum + loyalty_high = 2 conditions)
+        - base_total = LARGE, VIP boost → VERY_LARGE
+        - margin_enforced = True since cost_high=True and total_disc=VERY_LARGE
+  q3:
+    answer: No, the safety property cannot be violated. When cost_high=True and total_discount=VERY_LARGE,
+      the _check_margin_enforcement function always returns True, which leads to AT_MIN_MARGIN
+      price category. There are no edge cases that bypass this - even VIP customers,
+      even with various discount combinations.
+    reasoning: >-
+      - The safety property states: high cost products with VeryLarge discounts always
+      enforce minimum margin
+
+      - Analyzing the code path:
+        1. _check_margin_enforcement(cost_high=True, total_discount=VERY_LARGE) →
+      returns cost_high which is True
+        2. _categorize_price(margin_enforced=True, cost_high=True, ...) → returns
+      AT_MIN_MARGIN (assuming not out of stock)
+      - Edge cases examined:
+        1. Invalid stacking: Medium+VeryLarge or Large+Large return early with price_valid=False,
+      never reach margin check - but these don't have valid VeryLarge total discount
+        2. Out of stock: Returns early with ZERO_PRICE - product isn't sold anyway,
+      so margin enforcement is moot
+        3. VIP boost to VERY_LARGE: VIP boost can push LARGE to VERY_LARGE, but margin
+      enforcement still applies since we check total_disc after boost
+        4. flash_disc=VERY_LARGE blocks VIP boost: The total_disc is still VERY_LARGE,
+      so margin enforcement applies
+      - All paths where total_disc=VERY_LARGE AND cost_high=True will have margin_enforced=True
+
+      - The only "bypass" scenarios involve invalid transactions (invalid stacking,
+      out of stock) which don't complete as valid sales anyway
+
+      - Therefore, the safety property holds in all valid transaction scenarios

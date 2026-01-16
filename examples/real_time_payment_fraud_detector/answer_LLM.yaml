@@ -1,0 +1,352 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:47'
+  q1:
+    answer: 'There are 4 distinct fraud decision scenarios: allow, require 2FA, flag
+      for review, and invalid transaction. The key thresholds include risk score levels
+      (0-39: low risk, typically allow; 40-59: medium risk, may require 2FA; 60-69:
+      high risk, not allow but may not flag; 70-100: very high risk, flag for review),
+      amount thresholds (500 for 2FA on untrusted devices, 1000 for review unless
+      overridden), account age threshold (365 days with trusted device to override
+      >1000 review), and velocity quorum (2+ of 4 factors: tx_count_24h >10, amount_24h
+      >2000, location_changes >3, consecutive_failures >2).'
+    reasoning: >-
+      - The decision is based on allow_transaction, require_2fa, and flag_for_review
+      flags.
+
+      - Scenarios correspond to the main outcomes, plus invalid for boundary conditions.
+
+      - Thresholds are derived from the risk score calculation, overrides, and quorum
+      logic in the code.
+  q2:
+    answer: Yes, Casino category transactions can be allowed under conditions where
+      the calculated risk score is less than 60 and velocity risk is not detected
+      (fewer than 2 suspicious velocity factors).
+    reasoning: >-
+      - Casino base risk is 40, multiplied by device trust (100-250%) and time factors
+      (100-180%), resulting in risk scores between ~4 and 180.
+
+      - Allow condition is risk < 60 and no velocity risk (quorum of <2 from tx_count_24h
+      >10, amount_24h >2000, location_changes >3, consecutive_failures >2).
+  q3:
+    answer: Yes, large amounts >1000 can avoid being flagged for review if the device
+      is trusted, account age is >365 days (to override the amount threshold), velocity
+      risk is not detected (fewer than 2 suspicious velocity factors), and the risk
+      score is less than 70.
+    reasoning: >-
+      - Amount >1000 triggers review unless device is trusted and account >365 days,
+      per check_amount_threshold.
+
+      - Flag for review occurs if amount_review is true, or velocity_risk is true,
+      or risk >=70.
+
+      - To avoid, all three must be false: override the amount condition, ensure <2
+      velocity factors, and keep risk <70.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:51'
+  q1:
+    answer: 'There are 8 distinct fraud decision scenarios based on combinations of
+      allow_transaction (True/False), require_2fa (True/False), and flag_for_review
+      (True/False). Key thresholds: Risk score 40 (2FA boundary), 60 (allow/deny boundary),
+      70 (auto-flag); Amount 500 (2FA trigger), 1000 (review trigger); Velocity quorum
+      2/4 risk factors.'
+    reasoning: >-
+      - FraudDecision has 3 boolean outputs: allow_transaction, require_2fa, flag_for_review
+      = 2^3 = 8 theoretical scenarios
+
+      - Key risk score thresholds:
+        * risk < 40: Allow without 2FA (if no velocity risk)
+        * 40 <= risk < 60: Allow with 2FA (if no velocity risk)
+        * risk >= 60: Deny (allow = False)
+        * risk >= 70: Auto-flag for review
+      - Key amount thresholds:
+        * amount > 500: Triggers 2FA unless device is TRUSTED
+        * amount > 1000: Triggers review UNLESS (trusted device AND account_age >
+      365) - Velocity threshold: 2 or more of 4 risk factors (tx_count_24h > 10, amount_24h
+      > 2000, location_changes > 3, consecutive_failures > 2)
+
+      - Additional validity checks: Dead zone (985-1015 amount, 48-52 risk, 363-367
+      account_age) returns all False
+  q2:
+    answer: 'Yes, Casino transactions can be allowed under specific conditions: when
+      risk_score < 60 AND no velocity_risk is detected. This requires: TRUSTED device
+      (base 40 * 100% = 40), BUSINESS hours (40 * 100% = 40), amount <= 1000 (to avoid
+      review override), and velocity factors < 2.'
+    reasoning: >-
+      - Casino base risk score = 40 (constant, regardless of amount)
+
+      - To get allow_transaction=True: risk < 60 AND not velocity_risk
+
+      - Minimum Casino risk = 40 (TRUSTED device + BUSINESS hours): 40 * 100% * 100%
+      / 10000 = 40
+
+      - Risk score 40 is below the 60 threshold, so allow=True is possible
+
+      - Additional requirements to achieve this:
+        * device_trust = TRUSTED (multiplier 100%)
+        * transaction_time = BUSINESS (multiplier 100% for Casino)
+        * No velocity risk (fewer than 2 of 4 risk factors)
+        * Valid transaction (not in dead zone, amount < 10000)
+      - Note: Casino at EVENING = 44 risk (still < 60), LATE_NIGHT = 72 risk (>= 60,
+      denied)
+
+      - With UNVERIFIED device: 40 * 150% = 60 (boundary, denied since allow requires
+      risk < 60)
+
+      - With SUSPICIOUS device: 40 * 250% = 100 (capped at 100, denied)
+  q3:
+    answer: 'Yes, large amounts (>1000) can avoid being flagged for review IF the
+      account has: device_trust = TRUSTED AND account_age > 365 days. This is the
+      explicit override pattern in check_amount_threshold() that exempts trusted long-term
+      accounts from the large amount review requirement.'
+    reasoning: >-
+      - check_amount_threshold() implements the override pattern for amounts > 1000
+
+      - Default behavior: amount > 1000 triggers needs_review = True
+
+      - Override exception: If (device_trust == TRUSTED AND account_age > 365), the
+      function returns False (no review needed)
+
+      - The logic: `return not needs_review if trusted_account else needs_review`
+
+      - So for amount > 1000 to avoid flag_for_review=True:
+        * Must have TRUSTED device
+        * Must have account_age > 365 days
+        * Must also avoid other flagging conditions: velocity_risk=False AND risk_score
+      < 70 - Example: amount=1500, GROCERY category, TRUSTED device, BUSINESS hours,
+      account_age=400, no velocity risk
+        * Risk = 5 * 100% * 100% / 10000 = 5 (< 70)
+        * amount_review = False (due to override)
+        * velocity_risk = False
+        * flag_for_review = False OR False OR False = False ✓
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:14'
+  q1:
+    answer: >-
+      There are 4 primary decision scenarios driven by three key risk score thresholds
+      (40, 60, 70), plus an 'Invalid' state. The scenarios are:
+
+      1. **Allowed (Clean):** Risk < 40, no velocity issues, no amount flags.
+
+      2. **Allowed with 2FA:** Risk between 40-59 OR Amount > 500 on untrusted device.
+
+      3. **Allowed with Review:** Risk < 60, but flagged due to high amount (>1000).
+
+      4. **Blocked (Denied):** Risk ≥ 60 OR Velocity Risk detected (Transaction is
+      also flagged for review if Risk ≥ 70 or Velocity Risk is present).
+
+
+      Additionally, an **Invalid/Dead Zone** scenario exists where the transaction
+      is rejected immediately (Risk 0) if it falls within specific edge-case bounds
+      (Amount ~1000, Risk ~50, Age ~1 year).
+    reasoning: >-
+      - **Allow Threshold (<60):** The primary gate for acceptance is `risk_score
+      < 60` and `not velocity_risk`.
+
+      - **2FA Threshold (40-60):** 2FA is required if `40 <= risk < 60` or if `amount
+      > 500` on a non-trusted device.
+
+      - **Review Thresholds:** Review is flagged if `risk >= 70`, `velocity_risk`
+      is True, or `amount > 1000` (without override). Note that a transaction can
+      be Blocked (e.g., Risk 65) but not purely Score-Flagged (Risk < 70), though
+      Velocity Block usually implies Flag.
+
+      - **Velocity Quorum:** Uses a "2 of 4" rule (Count>10, Amt>2000, Loc>3, Fail>2)
+      to trigger a block and review.
+  q2:
+    answer: 'Yes, Casino transactions can be allowed, but only under strict conditions:
+      the device must be **TRUSTED** and the time must not be **LATE_NIGHT**.'
+    reasoning: >-
+      - The **Base Risk Score** for Casino is **40**.
+
+      - The **Allow Cutoff** is a risk score of **60** (`risk < 60`).
+
+      - **Device Impact:** A `TRUSTED` device has a multiplier of 100% (1.0x). Any
+      other device (Unverified 1.5x, Suspicious 2.5x) pushes the score to 60 or 100,
+      resulting in an automatic block.
+
+      - **Time Impact:**
+        - `BUSINESS` time (1.0x) results in a score of 40 (40 * 1.0 * 1.0). **Allowed**.
+        - `EVENING` time (1.1x) results in a score of 44 (40 * 1.0 * 1.1). **Allowed**.
+        - `LATE_NIGHT` time for Casino has a specific multiplier of 1.8x. This results
+      in a score of 72 (40 * 1.0 * 1.8), which is **Blocked** (>60).
+  q3:
+    answer: Yes, transactions larger than 1000 can avoid being flagged for review
+      if the user uses a **TRUSTED** device and has an account age **greater than
+      365 days**.
+    reasoning: >-
+      - The function `check_amount_threshold` contains an override pattern.
+
+      - By default, `if amount > 1000`, `needs_review` is set to `True`.
+
+      - However, there is an exception logic: `trusted_account = device_trust == DeviceTrust.TRUSTED
+      and account_age > 365`.
+
+      - The return statement `return not needs_review if trusted_account else needs_review`
+      inverts the review requirement to `False` if the trusted account conditions
+      are met.
+
+      - **Note:** The transaction must still satisfy `risk < 70` and pass velocity
+      checks to avoid a review flag from other sources.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:15'
+  q1:
+    answer: 'There are **9 distinct decision scenarios**: 1 invalid/ambiguous-input
+      rejection scenario, plus **8 boolean combinations** of (allow_transaction, require_2fa,
+      flag_for_review) that can occur for valid inputs.'
+    reasoning: >-
+      - **Invalid/ambiguous scenario (special case):** if `is_valid_transaction(...)`
+      is false (dead-zone or out-of-bounds), the function returns `(allow=False, 2FA=False,
+      review=False, risk_score=0)`.
+
+      - For **valid** transactions, the three booleans are computed independently
+      enough to allow **all 8 combinations**:
+        - allow = `risk < 60` AND `not velocity_risk`
+        - 2FA = `(40 <= risk < 60)` OR (`amount > 500` AND device != TRUSTED)
+        - review = `amount_review` OR `velocity_risk` OR `risk >= 70`
+      - **Key thresholds / gates:**
+        - **Risk bands:** `<40`, `40–59`, `60–69`, `>=70` (affect allow/2FA/review).
+        - **2FA amount threshold:** `amount > 500` AND device not trusted.
+        - **Large-amount review override:** `amount > 1000` triggers review **except**
+      when `device_trust==TRUSTED` AND `account_age > 365`.
+        - **Velocity quorum:** review/deny via `velocity_risk` when **≥2** of:
+          - `tx_count_24h > 10`
+          - `amount_24h > 2000`
+          - `location_changes > 3`
+          - `consecutive_failures > 2`
+        - **Validity “dead zone”:** invalid if `985<=amount<=1015` AND `48<=risk<=52`
+      AND `363<=account_age<=367`; also invalid if amount not in `[0,10000]`, risk
+      not in `[0,100]`, or account_age<0. - The 8 valid boolean outcomes are: (T/F)×(T/F)×(T/F)
+      across allow/2FA/review; each is achievable with appropriate parameter choices
+      (e.g., risk 60–69 yields `allow=False` while review can still be false if no
+      velocity and no amount_review).
+  q2:
+    answer: '**Yes. Casino transactions can be allowed**, but only when the **device
+      is TRUSTED**, the transaction is **not LATE_NIGHT**, and **velocity_risk is
+      false** (and the transaction is valid).'
+    reasoning: >-
+      - Casino base risk = **40**.
+
+      - Risk calculation: `risk = (base * device_mult * time_mult) // 10000`.
+
+      - To be allowed: must have `risk < 60` and `velocity_risk == False`.
+
+      - Casino time multipliers:
+        - BUSINESS: 100 → with TRUSTED (100): risk = 40
+        - EVENING: 110 → with TRUSTED (100): risk = 44
+        - LATE_NIGHT: 180 → with TRUSTED (100): risk = 72 (not allowed; also triggers
+      review via `risk>=70`) - With UNVERIFIED or SUSPICIOUS devices, casino risk
+      hits **60+** even in BUSINESS, so it won’t be allowed:
+        - UNVERIFIED+BUSINESS: 40*150*100/10000 = 60 (fails `risk<60`)
+        - SUSPICIOUS+BUSINESS: 100 (fails `risk<60`)
+      - Additionally, if risk computation exceeds 100 (e.g., UNVERIFIED+LATE_NIGHT
+      gives 108), the transaction becomes **invalid** and is rejected before decisions
+      are applied.
+  q3:
+    answer: '**Yes. Amounts > 1000 can avoid being flagged for review**, but only
+      if the large-amount override applies **and** no other review triggers fire.'
+    reasoning: >-
+      - Review flag is: `flag = amount_review OR velocity_risk OR risk >= 70`.
+
+      - For `amount > 1000`, `amount_review` becomes **False only when** `device_trust==TRUSTED`
+      **and** `account_age > 365` (override).
+
+      - Therefore, to avoid review with `amount > 1000`, all must hold:
+        - `device_trust == TRUSTED` and `account_age > 365` (so `amount_review=False`)
+        - `velocity_risk == False` (fewer than 2 velocity factors)
+        - `risk < 70` (avoid the `risk>=70` review trigger)
+        - and the transaction must be **valid** per `is_valid_transaction`.
+      - This is feasible in multiple categories/time windows (e.g., GROCERY is very
+      low risk; CRYPTO is ok in BUSINESS but not LATE_NIGHT where it becomes 85 and
+      triggers review).
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:43'
+  q1:
+    answer: 'There are 5 distinct fraud decision scenarios based on key thresholds:
+      (1) Allow without 2FA (risk < 40, no velocity risk, no amount review), (2) Allow
+      with 2FA (40 ≤ risk < 60 OR amount > 500 with non-trusted device, no velocity
+      risk), (3) Flag for review due to high risk (risk ≥ 70), (4) Flag for review
+      due to velocity risk (2+ of 4 velocity factors), (5) Flag for review due to
+      amount threshold (amount > 1000 unless trusted device + account age > 365 days).
+      Key thresholds: risk score 40 (2FA trigger), 60 (allow/deny boundary), 70 (auto-review);
+      amount $500 (2FA for non-trusted), $1000 (review trigger), $2000 (velocity factor);
+      transaction count > 10/24h, location changes > 3, consecutive failures > 2.'
+    reasoning: >-
+      - The decision logic produces distinct outcomes based on combinations of: risk
+      score thresholds (40, 60, 70), velocity risk (quorum of 2+ factors), and amount
+      threshold override
+
+      - Allow transaction: risk < 60 AND no velocity risk
+
+      - Require 2FA: (40 ≤ risk < 60) OR (amount > 500 AND device not trusted)
+
+      - Flag for review: amount_review OR velocity_risk OR risk ≥ 70
+
+      - Amount threshold review triggered when amount > 1000, EXCEPT for trusted device
+      + account age > 365 days (override pattern)
+
+      - Velocity risk quorum: 2+ of {tx_count_24h > 10, amount_24h > 2000, location_changes
+      > 3, consecutive_failures > 2}
+
+      - Invalid/dead zone transactions get a special rejection (allow=False, 2FA=False,
+      review=False, score=0)
+  q2:
+    answer: 'Yes, Casino category transactions can be allowed, but only under specific
+      conditions: (1) Device must be TRUSTED (multiplier 100%), (2) Transaction time
+      should be BUSINESS hours (multiplier 100%), (3) No velocity risk (fewer than
+      2 of 4 velocity factors present). Under these optimal conditions, the risk score
+      calculates to 40 * 100 * 100 / 10000 = 4, which is well below the 60 threshold.
+      Even with EVENING time (110% multiplier), risk = 4. With TRUSTED device and
+      LATE_NIGHT, risk = 40 * 100 * 180 / 10000 = 7, still allowed.'
+    reasoning: >-
+      - Casino base risk score is 40 (highest base after crypto's 50)
+
+      - For a transaction to be allowed: risk < 60 AND no velocity risk
+
+      - Minimum Casino risk calculation: 40 (base) * 100 (trusted device) * 100 (business
+      hours) / 10000 = 4
+
+      - With trusted device + business hours: risk = 4, transaction allowed
+
+      - With trusted device + evening: risk = 40 * 100 * 110 / 10000 = 4 (integer
+      division), allowed
+
+      - With trusted device + late night: risk = 40 * 100 * 180 / 10000 = 7, allowed
+
+      - With unverified device + business: risk = 40 * 150 * 100 / 10000 = 6, allowed
+
+      - Even unverified + late night: risk = 40 * 150 * 180 / 10000 = 10, still allowed
+
+      - Only suspicious device creates high risk: 40 * 250 * 100 / 10000 = 10 (business),
+      or 40 * 250 * 180 / 10000 = 18 (late night)
+
+      - None of these reach 60, so Casino CAN be allowed if no velocity risk is present
+  q3:
+    answer: 'Yes, large amounts (>1000) can avoid being flagged for review, but ONLY
+      when two conditions are met simultaneously: (1) The device trust level is TRUSTED,
+      and (2) The account age is greater than 365 days. This is the explicit override
+      pattern in check_amount_threshold(). Additionally, velocity risk must not be
+      triggered (fewer than 2 velocity factors), and risk score must be below 70.
+      Under these conditions, amount_review returns False, allowing large transactions
+      to proceed without automatic review flagging.'
+    reasoning: >-
+      - The check_amount_threshold() function implements an override pattern
+
+      - When amount > 1000, needs_review is set to True by default
+
+      - However, there's an explicit override: if device_trust == TRUSTED AND account_age
+      > 365 days, it returns False (no review needed)
+
+      - The function returns "not needs_review if trusted_account else needs_review"
+
+      - So trusted_account = True means return not True = False (no review)
+
+      - For flag_for_review to be False overall, must also avoid: velocity_risk and
+      risk >= 70
+
+      - Complete conditions to avoid review with amount > 1000:
+        1. Device must be TRUSTED
+        2. Account age must be > 365 days
+        3. Risk score must be < 70
+        4. Velocity risk must be False (fewer than 2 of 4 velocity factors)
+      - This represents a deliberate design to allow trusted, established customers
+      to make large purchases without friction

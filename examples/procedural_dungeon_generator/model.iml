@@ -1,0 +1,108 @@
+(* Procedural Dungeon Generator *)
+
+(* Core types *)
+type room_type = Entrance | Combat | Treasure | Boss | Puzzle | Secret
+
+type difficulty_tier = Easy | Medium | Hard | Extreme
+
+type placement_result = Approved | TooClose | TooFar | InvalidSequence | Rejected
+
+(* Distance thresholds by room type *)
+let min_distance_from_entrance room_type =
+  match room_type with
+  | Entrance -> 0
+  | Combat -> 2
+  | Treasure -> 3
+  | Puzzle -> 4
+  | Boss -> 8
+  | Secret -> 5
+
+(* Room count limits *)
+let max_count_for_type room_type difficulty =
+  match room_type, difficulty with
+  | Combat, Easy -> 3
+  | Combat, Medium -> 5
+  | Combat, Hard -> 7
+  | Combat, Extreme -> 10
+  | Treasure, Easy -> 2
+  | Treasure, Medium -> 3
+  | Treasure, Hard -> 4
+  | Treasure, Extreme -> 5
+  | Boss, _ -> 1
+  | Secret, _ -> 2
+  | Puzzle, Easy -> 1
+  | Puzzle, Medium -> 2
+  | Puzzle, Hard -> 3
+  | Puzzle, Extreme -> 4
+  | Entrance, _ -> 1
+
+(* Check if room placement is too close *)
+let is_too_close distance room_type =
+  let min_dist = min_distance_from_entrance room_type in
+  distance < min_dist
+
+(* Check if Boss is too far (must be reachable) *)
+let is_too_far_for_boss distance =
+  distance > 15
+
+(* Sequence validation: Boss requires Combat rooms before it *)
+let sequence_valid room_type combat_count =
+  if room_type = Boss then
+    combat_count >= 3
+  else
+    true
+
+(* Core room placement decision *)
+let determine_room_placement
+    room_type
+    difficulty
+    distance_from_entrance
+    existing_room_count
+    existing_combat_count =
+
+  (* Check sequence validity *)
+  let seq_ok = sequence_valid room_type existing_combat_count in
+
+  if not seq_ok then
+    InvalidSequence
+  else
+    (* Check distance constraints *)
+    let too_close = is_too_close distance_from_entrance room_type in
+
+    if too_close then
+      TooClose
+    else
+      (* Check if Boss is reachable *)
+      let too_far = (room_type = Boss && is_too_far_for_boss distance_from_entrance) in
+
+      if too_far then
+        TooFar
+      else
+        (* Check room count limits *)
+        let max_allowed = max_count_for_type room_type difficulty in
+        let at_limit = existing_room_count >= max_allowed in
+
+        if at_limit then
+          Rejected
+        else
+          Approved
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All room placement scenarios *)
+let all_placement_scenarios = determine_room_placement
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Boss room ever be placed at distance < 8? *)
+let boss_too_close room_type difficulty distance_from_entrance existing_room_count existing_combat_count =
+  let result = determine_room_placement room_type difficulty distance_from_entrance existing_room_count existing_combat_count in
+  room_type = Boss && distance_from_entrance < 8 && result = Approved
+[@@decomp top ()]
+
+(* Q3: Boss placement property *)
+verify (fun difficulty distance_from_entrance existing_room_count existing_combat_count ->
+  let result = determine_room_placement Boss difficulty distance_from_entrance existing_room_count existing_combat_count in
+  (distance_from_entrance >= 8 && distance_from_entrance <= 15 && existing_combat_count >= 3) ==> result = Approved
+)

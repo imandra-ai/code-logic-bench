@@ -1,0 +1,42 @@
+model: "adaptive_traffic_light_controller"
+q1:
+  question: "How many distinct phase action scenarios exist in determine_phase_action, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "50 scenarios (for busy traffic: queue_size >= 3, time_remaining <= 10 OR has_emergency OR has_bus)"
+  state_space_reduction: "Used ~assuming to focus on busy intersections"
+  key_thresholds:
+    time_remaining: [0, 1, 3, 5, 10, 15]
+    queue_size: [3, 4, 5, 6]
+    pedestrian_count: [2]
+    pedestrian_wait_time: [multiples of 10]
+    extension_amount: 10
+    emergency_duration: 15
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_phase_scenarios.json'
+    use_of_assuming: "queue_size >= 3 && (time_remaining <= 10 || has_emergency || has_bus)"
+q2:
+  question: "Can the system trigger EmergencyOverride when both lights are Red (Red-Red state)? If so, under what conditions?"
+  answer: "YES - 5 scenarios where emergency override triggers from Red-Red"
+  example:
+    scenario: "Red-Red + has_emergency=true + queue 4-6 + time 1-3"
+    result: "EmergencyOverride triggered"
+  explanation: "Emergency vehicles override ANY state including safety Red-Red state"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_emergency_red_red.json'
+    use_of_assuming: "current_ns_light = Red && current_ew_light = Red && queue_size <= 10"
+q3:
+  question: "Can the safety property 'emergency override always sets NS to Green, EW to Red, and duration to 15' ever be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "(action_type = EmergencyOverride) ==> (new_ns_light = Green && new_ew_light = Red && phase_duration = 15)"
+  why_proven: "Emergency override logic explicitly sets these values in code structure"
+  fixed_parameters_in_verify: "Red, Red, time_remaining=5, queue_size=5, pedestrian_count=1, pedestrian_wait_time=10"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_emergency_safety.json'
+analysis_metadata:
+  total_scenarios_q1: 50
+  emergency_red_red_count_q2: 5
+  property_result_q3: "PROVEN"
+  pattern_complexity:
+    override: "Emergency vehicles override all other logic including safety states"
+    dead_zone: "time 1-3 + queue 4-6 + no emergency → invalid state"
+    quorum: "Extension requires 2 of 3: [Bus<10s, HeavyTraffic<5s, ManyPeds<15s]"
+    multiplexer: "Light state changes action interpretation"

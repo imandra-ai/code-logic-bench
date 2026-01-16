@@ -1,0 +1,149 @@
+(* Emergency Shelter Management System *)
+
+(* Core types *)
+type priority_level = Critical | High | Medium | Low
+
+type medical_condition = NoMedical | Minor | Chronic | Acute | Disabled
+
+type weather_condition = Clear | Rain | Storm | Extreme
+
+type capacity_status = Full | NearFull | Available | Ample
+
+type shelter_type = Standard | Medical | WeatherProtected
+
+type assignment_decision = {
+  assignment_approved: bool;
+  assigned_shelter_type: shelter_type;
+  requires_emergency_override: bool;
+  priority_escalated: bool;
+  decision_valid: bool;
+}
+
+(* Capacity check based on status *)
+let has_capacity capacity_status =
+  match capacity_status with
+  | Full -> false
+  | NearFull -> false  (* Conservative *)
+  | Available -> true
+  | Ample -> true
+
+(* Medical requirement check*)
+let requires_medical_shelter medical_cond =
+  match medical_cond with
+  | NoMedical -> false
+  | Minor -> false
+  | Chronic -> true
+  | Acute -> true
+  | Disabled -> true
+
+(* Weather protection requirement *)
+let requires_weather_protection weather medical_cond =
+  match weather, medical_cond with
+  | Extreme, _ -> true  (* Everyone needs protection in extreme *)
+  | Storm, (Acute | Disabled) -> true
+  | _, _ -> false
+
+(* Dead zone: NearFull + High priority + Minor medical is ambiguous *)
+let is_in_dead_zone capacity priority medical_cond =
+  capacity = NearFull && priority = High && medical_cond = Minor
+
+(* Quorum for emergency override (2 out of 3) *)
+let check_emergency_override priority weather_severe special_req =
+  let c1 = (priority = Critical) in
+  let c2 = weather_severe in
+  let c3 = special_req in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0)
+  in
+  count >= 2
+
+(* Priority escalation - low capacity escalates Medium → High *)
+let escalate_priority base_priority capacity =
+  match base_priority, capacity with
+  | Medium, NearFull -> High
+  | Low, NearFull -> Medium
+  | p, _ -> p
+
+(* Determine shelter type needed *)
+let determine_shelter_type medical_cond weather =
+  let needs_medical = requires_medical_shelter medical_cond in
+  let needs_weather = requires_weather_protection weather medical_cond in
+
+  if needs_medical then Medical
+  else if needs_weather then WeatherProtected
+  else Standard
+
+(* Core decision function *)
+let determine_assignment
+    priority
+    medical_cond
+    weather
+    capacity
+    special_req =
+
+  (* Check dead zone first *)
+  let in_dead_zone = is_in_dead_zone capacity priority medical_cond in
+
+  if in_dead_zone then
+    { assignment_approved = false;
+      assigned_shelter_type = Standard;
+      requires_emergency_override = false;
+      priority_escalated = false;
+      decision_valid = false }
+  else
+    (* Escalate priority if needed*)
+    let escalated_priority = escalate_priority priority capacity in
+    let was_escalated = (escalated_priority <> priority) in
+
+    (* Check basic capacity *)
+    let has_cap = has_capacity capacity in
+
+    (* Determine required shelter type *)
+    let shelter_type = determine_shelter_type medical_cond weather in
+
+    (* Check if emergency override applies (quorum) *)
+    let weather_severe = (weather = Extreme || weather = Storm) in
+    let emergency_override = check_emergency_override escalated_priority weather_severe special_req in
+
+    (* Emergency can bypass capacity *)
+    let can_assign =
+      if emergency_override then true  (* Override capacity *)
+      else has_cap
+    in
+
+    (* Full shelters block ALL except Critical with override, EXCEPT Extreme weather always allows *)
+    let is_blocked = (capacity = Full && not emergency_override && weather <> Extreme) in
+
+    let final_approval = can_assign && not is_blocked in
+
+    { assignment_approved = final_approval;
+      assigned_shelter_type = shelter_type;
+      requires_emergency_override = emergency_override;
+      priority_escalated = was_escalated;
+      decision_valid = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all distinct assignment scenarios *)
+let assignment_scenarios = determine_assignment
+[@@decomp top ~prune:true ()]
+
+(* Q2: When does Critical priority with medical needs get rejected? *)
+let critical_medical_rejected priority medical_cond weather capacity special_req =
+  let decision = determine_assignment priority medical_cond weather capacity special_req in
+  priority = Critical &&
+  requires_medical_shelter medical_cond &&
+  not decision.assignment_approved
+[@@decomp top ()]
+
+(* Q3: Safety property - Extreme weather with Critical priority always approved *)
+verify (fun priority medical_cond weather capacity special_req ->
+  let decision = determine_assignment priority medical_cond weather capacity special_req in
+
+  (decision.decision_valid && weather = Extreme && priority = Critical) ==> decision.assignment_approved
+)

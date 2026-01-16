@@ -1,0 +1,294 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:24'
+  q1:
+    answer: 5 distinct AuthDecision outcomes.
+    reasoning: >-
+      - Enumerating all return paths yields the following unique (granted, requires_additional_factor,
+      lock_account, step_up_auth_needed) tuples:
+        - (False, False, True, False)
+        - (False, False, False, False)
+        - (False, True, False, False)
+        - (True, False, False, False)
+        - (True, False, False, True)
+      - Some branches collapse to the same tuple (e.g., suspended vs. password-fail-without-lock
+      both return (False,False,False,False); locked-user vs. password-fail-with-lock
+      both return (False,False,True,False)).
+
+      - MFA-required + TOTP-correct never produces step-up because needs_step_up(high_value_operation,
+      2) is always False (2 < 2 is False).
+  q2:
+    answer: No. If requires_mfa=True and totp_correct=False, authentication is denied.
+    reasoning: >-
+      - In the requires_mfa branch, if not totp_correct the function returns AuthDecision(granted=False,
+      requires_additional_factor=True, lock_account=False, step_up_auth_needed=False).
+
+      - There is no alternative path in that state combination that sets granted=True.
+  q3:
+    answer: No. It triggers in some cases, not universally.
+    reasoning: >-
+      - Lockout is computed only on the password-failure path: should_lock_account(failed_attempts
+      + 1, max_failed_attempts).
+
+      - If failed_attempts == max_failed_attempts and the password is wrong, then
+      failed_attempts+1 >= max_failed_attempts is True, so lock_account=True.
+
+      - But if the password is correct (or the function returns earlier for other
+      reasons), lock_account remains False (unless the user is already in LOCKED status,
+      which returns lock_account=True regardless of failed_attempts).
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:12'
+  q1:
+    answer: 7 distinct authentication outcome scenarios
+    reasoning: >-
+      - Analyzing the code paths in determine_auth_result function:
+
+      1. UserStatus.LOCKED → (granted=False, requires_additional_factor=False, lock_account=True,
+      step_up_auth_needed=False)
+
+      2. UserStatus.SUSPENDED → (granted=False, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=False)
+
+      3. UserStatus.ACTIVE + password_correct=False + should_lock=True → (granted=False,
+      requires_additional_factor=False, lock_account=True, step_up_auth_needed=False)
+
+      4. UserStatus.ACTIVE + password_correct=False + should_lock=False → (granted=False,
+      requires_additional_factor=False, lock_account=False, step_up_auth_needed=False)
+
+      5. UserStatus.ACTIVE + password_correct=True + requires_mfa=True + totp_correct=False
+      → (granted=False, requires_additional_factor=True, lock_account=False, step_up_auth_needed=False)
+
+      6. UserStatus.ACTIVE + password_correct=True + requires_mfa=True + totp_correct=True
+      → (granted=True, requires_additional_factor=False, lock_account=False, step_up_auth_needed=varies)
+
+      7. UserStatus.ACTIVE + password_correct=True + requires_mfa=False + device_trusted=True
+      → (granted=True, requires_additional_factor=False, lock_account=False, step_up_auth_needed=varies)
+
+      8. UserStatus.ACTIVE + password_correct=True + requires_mfa=False + device_trusted=False
+      → (granted=False, requires_additional_factor=True, lock_account=False, step_up_auth_needed=False)
+
+      - Note: Scenarios 1 and 3 produce the same outcome tuple, and scenario 2 and
+      4 produce the same outcome tuple
+
+      - Counting unique AuthDecision tuples (considering step_up_auth_needed can be
+      True or False in scenarios 6 and 7):
+        * Scenarios 6 and 7 each have 2 variants based on high_value_operation
+        * Total unique outcomes: 5 base scenarios + 2 variants from scenario 6 + 2
+      variants from scenario 7 - 2 (duplicates between scenarios 1&3 and 2&4) = 7
+      distinct outcomes
+  q2:
+    answer: No, authentication cannot be granted when requires_mfa=true but totp_correct=false
+    reasoning: >-
+      - When requires_mfa=True and totp_correct=False, the code explicitly returns:
+        * AuthDecision(granted=False, requires_additional_factor=True, lock_account=False,
+      step_up_auth_needed=False) - This occurs after password is verified as correct
+      (lines in the MFA required section)
+
+      - The condition "if not totp_correct:" under "if requires_mfa:" branch always
+      returns granted=False
+
+      - There is no code path where requires_mfa=True, totp_correct=False, and granted=True
+      simultaneously
+
+      - Therefore, authentication is always denied in this scenario
+  q3:
+    answer: No, lock_account does NOT always trigger when failed_attempts equals max_failed_attempts
+      exactly
+    reasoning: >-
+      - The should_lock_account function returns: failed_attempts >= max_attempts
+
+      - However, this function is only called when password_correct=False
+
+      - Specifically: should_lock = should_lock_account(failed_attempts + 1, max_failed_attempts)
+
+      - When password is incorrect, the comparison is (failed_attempts + 1) >= max_failed_attempts
+
+      - If failed_attempts == max_failed_attempts exactly:
+        * When password_correct=False: (max_failed_attempts + 1) >= max_failed_attempts
+      → True → lock_account=True
+        * When password_correct=True: The should_lock_account function is never called,
+      lock_account=False in all subsequent paths - Therefore, when failed_attempts
+      equals max_failed_attempts exactly, lock_account only triggers if the password
+      is incorrect
+
+      - If the password is correct at this point, the account is NOT locked
+
+      - Conclusion: lock_account does NOT always trigger when failed_attempts == max_failed_attempts
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:16'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - The function determine_auth_result can return several distinct AuthDecision
+      combinations based on inputs.
+
+      - Possible outcomes are:
+        - (granted=False, requires_additional_factor=False, lock_account=True, step_up_auth_needed=False):
+      returned for LOCKED users or ACTIVE users with incorrect password when should_lock=True.
+        - (granted=False, requires_additional_factor=False, lock_account=False, step_up_auth_needed=False):
+      returned for SUSPENDED users or ACTIVE users with incorrect password when should_lock=False.
+        - (granted=False, requires_additional_factor=True, lock_account=False, step_up_auth_needed=False):
+      returned for requires_mfa=True and totp_correct=False, or requires_mfa=False
+      and device not TRUSTED.
+        - (granted=True, requires_additional_factor=False, lock_account=False, step_up_auth_needed=False):
+      returned for requires_mfa=True and totp_correct=True (regardless of high_value_operation),
+      or requires_mfa=False, device=TRUSTED, and high_value_operation=False.
+        - (granted=True, requires_additional_factor=False, lock_account=False, step_up_auth_needed=True):
+      returned for requires_mfa=False, device=TRUSTED, and high_value_operation=True.
+      - These 5 combinations are distinct and cover all branches in the code.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - When requires_mfa=True and totp_correct=False, the function returns AuthDecision(granted=False,
+      requires_additional_factor=True, lock_account=False, step_up_auth_needed=False).
+
+      - Authentication is not granted in this case.
+
+      - There are no other code paths where requires_mfa=True but totp_correct=False
+      leads to granted=True.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The lock_account field is set to True only when password_correct=False and
+      should_lock_account(failed_attempts + 1, max_failed_attempts) is True.
+
+      - When password_correct=True, lock_account is always False, even if failed_attempts
+      == max_failed_attempts.
+
+      - Therefore, lock_account does not always trigger when failed_attempts equals
+      max_failed_attempts exactly; it depends on whether the password is correct.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:21:26'
+  q1:
+    answer: There are 9 distinct authentication outcome scenarios.
+    reasoning: >-
+      The model contains specific decision branches based on the input factors. The
+      distinct scenarios (logical paths resulting in a decision) are:
+
+      1. **User Locked**: The user status is LOCKED.
+
+      2. **User Suspended**: The user status is SUSPENDED.
+
+      3. **Password Incorrect (Lockout)**: User is Active, password is incorrect,
+      and `failed_attempts` threshold is reached.
+
+      4. **Password Incorrect (Retry)**: User is Active, password is incorrect, but
+      lockout threshold is not reached.
+
+      5. **MFA Fail**: Password correct, MFA required, but TOTP is incorrect.
+
+      6. **MFA Pass**: Password correct, MFA required, and TOTP is correct (Step-up
+      is never required here as auth level 2 meets requirement).
+
+      7. **Trusted Device Fail**: Password correct, MFA not required, but device is
+      not trusted.
+
+      8. **Trusted Device Pass (High Value)**: Password correct, MFA not required,
+      device is trusted, and operation is high value (Step-up required).
+
+      9. **Trusted Device Pass (Low Value)**: Password correct, MFA not required,
+      device is trusted, and operation is not high value (Step-up not required).
+
+
+      (Note: The `if not can_auth` path is unreachable given the provided `UserStatus`
+      enum values of ACTIVE, LOCKED, and SUSPENDED, as the latter two are handled
+      earlier).
+  q2:
+    answer: No, authentication cannot be granted.
+    reasoning: >-
+      - The code determines the result in the `if requires_mfa:` block.
+
+      - Inside this block, it checks `if not totp_correct:`.
+
+      - If `totp_correct` is false, the code returns an `AuthDecision` with `granted=False`
+      and `requires_additional_factor=True`.
+
+      - There is no path where `granted=True` when MFA is required and TOTP is incorrect.
+  q3:
+    answer: No, lock_account does not always trigger.
+    reasoning: >-
+      - **Reason 1 (Correct Password)**: The lockout logic checks `if not password_correct:`.
+      If the password is correct, the function skips the lockout check entirely and
+      proceeds to MFA/Device checks, eventually returning `lock_account=False` (unless
+      the user was already in `LOCKED` status at input).
+
+      - **Reason 2 (Suspended User)**: If the user status is `SUSPENDED`, the function
+      returns early with `lock_account=False`, regardless of the attempt count.
+
+      - The lockout logic inside the function only calculates `should_lock` if the
+      current authentication attempt failed (incorrect password).
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:33'
+  q1:
+    answer: 8 distinct authentication outcome scenarios
+    reasoning: >-
+      - Tracing through the determine_auth_result function, I identify the following
+      distinct return paths:
+
+      - 1. User LOCKED: granted=False, requires_additional_factor=False, lock_account=True,
+      step_up_auth_needed=False
+
+      - 2. User SUSPENDED: granted=False, requires_additional_factor=False, lock_account=False,
+      step_up_auth_needed=False
+
+      - 3. User not ACTIVE (unreachable after LOCKED/SUSPENDED checks, but coded):
+      granted=False, requires_additional_factor=False, lock_account=False, step_up_auth_needed=False
+
+      - 4. Password incorrect, should_lock=True: granted=False, requires_additional_factor=False,
+      lock_account=True, step_up_auth_needed=False
+
+      - 5. Password incorrect, should_lock=False: granted=False, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=False
+
+      - 6. Password correct, requires_mfa=True, totp_correct=False: granted=False,
+      requires_additional_factor=True, lock_account=False, step_up_auth_needed=False
+
+      - 7. Password correct, requires_mfa=True, totp_correct=True: granted=True, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=False (needs_step_up always false since
+      auth_level=2)
+
+      - 8. Password correct, requires_mfa=False, trusted device: granted=True, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed varies (True if high_value_operation,
+      False otherwise)
+
+      - 9. Password correct, requires_mfa=False, untrusted device: granted=False,
+      requires_additional_factor=True, lock_account=False, step_up_auth_needed=False
+
+      - Considering step_up_auth_needed variations in scenario 8, there are 8 distinct
+      outcome tuples
+  q2:
+    answer: No, authentication cannot be granted when requires_mfa=true and totp_correct=false
+    reasoning: >-
+      - When requires_mfa=True, the code enters the MFA-required branch
+
+      - Inside this branch, if totp_correct=False, the function immediately returns
+      AuthDecision with granted=False and requires_additional_factor=True
+
+      - There is no alternative path that bypasses this check when MFA is required
+
+      - The only way to get granted=True when requires_mfa=True is if totp_correct=True
+      (and password_correct=True and user_status=ACTIVE)
+  q3:
+    answer: No, lock_account does not always trigger when failed_attempts equals max_failed_attempts
+      exactly
+    reasoning: >-
+      - The should_lock_account function uses the condition: failed_attempts >= max_attempts
+
+      - However, lock_account is only evaluated and set in specific code paths
+
+      - Lock_account is only checked when password_correct=False, where it uses failed_attempts
+      + 1 (incrementing before comparison)
+
+      - If failed_attempts == max_failed_attempts and password is incorrect: failed_attempts
+      + 1 > max_failed_attempts, so lock_account=True
+
+      - However, if the user enters correct credentials (password_correct=True), the
+      lockout check is never performed
+
+      - For LOCKED users, lock_account=True is returned regardless of failed_attempts
+
+      - For SUSPENDED users or successful auth scenarios, lock_account=False regardless
+      of failed_attempts count
+
+      - Therefore, lock_account does not "always" trigger when failed_attempts ==
+      max_failed_attempts; it depends on whether the current authentication attempt
+      fails with incorrect password

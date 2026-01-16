@@ -1,0 +1,148 @@
+(* Smart Contract Supply Chain *)
+
+(* Core types *)
+type jurisdiction = US | EU | APAC
+
+type product_category = Electronics | Pharmaceuticals | Food | Chemicals
+
+type quality_standard = ISO9001 | FDA | CE | HACCP
+
+type party_role = Supplier | Buyer | Logistics
+
+type contract_decision = {
+  approved: bool;
+  requires_audit: bool;
+  penalty_applies: bool;
+}
+
+(* Check if party is certified for product *)
+let party_certified_for_product role category =
+  match role, category with
+  | Supplier, Pharmaceuticals -> true  (* All suppliers can handle Pharma *)
+  | Supplier, _ -> true
+  | Buyer, _ -> true
+  | Logistics, Food -> true  (* Logistics can handle Food *)
+  | Logistics, Electronics -> true
+  | Logistics, _ -> false
+
+(* Quality standard requirements by category *)
+let requires_standard category standard =
+  match category, standard with
+  | Pharmaceuticals, FDA -> true
+  | Pharmaceuticals, ISO9001 -> true
+  | Food, HACCP -> true
+  | Food, ISO9001 -> true
+  | Electronics, CE -> true
+  | Electronics, ISO9001 -> true
+  | Chemicals, ISO9001 -> true
+  | _ -> false
+
+(* Jurisdiction allows product category *)
+let jurisdiction_permits jurisdiction category =
+  match jurisdiction, category with
+  | US, Pharmaceuticals -> true
+  | US, _ -> true
+  | EU, Chemicals -> false  (* EU restricts Chemicals *)
+  | EU, _ -> true
+  | APAC, _ -> true
+
+(* Critical override: Pharmaceuticals always need audit *)
+let needs_mandatory_audit category =
+  category = Pharmaceuticals
+
+(* Core contract validation decision *)
+let determine_contract_validity
+    role
+    category
+    jurisdiction
+    has_iso9001
+    has_fda
+    has_ce
+    has_haccp
+    reputation_score
+    payment_advance_pct =
+
+  (* Check jurisdiction permits category first *)
+  let jurisdiction_ok = jurisdiction_permits jurisdiction category in
+
+  if not jurisdiction_ok then
+    { approved = false;
+      requires_audit = false;
+      penalty_applies = false }
+  else
+    (* Check party certification *)
+    let party_ok = party_certified_for_product role category in
+
+    if not party_ok then
+      { approved = false;
+        requires_audit = false;
+        penalty_applies = false }
+    else
+      (* Check quality standards *)
+      let iso_ok = if requires_standard category ISO9001 then has_iso9001 else true in
+      let fda_ok = if requires_standard category FDA then has_fda else true in
+      let ce_ok = if requires_standard category CE then has_ce else true in
+      let haccp_ok = if requires_standard category HACCP then has_haccp else true in
+
+      let standards_ok = iso_ok && fda_ok && ce_ok && haccp_ok in
+
+      if not standards_ok then
+        { approved = false;
+          requires_audit = false;
+          penalty_applies = true }  (* Penalty for missing standards *)
+      else
+        (* Check reputation *)
+        let reputation_ok = reputation_score >= 70 in
+
+        if not reputation_ok then
+          { approved = false;
+            requires_audit = true;  (* Low reputation needs audit *)
+            penalty_applies = false }
+        else
+          (* Check payment terms *)
+          let payment_ok = payment_advance_pct >= 30 in
+
+          if not payment_ok then
+            { approved = false;
+              requires_audit = false;
+              penalty_applies = true }  (* Penalty for risky payment terms *)
+          else
+            (* Mandatory audit for critical categories *)
+            let needs_audit = needs_mandatory_audit category in
+
+            { approved = true;
+              requires_audit = needs_audit;
+              penalty_applies = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Pharmaceuticals scenarios *)
+let assume_pharmaceuticals
+    (role : party_role)
+    (category : product_category)
+    (jurisdiction : jurisdiction)
+    (has_iso9001 : bool)
+    (has_fda : bool)
+    (has_ce : bool)
+    (has_haccp : bool)
+    (reputation_score : int)
+    (payment_advance_pct : int) : bool =
+  category = Pharmaceuticals
+
+let pharma_scenarios role category jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct =
+  determine_contract_validity role category jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct
+[@@decomp top ~prune:true ~assuming:[%id assume_pharmaceuticals] ()]
+
+(* Q2: Can approval happen without FDA for Pharmaceuticals? *)
+let approved_pharma_no_fda role category jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct =
+  let decision = determine_contract_validity role category jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct in
+  category = Pharmaceuticals && not has_fda && decision.approved
+[@@decomp top ()]
+
+(* Q3: Pharmaceuticals always require audit *)
+verify (fun role jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct ->
+  let decision = determine_contract_validity role Pharmaceuticals jurisdiction has_iso9001 has_fda has_ce has_haccp reputation_score payment_advance_pct in
+  decision.approved ==> decision.requires_audit
+)

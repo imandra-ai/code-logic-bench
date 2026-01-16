@@ -1,0 +1,47 @@
+model: "smart_factory_production"
+q1:
+  question: "How many production scenarios exist in HighSpeed mode?"
+  answer: "14 scenarios"
+  key_thresholds:
+    temperature_limit: 90
+    vibration_limit: 50
+    defect_thresholds: "ProductA=10, ProductB=20, ProductC=30"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_highspeed.json'
+    use_of_assuming: "mode = HighSpeed"
+q2:
+  question: "Can production_allowed=true ever occur when safety_level = Critical?"
+  answer: "YES - 12 scenarios where Critical allows production"
+  explanation: |
+    Critical is a warning level, not a halt condition.
+    Emergency stop only triggers for: safety_level = Emergency OR temperature > 100.
+    Critical alone does not halt production.
+  example:
+    product: "ProductC"
+    mode: "HighSpeed"
+    defect_score: 31
+    temperature: 100
+    safety_level: "Critical"
+    vibration: 0
+    result: "production_allowed = true"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_critical_safety.json'
+q3:
+  question: "Can production_allowed ever be true when safety_level = Emergency?"
+  answer: "PROVEN - Emergency always stops production (production_allowed = false)"
+  property: "safety_level = Emergency ==> not production_allowed"
+  why_proven: "Emergency stop check executes first (line 43), sets production_allowed = false unconditionally"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_emergency_stop.json'
+analysis_metadata:
+  total_scenarios_q1: 14
+  critical_production_count_q2: 12
+  property_result_q3: "PROVEN"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to HighSpeed mode"
+    q2_filtering: "Tests if Critical level allows production"
+    q3_property: "Tests Emergency stop guarantee"
+  complexity_insights:
+    - "Q1: HighSpeed creates 14 scenarios (3 products × defect ranges × temp × vibration)"
+    - "Q2: Critical is WARNING level - production continues (12 scenarios)"
+    - "Q3: Emergency is HALT level - production always stops (proven)"

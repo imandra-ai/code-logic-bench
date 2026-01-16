@@ -1,0 +1,23 @@
+model: "multifactor_auth"
+q1:
+  question: "How many distinct authentication outcome scenarios exist?"
+  answer: "9 scenarios"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_auth.json'
+q2:
+  question: "Can authentication be granted when requires_mfa=true but totp_correct=false?"
+  answer: "NO - MFA strictly enforced (0 scenarios)"
+  explanation: "MFA check (line 72) blocks grant if TOTP incorrect when requires_mfa=true"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_no_totp.json'
+q3:
+  question: "When failed_attempts = max_failed_attempts, does lock_account always trigger?"
+  answer: "REFUTED - Not always"
+  property: "(Active && password_incorrect && failed_attempts = max) ==> lock_account"
+  counterexample_reason: "Property checks failed_attempts = max BEFORE password attempt, but lock triggers at (failed_attempts + 1) >= max"
+  metadata:
+    extraction: 'cat vg_q3_lockout.json | jq ".[0] | keys"'
+analysis_metadata:
+  total_scenarios_q1: 9
+  mfa_bypass_q2: 0
+  property_result_q3: "REFUTED"

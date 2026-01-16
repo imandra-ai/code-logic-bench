@@ -1,0 +1,49 @@
+model: "emergency_triage"
+q1:
+  question: "How many distinct ESI triage scenarios exist?"
+  answer: "960 scenarios"
+  breakdown:
+    theoretical: "5 vitals × 5 vitals × 5 vitals × 5 vitals × 5 pain × 5 age × 4 arrival = 312,500"
+    actual: 960
+    reduction: "Dead zones, ESI_1 short-circuits, pruned unreachable combinations"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1.json'
+q2:
+  question: "Can ESI_4/ESI_5 be upgraded to ESI_2 via high-risk quorum?"
+  answer: "YES - Normal vitals (ESI_5) can upgrade to ESI_2 via quorum"
+  example_scenario:
+    initial: "All vitals normal → initial ESI_5"
+    quorum_met: "Excruciating pain (c1) + VeryElderly (c2) = 2/4 conditions"
+    result: "Upgraded to ESI_2"
+  why_counterintuitive: >
+    High-risk quorum (2 of 4: [severe pain, extreme age, ambulance/helicopter, 2+ abnormals]) can trigger ESI_2 WITHOUT any abnormal vitals. LLMs might assume ESI_2 requires clinical abnormalities, missing the policy-based upgrade via demographics+pain.
+
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2.json'
+q3:
+  question: "Can 'critical vitals → ESI_1' be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "has_critical_vital ==> (esi_level = ESI_1)"
+  why_holds: >
+    Critical vital check occurs BEFORE any upgrades (quorum, helicopter) and immediately returns ESI_1. Dead zone is checked first but only affects borderline vitals (VLow/VHigh), not critical (VCriticalLow/VCriticalHigh). The control flow guarantees critical vitals always result in ESI_1.
+
+  edge_cases_analyzed:
+    - "Dead zone + critical: Critical overrides dead zone (checked after)"
+    - "Helicopter upgrade + critical: ESI_1 cannot be upgraded further"
+    - "Borderline vs critical: VLow/VHigh ≠ VCriticalLow/VCriticalHigh"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3.json'
+analysis_metadata:
+  total_regions: 960
+  imandra_runtime: "All analyses completed < 10 seconds"
+  pattern_complexity:
+    quorum: "High-risk requires 2/4: [severe pain, extreme age, ambulance/helicopter, 2+ abnormal vitals]"
+    override: "Helicopter upgrades ESI EXCEPT when abnormal_count=0 (stable vitals)"
+    dead_zone: "One borderline vital + moderate pain + non-extreme age → ambiguous ESI_3"
+    multiplexer: "Resource prediction changes meaning based on ESI level and arrival mode"
+  interesting_findings:
+    - "Normal vitals CAN become ESI_2 via quorum (pain + age)"
+    - "Helicopter with stable vitals does NOT upgrade (conditional override)"
+    - "Three upgrade stages create complex decision tree"
+    - "Dead zone only applies to specific borderline+moderate+non-extreme combination"
+    - "LLMs likely to miss quorum upgrade paths and conditional helicopter override"

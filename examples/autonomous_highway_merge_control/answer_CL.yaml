@@ -1,0 +1,27 @@
+model: "autonomous_highway_merge_control"
+q1:
+  question: "How many distinct merge decision scenarios exist in determine_merge_decision?"
+  answer: 247
+  explanation: >
+    The decomposition identified 247 distinct regions representing all possible merge decision scenarios. This covers combinations of: - 3 vehicle types (Autonomous, Human_Driven, Emergency_Vehicle) - 3 weather conditions (Clear, Rainy, Adverse) - gap_size range (25-65 meters) - closing_rate range (10-35 m/s) - 2 speed_matched states (true/false) - 2 emergency_present states (true/false) With patterns: Dead Zone, Multiplexer (weather), Quorum (2-of-3), Override (emergency)
+
+q2:
+  question: "Can an Emergency_Vehicle with gap_size=45m and gap_closing_rate=25 ever be commanded to Emergency_Brake?"
+  answer: "NO"
+  explanation: >
+    Emergency_Brake is only triggered when closing_rate > 30 m/s (critical gap condition). With gap_closing_rate=25, this threshold is not met, so Emergency_Brake will not occur. The gap_size value is irrelevant for Emergency_Brake trigger - only the closing_rate matters. Even Emergency_Vehicles are subject to the same physics-based critical gap detection.
+
+q3:
+  question: "Can the safety property 'non-emergency vehicles with emergency_present=true should never Execute_Merge' ever be violated?"
+  answer: "PROVEN"
+  explanation: >
+    The safety property holds. When emergency_present=true and v_type ≠ Emergency_Vehicle, the override pattern in the code ensures that Abort_Merge is commanded before any quorum check can allow Execute_Merge. This is enforced at line 75-76 in model.iml.
+
+key_thresholds:
+  - "gap_size dead zone: 48-52 meters"
+  - "closing_rate dead zone: 18-22 m/s"
+  - "closing_rate critical: > 30 m/s"
+  - "closing_rate safe quorum: < 15 m/s"
+  - "gap margin for Execute_Merge: threshold + 10"
+  - "Base gaps: Autonomous=30, Human=45, Emergency=25"
+  - "Weather multipliers: Clear=1.0x, Rainy=1.3x, Adverse=1.7x"

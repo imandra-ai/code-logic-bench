@@ -1,0 +1,190 @@
+(* Infusion Pump Controller *)
+
+(* Core types *)
+type drug_class = Opioid | Vasopressor | Fluid
+
+type patient_risk = LowRisk | MediumRisk | HighRisk
+
+type hardware_status = Normal | Degraded | Critical
+
+type infusion_decision = {
+  allow_infusion: bool;
+  require_double_check: bool;
+  trigger_alarm: bool;
+  adjusted_max_rate: int;  (* ml/hour *)
+  safety_level: patient_risk;
+}
+
+(* Drug-specific base limits (ml/hour) *)
+let base_max_rate drug =
+  match drug with
+  | Opioid -> 20
+  | Vasopressor -> 30
+  | Fluid -> 500
+
+let base_min_rate drug =
+  match drug with
+  | Opioid -> 1
+  | Vasopressor -> 1
+  | Fluid -> 10
+
+(* Critical drug check *)
+let is_critical_drug drug =
+  match drug with
+  | Opioid | Vasopressor -> true
+  | Fluid -> false
+
+(* Patient risk assessment with multiplexer pattern *)
+let adjust_max_rate_for_patient drug patient_risk patient_weight =
+  let base = base_max_rate drug in
+
+  (* Weight adjustmentmultiplier based on drug class *)
+  let weight_factor =
+    match drug with
+    | Opioid ->
+      if patient_weight < 50 then 60  (* 60% for lightweight patients *)
+      else if patient_weight > 90 then 120  (* 120% for heavy patients *)
+      else 100
+    | Vasopressor ->
+      if patient_weight < 60 then 70
+      else if patient_weight > 85 then 110
+      else 100
+    | Fluid ->
+      100  (* Fluid rates don't vary by weight in this simplified model *)
+  in
+
+  (* Risk adjustment *)
+  let risk_factor =
+    match patient_risk with
+    | LowRisk -> 100
+    | MediumRisk -> 80
+    | HighRisk -> 60
+  in
+
+  (* Compute adjusted rate *)
+  (base * weight_factor * risk_factor) / 10000
+
+(* Hardware affects safety with override pattern *)
+let evaluate_hardware_safety hardware requested_rate drug patient_risk =
+  match hardware with
+  | Normal -> true
+
+  | Degraded ->
+    (* Override: Degraded hardware restricts high rates... *)
+    let rate_ok = requested_rate <= 50 in
+    (* ...BUT critical drugs override this restriction if patient is HighRisk *)
+    let critical_override = is_critical_drug drug && patient_risk = HighRisk in
+    if critical_override then true else rate_ok
+
+  | Critical ->
+    (* Critical hardware status: only allow low rates for critical drugs *)
+    is_critical_drug drug && requested_rate <= 10
+
+(* Dead zone: certain combinations are ambiguous *)
+let is_valid_configuration requested_rate patient_weight battery_level =
+  (* Rates in 48-52 range with weight 69-71 and battery 19-21% are ambiguous *)
+  let in_dead_zone =
+    requested_rate >= 48 && requested_rate <= 52 &&
+    patient_weight >= 69 && patient_weight <= 71 &&
+    battery_level >= 19 && battery_level <= 21
+  in
+  (* Also invalid if battery is too low or rate is nonsensical *)
+  let battery_too_low = battery_level < 10 in
+  let rate_invalid = requested_rate < 0 || requested_rate > 1000 in
+
+  not (in_dead_zone || battery_too_low || rate_invalid)
+
+(* Alarm triggering with quorum pattern *)
+let check_alarm_conditions drug patient_risk hardware requested_rate adjusted_max =
+  let c1 = is_critical_drug drug in
+  let c2 = patient_risk = HighRisk in
+  let c3 = hardware = Critical in
+  let c4 = requested_rate > adjusted_max in
+
+  let alarm_factors =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+
+  alarm_factors >= 2
+
+(* Core decision function *)
+let determine_infusion_safety
+    drug
+    patient_risk
+    patient_weight
+    hardware
+    requested_rate
+    battery_level =
+
+  (* Check validity first *)
+  let valid = is_valid_configuration requested_rate patient_weight battery_level in
+
+  if not valid then
+    { allow_infusion = false;
+      require_double_check = false;
+      trigger_alarm = false;
+      adjusted_max_rate = 0;
+      safety_level = LowRisk }
+  else
+    (* Calculate adjusted max rate (multiplexer) *)
+    let max_rate = adjust_max_rate_for_patient drug patient_risk patient_weight in
+    let min_rate = base_min_rate drug in
+
+    (* Check hardware safety (override) *)
+    let hardware_ok = evaluate_hardware_safety hardware requested_rate drug patient_risk in
+
+    (* Check rate bounds *)
+    let rate_in_bounds = requested_rate >= min_rate && requested_rate <= max_rate in
+
+    (* Determine if double check needed *)
+    let needs_double_check =
+      is_critical_drug drug &&
+      (patient_risk = HighRisk || hardware = Degraded || requested_rate > (max_rate * 80) / 100)
+    in
+
+    (* Check alarm conditions (quorum) *)
+    let alarm = check_alarm_conditions drug patient_risk hardware requested_rate max_rate in
+
+    let final_allowed = hardware_ok && rate_in_bounds in
+
+    { allow_infusion = final_allowed;
+      require_double_check = needs_double_check;
+      trigger_alarm = alarm;
+      adjusted_max_rate = max_rate;
+      safety_level = patient_risk }
+
+(* Analysis
+====================
+ *)
+
+(* Restrict input space for decomposition *)
+let assume_valid_inputs
+    (drug : drug_class)
+    (patient_risk : patient_risk)
+    (patient_weight : int)
+    (hardware : hardware_status)
+    (requested_rate : int)
+    (battery_level : int) : bool =
+  patient_weight >= 40 && patient_weight <= 100 &&
+  requested_rate >= 0 && requested_rate <= 600 &&
+  battery_level >= 10 && battery_level <= 100
+
+(* Q1: Enumerate all distinct infusion safety scenarios *)
+let infusion_scenarios drug patient_risk patient_weight hardware requested_rate battery_level =
+  determine_infusion_safety drug patient_risk patient_weight hardware requested_rate battery_level
+[@@decomp top ~prune:true ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q2: Can a Critical hardware status ever allow infusion? *)
+let critical_hardware_allowed drug patient_risk patient_weight hardware requested_rate battery_level =
+  let decision = determine_infusion_safety drug patient_risk patient_weight hardware requested_rate battery_level in
+  hardware = Critical && decision.allow_infusion
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q3: Can HighRisk patient with critical drug fail to require double check? *)
+let high_risk_no_double_check drug patient_risk patient_weight hardware requested_rate battery_level =
+  let decision = determine_infusion_safety drug patient_risk patient_weight hardware requested_rate battery_level in
+  patient_risk = HighRisk && is_critical_drug drug && not decision.require_double_check
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]

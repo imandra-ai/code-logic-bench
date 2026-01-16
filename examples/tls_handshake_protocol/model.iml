@@ -1,0 +1,229 @@
+(* TLS 1.3 Handshake Protocol *)
+
+(* Core types *)
+type cipher_suite = AES_256_GCM | AES_128_GCM
+
+type certificate_status = Valid | Invalid
+
+type key_exchange_group = SECP256R1 | X25519
+
+type handshake_outcome = 
+  | FullHandshake_Success
+  | SessionResumption_Success
+  | SecurityDowngrade
+  | CertificateFailure
+  | CompatibilityFailure
+  | ReplayAttack
+  | InvalidState
+
+type handshake_decision = {
+  outcome: handshake_outcome;
+  forward_secrecy: bool;
+  cipher_strength: int;
+  can_proceed: bool;
+}
+
+(* Cipher suite strength *)
+let cipher_strength = function
+  | AES_256_GCM -> 256
+  | AES_128_GCM -> 128
+
+(* Check if cipher suites are compatible *)
+let has_compatible_cipher client_cipher server_cipher =
+  client_cipher = server_cipher
+
+(* Check if key exchange groups are compatible *)
+let has_compatible_group client_group server_group =
+  client_group = server_group
+
+(* Check for forward secrecy *)
+let provides_forward_secrecy group =
+  group = X25519
+
+(* Determine minimum acceptable cipher strength based on security policy *)
+let minimum_cipher_strength_for_policy security_policy_level =
+  if security_policy_level >= 3 then 256
+  else if security_policy_level >= 2 then 192
+  else 128
+
+(* Check if resumption is allowed based on security policy *)
+let resumption_allowed_by_policy security_policy_level session_age =
+  (* High security policy overrides resumption *)
+  if security_policy_level >= 4 then false
+  (* Sessions aged 86400-86410 are ambiguous *)
+  else if session_age >= 86400 && session_age <= 86410 then false
+  else session_age < 86400
+
+(* Core decision function - simplified for decomposition *)
+let determine_handshake_outcome
+    client_cipher
+    server_cipher
+    client_group
+    server_group
+    cert_status
+    has_session_ticket
+    ticket_is_valid
+    resumption_policy_ok
+    replay_detected
+    security_policy_level
+    error_count =
+  
+  (* Check for replay attack first (security critical) *)
+  if replay_detected then
+    { outcome = ReplayAttack;
+      forward_secrecy = false;
+      cipher_strength = 0;
+      can_proceed = false }
+
+  (* Check error threshold *)
+  else if error_count >= 3 then
+    { outcome = InvalidState;
+      forward_secrecy = false;
+      cipher_strength = 0;
+      can_proceed = false }
+
+  (* Check basic compatibility *)
+  else if not (has_compatible_cipher client_cipher server_cipher) then
+    { outcome = CompatibilityFailure;
+      forward_secrecy = false;
+      cipher_strength = 0;
+      can_proceed = false }
+
+  else if not (has_compatible_group client_group server_group) then
+    { outcome = CompatibilityFailure;
+      forward_secrecy = false;
+      cipher_strength = 0;
+      can_proceed = false }
+
+  else
+    (* security_policy_level changes requirements *)
+    let min_strength = minimum_cipher_strength_for_policy security_policy_level in
+    let actual_strength = cipher_strength client_cipher in
+    
+    (* Check if cipher meets policy requirements *)
+    if actual_strength < min_strength then
+      { outcome = SecurityDowngrade;
+        forward_secrecy = false;
+        cipher_strength = actual_strength;
+        can_proceed = false }
+    
+    (* Attempt session resumption if ticket exists *)
+    else if has_session_ticket then
+      (* Valid ticket BUT policy can override *)
+      if ticket_is_valid && resumption_policy_ok then
+        { outcome = SessionResumption_Success;
+          forward_secrecy = false;  (* PSK doesn't provide forward secrecy *)
+          cipher_strength = actual_strength;
+          can_proceed = true }
+      else
+        (* Ticket invalid or policy blocks it, fall through to full handshake *)
+        if cert_status = Invalid then
+          { outcome = CertificateFailure;
+            forward_secrecy = false;
+            cipher_strength = 0;
+            can_proceed = false }
+        else
+          let fs = provides_forward_secrecy client_group in
+          (* High security policy requires forward secrecy *)
+          if security_policy_level >= 4 && not fs then
+            { outcome = SecurityDowngrade;
+              forward_secrecy = false;
+              cipher_strength = actual_strength;
+              can_proceed = false }
+          else
+            { outcome = FullHandshake_Success;
+              forward_secrecy = fs;
+              cipher_strength = actual_strength;
+              can_proceed = true }
+    
+    (* No session ticket, perform full handshake *)
+    else
+      if cert_status = Invalid then
+        { outcome = CertificateFailure;
+          forward_secrecy = false;
+          cipher_strength = 0;
+          can_proceed = false }
+      else
+        let fs = provides_forward_secrecy client_group in
+        (* High security policy requires forward secrecy *)
+        if security_policy_level >= 4 && not fs then
+          { outcome = SecurityDowngrade;
+            forward_secrecy = false;
+            cipher_strength = actual_strength;
+            can_proceed = false }
+        else
+          { outcome = FullHandshake_Success;
+            forward_secrecy = fs;
+            cipher_strength = actual_strength;
+            can_proceed = true }
+
+(* Analysis
+====================
+ *)
+
+(* Assumption predicate for Q1 *)
+let q1_assumptions
+    (client_cipher : cipher_suite)
+    (server_cipher : cipher_suite)
+    (client_group : key_exchange_group)
+    (server_group : key_exchange_group)
+    (cert_status : certificate_status)
+    (has_session_ticket : bool)
+    (ticket_is_valid : bool)
+    (resumption_policy_ok : bool)
+    (replay_detected : bool)
+    (security_policy_level : int)
+    (error_count : int) =
+  error_count >= 0 && error_count <= 5 &&
+  security_policy_level >= 1 && security_policy_level <= 5 &&
+  (* Constraint: resumption_policy_ok must be false for high security *)
+  (security_policy_level >= 4 ==> not resumption_policy_ok)
+
+(* Decomposition target: enumerate all distinct handshake scenarios *)
+let handshake_scenarios = determine_handshake_outcome
+[@@decomp top ~prune:true ~assuming:[%id q1_assumptions] ()]
+
+(* Assumption predicate for Q2 *)
+let q2_assumptions
+    (client_cipher : cipher_suite)
+    (server_cipher : cipher_suite)
+    (client_group : key_exchange_group)
+    (server_group : key_exchange_group)
+    (cert_status : certificate_status)
+    (has_session_ticket : bool)
+    (ticket_is_valid : bool)
+    (resumption_policy_ok : bool)
+    (replay_detected : bool)
+    (security_policy_level : int)
+    (error_count : int) =
+  error_count >= 0 && error_count <= 5 &&
+  security_policy_level >= 1 && security_policy_level <= 5 &&
+  (security_policy_level >= 4 ==> not resumption_policy_ok)
+
+(* Q2: When does forward secrecy fail despite successful connection? *)
+let successful_without_forward_secrecy 
+    client_cipher server_cipher client_group server_group
+    cert_status has_session_ticket ticket_is_valid
+    resumption_policy_ok replay_detected security_policy_level error_count =
+  let result = determine_handshake_outcome
+    client_cipher server_cipher client_group server_group
+    cert_status has_session_ticket ticket_is_valid
+    resumption_policy_ok replay_detected security_policy_level error_count in
+  result.can_proceed && not result.forward_secrecy
+[@@decomp top ~assuming:[%id q2_assumptions] ()]
+
+(* Q3: Safety property - High security policy with successful handshake always provides forward secrecy *)
+verify (fun client_cipher server_cipher client_group server_group
+    cert_status has_session_ticket ticket_is_valid
+    resumption_policy_ok replay_detected security_policy_level error_count ->
+  (* Reasonable bounds and policy constraint *)
+  (error_count >= 0 && error_count <= 5 &&
+   security_policy_level >= 1 && security_policy_level <= 5 &&
+   (security_policy_level >= 4 ==> not resumption_policy_ok)) ==>
+  (let result = determine_handshake_outcome
+    client_cipher server_cipher client_group server_group
+    cert_status has_session_ticket ticket_is_valid
+    resumption_policy_ok replay_detected security_policy_level error_count in
+  
+  (security_policy_level >= 4 && result.can_proceed) ==> result.forward_secrecy)
+)

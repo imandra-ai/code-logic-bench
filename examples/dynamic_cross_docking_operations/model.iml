@@ -1,0 +1,222 @@
+(* Dynamic Cross-Docking Operations *)
+
+(* Core types *)
+type product_type = Standard | Fragile | Hazardous | Perishable | HighValue
+
+type temperature_zone = Ambient | Refrigerated | Frozen
+
+type priority_level = Normal | High | Emergency
+
+type dock_status = Available | PartiallyOccupied | FullyOccupied | Maintenance
+
+type routing_decision = {
+  route_approved: bool;
+  assigned_dock_id: int;
+  requires_emergency_override: bool;
+  estimated_handling_time: int;
+  routing_valid: bool;
+}
+
+(* Base handling time by product type (minutes) *)
+let base_handling_time product_type =
+  match product_type with
+  | Standard -> 15
+  | Fragile -> 30
+  | Hazardous -> 45
+  | Perishable -> 20
+  | HighValue -> 25
+
+(* Temperature zone affects handling time multiplier *)
+let temp_handling_multiplier temp_zone =
+  match temp_zone with
+  | Ambient -> 1
+  | Refrigerated -> 2
+  | Frozen -> 3
+
+(* Dock capacity thresholds *)
+let dock_capacity_limit dock_status =
+  match dock_status with
+  | Available -> 100
+  | PartiallyOccupied -> 60
+  | FullyOccupied -> 0
+  | Maintenance -> 0
+
+(* Priority adjusts capacity requirements *)
+let priority_capacity_adjustment priority =
+  match priority with
+  | Normal -> 0
+  | High -> -10    (* High priority can squeeze into slightly fuller docks *)
+  | Emergency -> -30  (* Emergency can override more capacity *)
+
+(* Temperature zone compatibility check *)
+let is_temp_compatible dock_temp_zone product_temp_zone =
+  match dock_temp_zone, product_temp_zone with
+  (* Refrigerated docks can handle Ambient (but not ideal) *)
+  | Refrigerated, Ambient -> true
+  (* Frozen can handle Refrigerated and Ambient (but not ideal) *)
+  | Frozen, (Refrigerated | Ambient) -> true
+  (* Exact match always works *)
+  | Ambient, Ambient -> true
+  | Refrigerated, Refrigerated -> true
+  | Frozen, Frozen -> true
+  (* Other combinations don't work *)
+  | _ -> false
+
+(* Calculate adjusted handling time based on temp zone and product type *)
+let calculate_handling_time product_type temp_zone priority =
+  let base = base_handling_time product_type in
+  let temp_mult = temp_handling_multiplier temp_zone in
+  let adjusted = base * temp_mult in
+
+  (* Emergency reduces handling time, EXCEPT for Hazardous *)
+  match priority, product_type with
+  | Emergency, Hazardous -> adjusted  (* Cannot rush hazardous handling *)
+  | Emergency, _ -> (adjusted * 7) / 10  (* 30% faster *)
+  | High, _ -> (adjusted * 9) / 10  (* 10% faster *)
+  | Normal, _ -> adjusted
+
+(* Check if product volume fits in dock capacity *)
+let check_capacity_fit product_volume dock_status priority =
+  let dock_capacity = dock_capacity_limit dock_status in
+  let priority_adjustment = priority_capacity_adjustment priority in
+  let effective_capacity = dock_capacity + priority_adjustment in
+  product_volume <= effective_capacity
+
+(* Dead zone: volumes in certain ranges with certain dock states are ambiguous *)
+let is_in_dead_zone product_volume dock_status =
+  match dock_status with
+  | PartiallyOccupied -> product_volume >= 58 && product_volume <= 62
+  | _ -> false
+
+(* Check emergency override conditions *)
+let check_emergency_override_needed
+    priority
+    time_to_deadline
+    product_value
+    dock_distance =
+
+  let c1 = (priority = Emergency) in
+  let c2 = (time_to_deadline < 30) in  (* Less than 30 minutes *)
+  let c3 = (product_value > 10000) in
+  let c4 = (dock_distance > 100) in  (* Long distance needs override *)
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count >= 3
+
+(* Assign dock ID based on temperature zone and status *)
+let assign_dock_by_temp_and_status dock_temp_zone dock_status =
+  match dock_temp_zone, dock_status with
+  | Ambient, Available -> 1
+  | Ambient, PartiallyOccupied -> 2
+  | Refrigerated, Available -> 3
+  | Refrigerated, PartiallyOccupied -> 4
+  | Frozen, Available -> 5
+  | Frozen, PartiallyOccupied -> 6
+  | _, (FullyOccupied | Maintenance) -> 0  (* Invalid *)
+
+(* Core decision function *)
+let determine_routing_decision
+    product_type
+    product_temp_zone
+    product_volume
+    priority
+    dock_temp_zone
+    dock_status
+    time_to_deadline
+    product_value
+    dock_distance =
+
+  (* Check validity conditions first *)
+  let in_dead_zone = is_in_dead_zone product_volume dock_status in
+
+  if in_dead_zone then
+    { route_approved = false;
+      assigned_dock_id = 0;
+      requires_emergency_override = false;
+      estimated_handling_time = 0;
+      routing_valid = false }
+  else
+    (* Check temperature compatibility *)
+    let temp_compatible = is_temp_compatible dock_temp_zone product_temp_zone in
+
+    if not temp_compatible then
+      { route_approved = false;
+        assigned_dock_id = 0;
+        requires_emergency_override = false;
+        estimated_handling_time = 0;
+        routing_valid = true }
+    else
+      (* Check capacity fit *)
+      let capacity_ok = check_capacity_fit product_volume dock_status priority in
+
+      (* Maintenance dock blocks all routing EXCEPT Emergency with override *)
+      let blocked_by_maintenance = (dock_status = Maintenance) in
+
+      (* Calculate handling time *)
+      let handling_time = calculate_handling_time product_type product_temp_zone priority in
+
+      (* Check if emergency override is needed *)
+      let needs_override = check_emergency_override_needed priority time_to_deadline product_value dock_distance in
+
+      (* Override logic - Emergency can bypass capacity and maintenance *)
+      let emergency_bypass = (priority = Emergency && needs_override) in
+
+      (* Final routing decision *)
+      let can_route =
+        if blocked_by_maintenance then
+          (* Only emergency with override can use maintenance docks *)
+          emergency_bypass
+        else
+          (* Normal routing requires capacity *)
+          capacity_ok || emergency_bypass
+      in
+
+      if can_route then
+        let dock_id = assign_dock_by_temp_and_status dock_temp_zone dock_status in
+        { route_approved = true;
+          assigned_dock_id = dock_id;
+          requires_emergency_override = needs_override;
+          estimated_handling_time = handling_time;
+          routing_valid = true }
+      else
+        { route_approved = false;
+          assigned_dock_id = 0;
+          requires_emergency_override = false;
+          estimated_handling_time = 0;
+          routing_valid = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Decomposition target - enumerate all distinct routing scenarios *)
+let routing_scenarios = determine_routing_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: When does emergency override trigger? *)
+let triggers_emergency_override
+    product_type product_temp_zone product_volume priority
+    dock_temp_zone dock_status time_to_deadline product_value dock_distance =
+  let decision = determine_routing_decision
+    product_type product_temp_zone product_volume priority
+    dock_temp_zone dock_status time_to_deadline product_value dock_distance in
+  decision.requires_emergency_override
+[@@decomp top ()]
+
+(* Q3: Safety property - Hazardous products routed to maintenance docks must have emergency override *)
+verify (fun product_type product_temp_zone product_volume priority
+            dock_temp_zone dock_status time_to_deadline product_value dock_distance ->
+  let decision = determine_routing_decision
+    product_type product_temp_zone product_volume priority
+    dock_temp_zone dock_status time_to_deadline product_value dock_distance in
+
+  let hazardous_to_maintenance =
+    (product_type = Hazardous && dock_status = Maintenance && decision.route_approved) in
+
+  hazardous_to_maintenance ==> decision.requires_emergency_override
+)

@@ -1,0 +1,136 @@
+(* Healthcare Appointment Scheduler *)
+
+(* Core types *)
+type insurance_status = Verified | Pending | Denied | Expired
+
+type priority = Routine | Urgent | Emergency
+
+type appointment_result = Approved | WaitList | Rejected
+
+(* Emergency appointments can bypass certain constraints *)
+(* BUT only if patient record is acceptable (no_show_count < 3) *)
+let emergency_override priority no_show_count =
+  priority = Emergency && no_show_count < 3
+
+(* Insurance verification depends on provider type and age *)
+(* Different providers have different rules for "acceptable" insurance *)
+let insurance_acceptable status provider_premium age =
+  match status with
+  | Verified -> true
+  | Pending -> provider_premium && age >= 65  (* Premium providers accept pending for seniors *)
+  | Expired -> false
+  | Denied -> false
+
+(* Certain time slots (720-750) with high daily_count (18-20) are ambiguous *)
+(* These represent lunch hour borderline cases where policies unclear *)
+let in_scheduling_dead_zone time_slot daily_count =
+  time_slot >= 720 && time_slot <= 750 &&  (* 12:00-12:30 PM *)
+  daily_count >= 18 && daily_count <= 20   (* Near capacity *)
+
+(* Approval requires 3 out of 5 conditions *)
+let calculate_approval_score
+    insurance_ok
+    slot_available
+    pre_auth_ok
+    no_show_acceptable
+    days_in_advance_ok =
+  let count =
+    (if insurance_ok then 1 else 0) +
+    (if slot_available then 1 else 0) +
+    (if pre_auth_ok then 1 else 0) +
+    (if no_show_acceptable then 1 else 0) +
+    (if days_in_advance_ok then 1 else 0)
+  in
+  count
+
+(* Core appointment scheduling decision *)
+let determine_appointment_decision
+    (* Patient info *)
+    insurance_status
+    no_show_count
+    patient_age
+    pre_auth_provided
+    (* Request info *)
+    priority
+    days_in_advance
+    time_slot
+    (* Doctor/system info *)
+    daily_count
+    provider_premium
+    slot_available
+    pre_auth_required =
+
+  (* Check dead zone first *)
+  let in_dead_zone = in_scheduling_dead_zone time_slot daily_count in
+
+  if in_dead_zone then
+    WaitList  (* Dead zone goes to waiting list for manual review *)
+  else
+    (* Check emergency override *)
+    let is_emergency_override = emergency_override priority no_show_count in
+
+    if is_emergency_override then
+      Approved  (* Emergency bypasses normal checks *)
+    else
+      (* Normal approval logic with quorum pattern *)
+
+      (* Check individual conditions *)
+      let insurance_ok = insurance_acceptable insurance_status provider_premium patient_age in
+
+      let pre_auth_ok =
+        if pre_auth_required then pre_auth_provided
+        else true
+      in
+
+      let no_show_ok = no_show_count <= 2 in
+
+      let days_ok = days_in_advance <= 90 in
+
+      (* Calculate approval score (quorum) *)
+      let score = calculate_approval_score
+        insurance_ok slot_available pre_auth_ok no_show_ok days_ok
+      in
+
+      (* Need 3 out of 5 conditions for approval *)
+      if score >= 3 then
+        if slot_available then Approved
+        else WaitList
+      else if score >= 2 then
+        WaitList  (* Borderline cases go to waiting list *)
+      else
+        Rejected
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all scheduling decision scenarios *)
+let all_scheduling_scenarios = determine_appointment_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Routine appointments ever be approved when insurance is Pending? *)
+let routine_with_pending_insurance
+    insurance_status no_show_count patient_age pre_auth_provided
+    priority days_in_advance time_slot
+    daily_count provider_premium slot_available pre_auth_required =
+  let result = determine_appointment_decision
+    insurance_status no_show_count patient_age pre_auth_provided
+    priority days_in_advance time_slot
+    daily_count provider_premium slot_available pre_auth_required
+  in
+  priority = Routine && insurance_status = Pending && result = Approved
+[@@decomp top ()]
+
+(* Q3: Safety property - Emergency with high no_shows never approved *)
+verify (fun
+    insurance_status no_show_count patient_age pre_auth_provided
+    priority days_in_advance time_slot
+    daily_count provider_premium slot_available pre_auth_required ->
+  let result = determine_appointment_decision
+    insurance_status no_show_count patient_age pre_auth_provided
+    priority days_in_advance time_slot
+    daily_count provider_premium slot_available pre_auth_required
+  in
+  (* Emergency with 3+ no-shows should never be approved via override *)
+  (priority = Emergency && no_show_count >= 3) ==> result <> Approved
+)

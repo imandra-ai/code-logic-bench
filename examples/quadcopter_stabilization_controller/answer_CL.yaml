@@ -1,0 +1,29 @@
+model: "quadcopter_stabilization_controller"
+q1:
+  question: "How many distinct control decision scenarios exist across all flight modes?"
+  answer: "38 scenarios"
+  key_thresholds:
+    battery: [15, 30]
+    tilt: 45
+    altitude: 3
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_control.json'
+q2:
+  question: "Can autonomous flight modes (AltHold, Hover, ReturnHome) ever be approved when battery_pct < 30 (low battery)?"
+  answer: "NO - Autonomous modes blocked below 30% battery (0 scenarios)"
+  explanation: |
+    Autonomous modes require battery_pct >= 30 (line 62-68).
+    Manual/Stabilize modes still work below 30%, but autonomous modes blocked.
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_autonomous_low_battery.json'
+q3:
+  question: "Does battery_pct < 15 (critical battery) always trigger force_emergency_landing=true?"
+  answer: "PROVEN - Critical battery always forces emergency landing"
+  property: "battery_pct < 15 ==> force_emergency_landing"
+  why_proven: "Emergency landing check (line 44) includes critical_battery condition (line 39)"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_critical_battery.json'
+analysis_metadata:
+  total_scenarios_q1: 38
+  autonomous_low_battery_q2: 0
+  property_result_q3: "PROVEN"

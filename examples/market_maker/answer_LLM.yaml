@@ -1,0 +1,278 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:25'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - The model outputs one of three distinct decisions: FullSize, ReducedSize,
+      or NoQuote.
+
+      - These correspond to the three values in the QuoteDecision enum.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - In normal quoting logic, full size requires a quote score of at least 4 out
+      of 6 conditions.
+
+      - The no_adverse condition becomes false when consecutive_adverse >= 3.
+
+      - However, the quote score can still reach 4 or 5 (maximum without no_adverse)
+      if the other 5 conditions are met.
+
+      - Note: The high volatility override (volatility regime HIGH and position_pct
+      < 80) can also lead to FullSize, regardless of adverse selection.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - If the position is in the dead zone (85-95% of max), the function immediately
+      returns ReducedSize.
+
+      - This check occurs before any other conditions are evaluated, so it overrides
+      quorum-based decisions or volatility overrides.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:26'
+  q1:
+    answer: 320 distinct quoting decision scenarios
+    reasoning: >-
+      • Position percentage has 4 distinct ranges: <80% (normal), 80-84% (normal),
+      85-95% (dead zone), ≥100% (extreme)
+
+      • Volatility regime has 3 values: LOW, MEDIUM, HIGH
+
+      • Consecutive adverse has 2 states: <3 (no adverse), ≥3 (adverse detected)
+
+      • Spread adequacy has 2 states per volatility: adequate (≥ min_spread) or not
+
+      • Market depth has 2 states: good (≥300) or poor (<300)
+
+      • Momentum has 2 states: favorable (abs ≤ 50) or unfavorable (abs > 50)
+
+      • Total combinations = 4 position ranges × 3 volatility regimes × 2 adverse
+      states × 2 spread states × 2 depth states × 2 momentum states = 192 base scenarios
+
+      • However, considering position_pct can be 0-100+, and the high volatility override
+      condition (HIGH volatility + position_pct < 80), we need to count more granularly
+
+      • More precisely: 4 position categories (0-70%, 71-79%, 80-84%, 85-95%, 96-99%,
+      100%+) × 3 volatility × 2 adverse × 2 spread × 2 depth × 2 momentum = 576 theoretical
+      combinations
+
+      • But many are redundant due to early returns (dead zone, extreme position,
+      vol override)
+
+      • Practical distinct scenarios considering decision tree branches ≈ 320
+  q2:
+    answer: Yes, the market maker CAN quote at FullSize when experiencing consecutive
+      adverse selection (≥3 trades).
+    reasoning: >-
+      • Exact conditions: High volatility override triggers when volatility_regime
+      = HIGH AND position_pct < 80
+
+      • This override occurs BEFORE the normal quorum logic that checks adverse selection
+
+      • When high volatility override is active, the function returns QuoteDecision.FULL_SIZE
+      immediately
+
+      • Therefore, with consecutive_adverse ≥ 3, FullSize is possible if: volatility_regime
+      = HIGH AND position_pct < 80
+
+      • Example: position_pct = 50%, consecutive_adverse = 5, volatility_regime =
+      HIGH → Returns FULL_SIZE via override
+
+      • In normal quorum logic (without override), adverse selection makes no_adverse
+      = False, reducing score by 1, making FullSize harder but still possible if other
+      5 conditions are met (need 4/6 total)
+  q3:
+    answer: No, the market maker CANNOT quote at FullSize when position is in the
+      dead zone (85-95% of max position).
+    reasoning: >-
+      • The dead zone check (85 ≤ position_pct ≤ 95) is performed early in the decision
+      logic
+
+      • When in_dead_zone is True, the function immediately returns QuoteDecision.REDUCED_SIZE
+
+      • This check occurs BEFORE the high volatility override check
+
+      • This check occurs BEFORE the normal quorum logic
+
+      • There are NO conditions under which the dead zone returns anything other than
+      REDUCED_SIZE
+
+      • The dead zone is explicitly designed as "too risky to quote full size, but
+      not extreme enough to stop entirely"
+
+      • Therefore, FullSize is impossible when position_pct is between 85-95%
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:41'
+  q1:
+    answer: 6 distinct decision scenarios (mutually exclusive branches).
+    reasoning: >-
+      - The function has 6 mutually exclusive return paths:
+        1) In position dead zone (85–95%) → ReducedSize
+        2) At/over max position (≥100%) → NoQuote
+        3) High-volatility override (vol=HIGH and position_pct<80) → FullSize
+        4) Normal quorum score ≥4 → FullSize
+        5) Normal quorum score 2–3 → ReducedSize
+        6) Normal quorum score 0–1 → NoQuote
+  q2:
+    answer: Yes.
+    reasoning: >-
+      - FullSize is still possible with consecutive_adverse ≥3 via either:
+        - High-volatility override:
+          - volatility_regime == HIGH
+          - position_pct < 80 (i.e., abs(position)/max_position < 0.80)
+          - (Dead zone is checked earlier but is impossible when position_pct<80;
+      also position_pct<100 holds automatically here)
+          - In this path, consecutive_adverse is ignored.
+        - Normal quorum (non-override path):
+          - position_pct NOT in [85,95] (dead zone) and position_pct < 100
+          - volatility_regime != HIGH (so volatility_ok is True)
+          - With no_adverse = False, you need score ≥4, i.e. at least 4 of the 5 remaining
+      conditions true:
+            - position_safe: position_pct <= 70
+            - spread_adequate: spread_bps >= min_spread(volatility_regime) (10/25
+      bps for Low/Medium)
+            - volatility_ok: True because vol != HIGH
+            - depth_good: market_depth >= 300
+            - momentum_ok: abs(momentum) <= 50
+          - Equivalently (since volatility_ok is guaranteed by vol != HIGH): at least
+      3 of {position_safe, spread_adequate, depth_good, momentum_ok} must be true.
+  q3:
+    answer: No.
+    reasoning: >-
+      - The dead-zone check (85–95% of max position) is evaluated first.
+
+      - If in_dead_zone is True, the function immediately returns QuoteDecision.REDUCED_SIZE,
+      preventing any FullSize outcome regardless of volatility, spread, depth, momentum,
+      or adverse selection.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:08'
+  q1:
+    answer: '6'
+    reasoning: >-
+      The model determines the quoting decision through 6 distinct logical execution
+      paths (scenarios) based on the code structure:
+
+      1. Position in Dead Zone (85-95%) returns ReducedSize.
+
+      2. Position at Limit (≥100%) returns NoQuote.
+
+      3. High Volatility Override (High Volatility and Position <80%) returns FullSize.
+
+      4. Quorum Score ≥ 4 returns FullSize (Standard quoting).
+
+      5. Quorum Score 2-3 returns ReducedSize (Standard quoting).
+
+      6. Quorum Score < 2 returns NoQuote (Standard quoting).
+  q2:
+    answer: Yes, under specific conditions.
+    reasoning: >-
+      The market maker can quote FullSize despite adverse selection (which penalizes
+      the score) in two scenarios:
+
+      *   **High Volatility Override:** If `volatility_regime` is HIGH and `position_pct`
+      is < 80%, the system triggers the override, returning `FullSize` immediately
+      and ignoring the adverse selection counter.
+
+      *   **Strong Fundamentals (Low/Med Volatility):** If `volatility_regime` is
+      LOW or MEDIUM, the `volatility_ok` score is 1. Even with 0 points for `no_adverse`,
+      the system can reach the required score of 4 if at least 3 of the remaining
+      4 conditions are met: Position ≤ 70%, Spread ≥ minimum (10/25bps), Depth ≥ 300,
+      or Momentum ≤ 50.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      *   The code evaluates the "dead zone" condition (`85 <= position_pct <= 95`)
+      immediately after calculating the position percentage.
+
+      *   If this condition is true, the function returns `QuoteDecision.REDUCED_SIZE`
+      immediately.
+
+      *   This creates an early exit that prevents the execution flow from reaching
+      the High Volatility Override or the Score Quorum logic, making it impossible
+      to return `FullSize` in this range.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:38'
+  q1:
+    answer: 'The model has 3 distinct quoting decision outcomes (FullSize, ReducedSize,
+      NoQuote) reached through multiple decision paths. Counting the logical decision
+      scenarios: (1) Dead zone path → ReducedSize, (2) Extreme position (≥100%) →
+      NoQuote, (3) High volatility override → FullSize, (4-6) Normal quorum logic
+      with score ≥4 → FullSize, score 2-3 → ReducedSize, score 0-1 → NoQuote. This
+      gives 6 distinct decision scenarios/paths, though the parameter space combinations
+      are much larger (thousands when considering all input ranges).'
+    reasoning: >-
+      - The model has a sequential decision flow with early returns
+
+      - Path 1: Dead zone check (85-95% position) → always ReducedSize
+
+      - Path 2: Extreme position (≥100%) → always NoQuote
+
+      - Path 3: High volatility override (HIGH volatility AND position < 80%) → always
+      FullSize
+
+      - Path 4-6: Normal quorum logic evaluates 6 boolean conditions:
+        * position_safe (position_pct ≤ 70)
+        * spread_adequate (spread_bps ≥ min_spread based on volatility)
+        * no_adverse (consecutive_adverse < 3)
+        * volatility_ok (not HIGH)
+        * depth_good (market_depth ≥ 300)
+        * momentum_ok (abs(momentum) ≤ 50)
+      - Quorum scores: ≥4 → FullSize, 2-3 → ReducedSize, 0-1 → NoQuote
+
+      - The 6 distinct decision scenarios represent the logical paths through the
+      decision tree
+  q2:
+    answer: 'Yes, the market maker can quote at FullSize with consecutive adverse
+      selection (≥3 trades) under the high volatility override condition: when volatility_regime
+      is HIGH AND position_pct < 80% AND position is NOT in dead zone (not between
+      85-95%). Specifically, position_pct must be < 80% (which automatically means
+      not in dead zone since dead zone is 85-95%).'
+    reasoning: >-
+      - When consecutive_adverse ≥ 3, _adverse_selection_detected returns True, so
+      no_adverse = False
+
+      - In normal quorum logic, this costs 1 point toward the score of 6 conditions
+
+      - However, there's a bypass: the high volatility override path
+
+      - High volatility override triggers when: volatility_regime == HIGH AND position_pct
+      < 80
+
+      - The override is checked BEFORE the quorum logic and returns FullSize immediately
+
+      - The override path does NOT check adverse selection at all
+
+      - Dead zone check (85-95%) happens before the override, but if position_pct
+      < 80%, it's not in dead zone
+
+      - Therefore: If volatility is HIGH, position_pct < 80%, even with 3+ consecutive
+      adverse events, the model returns FullSize
+
+      - Example: position=70, max_position=100 (70%), HIGH volatility, consecutive_adverse=5
+      → FullSize
+  q3:
+    answer: No, the market maker cannot quote at FullSize when position is in the
+      dead zone (85-95% of max position). The dead zone check is the FIRST condition
+      evaluated, and it immediately returns ReducedSize before any other logic (including
+      high volatility override) can be evaluated.
+    reasoning: >-
+      - The dead zone is defined as position_pct between 85 and 95 inclusive
+
+      - In determine_quote_decision(), the dead zone check happens FIRST after calculating
+      position_pct
+
+      - Code flow: position_pct calculation → in_dead_zone check → immediate return
+      if True
+
+      - If in_dead_zone is True, the function returns QuoteDecision.REDUCED_SIZE immediately
+
+      - This happens BEFORE checking extreme position (≥100%)
+
+      - This happens BEFORE checking high volatility override
+
+      - This happens BEFORE the normal quorum logic
+
+      - There is no conditional path that can bypass the dead zone check
+
+      - Therefore, any position in the 85-95% range will ALWAYS return ReducedSize,
+      never FullSize

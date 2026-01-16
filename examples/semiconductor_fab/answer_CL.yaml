@@ -1,0 +1,50 @@
+model: "semiconductor_fab"
+q1:
+  question: "How many wafer processing scenarios exist for Photolithography (the most contamination-sensitive process step)?"
+  answer: "24 scenarios"
+  key_thresholds:
+    temperature: 150
+    maintenance_cycles: [100, 120]
+    contamination_requirement: "Class1 (strictest)"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_photolithography.json'
+    use_of_assuming: "step = Photolithography"
+q2:
+  question: "Can wafer processing ever be approved when chamber_contamination = Class100 (relatively dirty)?"
+  answer: "YES - 6 scenarios where Class100 is approved"
+  approved_steps:
+    - "Deposition (requires Class100)"
+    - "Metrology (requires Class100)"
+    - "Etching (requires Class1000, Class100 exceeds requirement)"
+  explanation: |
+    Contamination hierarchy: Class1 (cleanest) > Class10 > Class100 > Class1000 > Contaminated
+    Class100 acceptable for steps requiring Class100 or Class1000.
+    Not acceptable for Photolithography (Class1) or IonImplant (Class10).
+  example:
+    step: "Deposition"
+    chamber_contamination: "Class100"
+    result: "approved = true (meets Class100 requirement)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_class100.json'
+q3:
+  question: "For Photolithography with Critical priority, does chamber_contamination = Class10 always result in approval when tool is Available with maintenance_cycles < 100 and temperature <= 150?"
+  answer: "PROVEN - Property always holds"
+  property: "(Photolithography + Critical + Class10 + qualified tool + safe temp) ==> approved"
+  why_proven: |
+    Critical override allows Class10 for Photolithography (requires Class1).
+    Override condition: priority=Critical && required=Class1 && chamber=Class10.
+    When override activates, approval granted with 5% estimated yield loss.
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_critical_override.json'
+analysis_metadata:
+  total_scenarios_q1: 24
+  class100_approval_count_q2: 6
+  property_result_q3: "PROVEN"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to most sensitive Photolithography step"
+    q2_filtering: "Tests contamination hierarchy understanding"
+    q3_property: "Tests critical priority override mechanism"
+  complexity_insights:
+    - "Q1: Photolithography creates 24 scenarios (4 priorities × contamination classes × tool status × maintenance ranges)"
+    - "Q2: Class100 approved for 3 process steps (Deposition, Metrology, Etching)"
+    - "Q3: Critical override proven to work for Class10 → Class1 downgrade"

@@ -1,0 +1,58 @@
+model: "transportation_risk_manager"
+q1:
+  question: "How many distinct routing scenarios exist for Sea transport when operating under geopolitical tensions (Tensions, Sanctions, or WarZone)?"
+  answer: "117 scenarios"
+  state_space_reduction: "Restricted from 4 modes × 4 geopolitical to 1 mode × 3 geopolitical"
+  key_thresholds:
+    cargo_value: [100000]
+    time_critical: [24]
+    route_cost: [1000]
+    route_time: [72]
+    sea_base_cost: 200
+    sea_base_time: 336
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_sea_under_tensions.json'
+    use_of_assuming: "mode = Sea && geopolitical ∈ {Tensions, Sanctions, WarZone}"
+q2:
+  question: "Can Air transport ever be rejected for Standard (non-Hazardous) cargo? If yes, under what conditions?"
+  answer: "YES - 2 scenarios where Air is rejected for Standard cargo"
+  rejected_conditions:
+    scenario_1: "Air + Hurricane + WarZone"
+    scenario_2: "Air + Hurricane + Sanctions"
+  explanation: "Air gets grounded in dead zones despite cargo being safe (Standard)"
+  example:
+    mode: "Air"
+    cargo: "Standard"
+    weather: "Hurricane"
+    geopolitical: "WarZone"
+    result: "approved = false"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_air_rejected.json'
+q3:
+  question: "For Air transport specifically, does having both cargo_value > 100000 AND time_critical < 24 always activate emergency routing when the route is approved?"
+  answer: "PROVEN - Property always holds"
+  property: "(approved && cargo_value > 100000 && time_critical < 24) ==> emergency_routing"
+  why_proven: |
+    For Air transport, max time is 8h * 3 (Hurricane) = 24h.
+    This means route_time < 72 (condition 4) is ALWAYS true for Air.
+    Combined with cargo_value > 100000 (c1) and time_critical < 24 (c2),
+    we have 3 out of 4 conditions guaranteed, so emergency always activates.
+  emergency_conditions_for_air:
+    c1_cargo_value: "Always true (premise)"
+    c2_time_critical: "Always true (premise)"
+    c3_route_cost: "Variable (depends on weather/geopolitical)"
+    c4_route_time: "Always true for Air (max 24h < 72h threshold)"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_air_emergency.json'
+analysis_metadata:
+  total_scenarios_q1: 117
+  air_rejected_count_q2: 2
+  property_result_q3: "PROVEN"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to Sea under tensions - reduces state space significantly"
+    q2_filtering: "Checks Air + Standard cargo only"
+    q3_fixed_mode: "Property tested specifically for Air mode"
+  complexity_insights:
+    - "Q1: ~assuming reduces to 117 focused scenarios (Sea × 3 geopolitical × 4 cargo × weather × thresholds)"
+    - "Q2: Only 2 dead zone scenarios reject Air for Standard cargo (Hurricane + {WarZone, Sanctions})"
+    - "Q3: Air's fast base time (8h) guarantees route_time < 72h, ensuring 3/4 emergency conditions"

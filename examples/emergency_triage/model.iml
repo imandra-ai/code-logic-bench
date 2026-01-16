@@ -1,0 +1,159 @@
+(* Emergency Triage System - ESI Decision Logic *)
+
+type vital_category = VCriticalLow | VLow | VNormal | VHigh | VCriticalHigh
+type pain_level = NoPain | Mild | Moderate | Severe | Excruciating
+type age_category = Infant | Child | Adult | Elderly | VeryElderly
+type arrival_mode = Ambulatory | Wheelchair | Stretcher | Ambulance | Helicopter
+type resource_level = NoResources | SingleResource | MultipleResources | ComplexResources
+
+type esi_category = ESI_1 | ESI_2 | ESI_3 | ESI_4 | ESI_5
+
+type triage_decision = {
+  esi_level: esi_category;
+  immediate_intervention: bool;
+  high_risk_situation: bool;
+  resource_prediction: resource_level;
+  upgrade_from_initial: bool;
+}
+
+(* Check if any vital is critical - ESI_1 indicator *)
+let has_critical_vital bp hr resp o2 =
+  bp = VCriticalLow || bp = VCriticalHigh ||
+  hr = VCriticalLow || hr = VCriticalHigh ||
+  resp = VCriticalLow || resp = VCriticalHigh ||
+  o2 = VCriticalLow || o2 = VCriticalHigh
+
+(* Count abnormal vitals *)
+let count_abnormal_vitals bp hr resp o2 =
+  let count =
+    (if bp <> VNormal then 1 else 0) +
+    (if hr <> VNormal then 1 else 0) +
+    (if resp <> VNormal then 1 else 0) +
+    (if o2 <> VNormal then 1 else 0)
+  in
+  count
+
+(* Quorum for high-risk (2 of 4) - ESI_2 upgrade *)
+let check_high_risk_quorum pain age arrival abnormal_count =
+  let c1 = (pain = Severe || pain = Excruciating) in
+  let c2 = (age = Infant || age = VeryElderly) in
+  let c3 = (arrival = Ambulance || arrival = Helicopter) in
+  let c4 = (abnormal_count >= 2) in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count >= 2
+
+(* Dead zone: certain combinations are ambiguous *)
+let is_in_triage_dead_zone bp hr pain age =
+  (* One borderline vital + moderate pain + non-extreme age = ambiguous *)
+  let one_borderline =
+    ((bp = VLow || bp = VHigh) && hr = VNormal) ||
+    (bp = VNormal && (hr = VLow || hr = VHigh))
+  in
+  let moderate_pain = (pain = Moderate) in
+  let non_extreme_age = (age = Child || age = Adult) in
+
+  one_borderline && moderate_pain && non_extreme_age
+
+(* Predict resource needs based on presentation *)
+let predict_resources esi_level pain arrival =
+  match esi_level, arrival with
+  | ESI_1, _ -> ComplexResources
+  | ESI_2, (Ambulance | Helicopter) -> MultipleResources
+  | ESI_3, _ -> MultipleResources
+  | ESI_4, _ -> SingleResource
+  | ESI_5, _ -> NoResources
+  | ESI_2, _ -> if pain = Severe then MultipleResources else SingleResource
+
+(* Helicopter arrival upgrades ESI level EXCEPT when stable vitals *)
+let apply_arrival_upgrade base_esi arrival abnormal_count =
+  let stable_vitals = (abnormal_count = 0) in
+
+  match arrival, stable_vitals with
+  | Helicopter, false -> (
+      match base_esi with
+      | ESI_5 -> ESI_4
+      | ESI_4 -> ESI_3
+      | ESI_3 -> ESI_2
+      | _ -> base_esi
+    )
+  | _, _ -> base_esi
+
+(* Core ESI determination with upgrade tracking *)
+let determine_esi bp hr resp o2 pain age arrival =
+  (* Check dead zone first *)
+  let in_dead_zone = is_in_triage_dead_zone bp hr pain age in
+
+  if in_dead_zone then
+    { esi_level = ESI_3;
+      immediate_intervention = false;
+      high_risk_situation = false;
+      resource_prediction = MultipleResources;
+      upgrade_from_initial = false }
+  else
+    (* Check critical vitals - ESI_1 *)
+    let has_critical = has_critical_vital bp hr resp o2 in
+
+    if has_critical then
+      { esi_level = ESI_1;
+        immediate_intervention = true;
+        high_risk_situation = true;
+        resource_prediction = ComplexResources;
+        upgrade_from_initial = false }
+    else
+      (* Count abnormal vitals *)
+      let abnormal_count = count_abnormal_vitals bp hr resp o2 in
+
+      (* Check high-risk quorum *)
+      let high_risk = check_high_risk_quorum pain age arrival abnormal_count in
+
+      (* Initial ESI based on abnormal count *)
+      let initial_esi =
+        if abnormal_count >= 3 then ESI_2
+        else if abnormal_count = 2 then ESI_3
+        else if abnormal_count = 1 then ESI_4
+        else ESI_5
+      in
+
+      (* Upgrade to ESI_2 if high-risk quorum met *)
+      let esi_after_risk =
+        if high_risk && (initial_esi <> ESI_2) then ESI_2
+        else initial_esi
+      in
+
+      (* Apply arrival mode upgrade *)
+      let final_esi = apply_arrival_upgrade esi_after_risk arrival abnormal_count in
+
+      let upgraded = (final_esi <> initial_esi) in
+      let resources = predict_resources final_esi pain arrival in
+
+      { esi_level = final_esi;
+        immediate_intervention = false;
+        high_risk_situation = (final_esi = ESI_2 || final_esi = ESI_3);
+        resource_prediction = resources;
+        upgrade_from_initial = upgraded }
+
+(* Analysis
+====================
+*)
+
+let esi_scenarios = determine_esi
+[@@decomp top ~prune:true ()]
+
+let esi_2_via_quorum bp hr resp o2 pain age arrival =
+  let decision = determine_esi bp hr resp o2 pain age arrival in
+  decision.esi_level = ESI_2 &&
+  check_high_risk_quorum pain age arrival (count_abnormal_vitals bp hr resp o2)
+[@@decomp top ()]
+
+verify (fun bp hr resp o2 pain age arrival ->
+  let decision = determine_esi bp hr resp o2 pain age arrival in
+  let has_critical = has_critical_vital bp hr resp o2 in
+
+  has_critical ==> (decision.esi_level = ESI_1)
+)

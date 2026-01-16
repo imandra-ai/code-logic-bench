@@ -1,0 +1,277 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:22'
+  q1:
+    answer: 3 scenarios
+    reasoning: >-
+      - Hazardous items can only be handled by 2 robot types: TransportRobot and InspectionRobot
+      (per robot_handles_item function)
+
+      - For task approval, there are two pathways: Critical Override and Normal Flow
+
+      - Critical Override pathway: 1 scenario where priority=CRITICAL, battery_level>=15,
+      and robot is compatible (TransportRobot or InspectionRobot)
+
+      - Normal Flow pathway: 2 scenarios where battery_level>=50 (required for Hazardous
+      per has_sufficient_battery), zone_safety in {SAFE, CAUTION}, and robot is compatible
+      (TransportRobot or InspectionRobot)
+
+      - Total: 1 (Critical Override) + 2 (Normal Flow with TransportRobot and InspectionRobot)
+      = 3 task assignment scenarios for Hazardous items
+  q2:
+    answer: Yes, only when Critical Override applies
+    reasoning: >-
+      - In Normal Flow: battery_level < 20 will always fail the has_sufficient_battery
+      check for all item types (minimum required is 20 for standard items, 40 for
+      Heavy, 50 for Hazardous)
+
+      - In Critical Override pathway: tasks can be approved if battery_level >= 15
+      (the emergency minimum)
+
+      - Therefore, battery_level in range [15, 19] can result in approved=True
+
+      - Required conditions: priority must be CRITICAL, robot_type must handle the
+      item_type (per robot_handles_item), and battery_level >= 15
+
+      - Example: priority=CRITICAL, robot_type=PICKING_ROBOT, item_type=STANDARD,
+      battery_level=18 would be approved
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - For Heavy items with TransportRobot, approved=True can occur via two pathways:
+      Critical Override or Normal Flow
+
+      - In Critical Override: requires_supervision is always True for Heavy items
+      (hardcoded in the critical override return statement)
+
+      - In Normal Flow: requires_supervision = (item_type in {HAZARDOUS, HEAVY}) and
+      humans_in_zone == 0
+
+      - When humans_in_zone > 0 in Normal Flow: requires_supervision = True and 0
+      = False (supervision not required)
+
+      - However, when humans_in_zone > 0 in Critical Override: requires_supervision
+      = True regardless
+
+      - Therefore, approved=True does NOT always mean requires_supervision=false when
+      humans_in_zone > 0
+
+      - Counterexample: priority=CRITICAL, robot_type=TRANSPORT_ROBOT, item_type=HEAVY,
+      battery_level=20, humans_in_zone=5 → approved=True, requires_supervision=True
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:24'
+  q1:
+    answer: 'Undefined, but based on possible outcomes, 4 scenarios: 1) Rejected (any
+      reason); 2) Approved critical (supervision=True); 3) Approved normal, humans_in_zone
+      > 0 (supervision=False); 4) Approved normal, humans_in_zone == 0 (supervision=True).'
+    reasoning: >-
+      - For Hazardous items, only TransportRobot and InspectionRobot can handle them.
+
+      - Rejected scenarios are unified when checks fail (not capable, zone not ok,
+      battery not ok), returning approved=False with 0 values.
+
+      - Approved critical: when priority==CRITICAL, robot handles, battery>=15; always
+      supervision=True, boost=100.
+
+      - Approved non-critical: after all checks; supervision depends on humans_in_zone.
+
+      - Efficiency affects duration (6 possible factors: 100-eff//10 from 0 to 100,
+      but adjacent might overlap; actually varies continuously).
+
+      - Zone safety, priority (for boost) add variations, but scenarios seem to group
+      by outcome types.
+
+      - Excluding infinite variations, 4 distinct decision scenarios.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Normal assignment requires battery_level >= required (50 for Hazardous, 40
+      for Heavy, 20 for others).
+
+      - However, critical override applies if priority==CRITICAL, robot handles item,
+      and battery_level >=15.
+
+      - Thus, approved even if <20 as long as >=15 and critical.
+
+      - For example, with battery=16, critical priority, and robot that handles_ITEM,
+      task is approved despite battery <20.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - Approved=true can be from critical override: requires_supervision=True even
+      when humans_in_zone > 0.
+
+      - Or from normal approval: requires_supervision=False only if humans_in_zone
+      > 0.
+
+      - So when approved=true and humans_in_zone > 0, supervision is True for critical,
+      False for non-critical.
+
+      - Therefore, it does not always mean requires_supervision=false.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:33'
+  q1:
+    answer: 6 distinct decision scenarios.
+    reasoning: >-
+      - For ItemType.HAZARDOUS there is a special “critical override” approval path
+      and a normal evaluation path.
+
+      - Critical override path (priority=CRITICAL, capable robot, battery>=15): approved=True,
+      requires_supervision=True. (1)
+
+      - Normal path can result in three different rejections: (2) not capable robot
+      -> approved=False; (3) zone_safety in {HAZARD, EMERGENCY} -> approved=False;
+      (4) battery below required 50% -> approved=False.
+
+      - Normal path can result in two different approvals depending on humans_in_zone:
+      (5) humans_in_zone==0 -> approved=True, requires_supervision=True; (6) humans_in_zone>0
+      -> approved=True, requires_supervision=False.
+  q2:
+    answer: Yes—via the critical-priority override, but only if battery_level is at
+      least 15.
+    reasoning: >-
+      - In the normal flow, has_sufficient_battery() requires at least 20% for most
+      items (40% Heavy, 50% Hazardous), so battery_level < 20 cannot pass normal checks.
+
+      - The critical override bypasses zone and normal battery thresholds and approves
+      when:
+        - priority == CRITICAL
+        - robot_handles_item(robot_type, item_type) is True
+        - battery_level >= 15
+      - Therefore approval is possible for battery_level in [15, 19] under those critical-override
+      conditions (battery < 15 can never be approved).
+  q3:
+    answer: No. If the task is approved via the critical override, it still requires
+      supervision even when humans_in_zone > 0.
+    reasoning: >-
+      - For Heavy items, the critical override approval sets requires_supervision
+      = (item_type in {HAZARDOUS, HEAVY}) which is always True for HEAVY, independent
+      of humans_in_zone.
+
+      - In the non-critical (normal) approval path, requires_supervision is True only
+      when humans_in_zone == 0, so with humans_in_zone > 0 it becomes False.
+
+      - Since approved=True can occur through either path, approved=True does not
+      always imply requires_supervision=False when humans_in_zone > 0.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:19:53'
+  q1:
+    answer: '5'
+    reasoning: >-
+      For ItemType.HAZARDOUS, there are 5 distinct logical execution paths (scenarios)
+      based on the return statements in the function:
+
+      1. Critical Override Approved: Priority is CRITICAL, Robot is capable, and Battery
+      >= 15.
+
+      2. Capability Denial: Robot type is not allowed (e.g., PickingRobot).
+
+      3. Zone Safety Denial: Zone is EMERGENCY or HAZARD.
+
+      4. Battery Denial: Battery is < 50 (Minimum for Hazardous) and not a valid Critical
+      Override.
+
+      5. Normal Approved: Robot capable, Zone safe, Battery >= 50. (Note: Supervision
+      variation happens within this branch, but it is a single logical return point).
+  q2:
+    answer: Yes, but only if the battery level is between 15 and 19 inclusive.
+    reasoning: >-
+      - The normal `has_sufficient_battery` check requires a minimum of 20 for any
+      item (Standard default), and higher for others.
+
+      - However, the `is_critical_override` function allows approval if `battery_level
+      >= 15`.
+
+      - Therefore, a task can be approved with battery < 20 only if:
+        1. The task priority is `CRITICAL`.
+        2. The robot is compatible with the item.
+        3. The battery level is >= 15.
+  q3:
+    answer: No.
+    reasoning: >-
+      - In the 'Normal' flow, having `humans_in_zone > 0` prevents `requires_supervision`
+      from being True for Heavy items.
+
+      - However, if the task is `CRITICAL` (and triggers the override), the code executes
+      the first return block.
+
+      - In the Critical override block, `requires_supervision` is calculated strictly
+      as `item_type in {ItemType.HAZARDOUS, ItemType.HEAVY}`.
+
+      - Consequently, a Critical Heavy task returns `requires_supervision=True` even
+      if `humans_in_zone > 0`.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:35'
+  q1:
+    answer: 4 task assignment scenarios exist for Hazardous items.
+    reasoning: >-
+      - Hazardous items can only be handled by TransportRobot and InspectionRobot
+      (based on robot_handles_item compatibility)
+
+      - For each capable robot, there are two main paths:
+        1. Critical override path (priority=Critical, battery>=15): approved=True,
+      requires_supervision=True
+        2. Normal approval path (zone safe/caution, battery>=50): approved=True, requires_supervision
+      depends on humans_in_zone
+      - Additionally, there are rejection scenarios (not capable, zone hazard/emergency,
+      insufficient battery)
+
+      - Breaking down the distinct approval scenarios:
+        1. Critical override with TransportRobot: approved=True, requires_supervision=True,
+      priority_boost=100
+        2. Critical override with InspectionRobot: approved=True, requires_supervision=True,
+      priority_boost=100
+        3. Normal approval with TransportRobot (battery>=50, zone ok): approved=True,
+      requires_supervision=(humans_in_zone==0)
+        4. Normal approval with InspectionRobot (battery>=50, zone ok): approved=True,
+      requires_supervision=(humans_in_zone==0)
+      - These 4 scenarios represent the distinct successful assignment paths for Hazardous
+      items
+  q2:
+    answer: Yes, a task can be approved when battery_level < 20 under the critical
+      priority override condition.
+    reasoning: >-
+      - The is_critical_override function checks: priority == CRITICAL, robot can
+      handle item, and battery_level >= 15
+
+      - When critical override applies, the task is approved immediately bypassing
+      normal battery checks
+
+      - Normal battery requirement is minimum 20 for most items (from has_sufficient_battery
+      default)
+
+      - For battery levels 15, 16, 17, 18, or 19 (i.e., 15 <= battery < 20):
+        - If priority is CRITICAL
+        - AND robot_type can handle the item_type (not Heavy which needs 40, not Hazardous
+      which needs 50)
+        - The task will be approved via critical override
+      - Example: battery_level=15, priority=CRITICAL, robot=PickingRobot, item=Standard
+      → approved=True
+
+      - This works for Standard, Fragile, Frozen, and Perishable items with compatible
+      robots at battery 15-19
+  q3:
+    answer: No, approved=true does NOT always mean requires_supervision=false when
+      humans_in_zone > 0 for Heavy items with TransportRobot.
+    reasoning: >-
+      - There are two paths to approval for Heavy items with TransportRobot:
+        1. Critical override path: When priority=CRITICAL and battery>=15
+        2. Normal approval path: When zone is Safe/Caution and battery>=40
+
+      - In the CRITICAL OVERRIDE path:
+        - requires_supervision is set to True if item_type is HAZARDOUS or HEAVY
+        - This is hardcoded: requires_supervision=(item_type in {ItemType.HAZARDOUS,
+      ItemType.HEAVY})
+        - The humans_in_zone value is NOT considered in this path
+        - So for Heavy items via critical override: requires_supervision=True regardless
+      of humans_in_zone
+
+      - In the NORMAL APPROVAL path:
+        - needs_super = (item_type in {ItemType.HAZARDOUS, ItemType.HEAVY}) and humans_in_zone
+      == 0
+        - When humans_in_zone > 0, this evaluates to False
+        - So requires_supervision=False only in normal path with humans present
+
+      - Counterexample: priority=CRITICAL, battery=40, humans_in_zone=5, zone=Safe
+        - This triggers critical override
+        - Result: approved=True, requires_supervision=True (despite humans_in_zone
+      > 0)

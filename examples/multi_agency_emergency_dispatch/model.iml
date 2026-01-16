@@ -1,0 +1,255 @@
+(* Multi-Agency Emergency Dispatch *)
+
+(* Core types *)
+type incident_category = RoutineMedical | SeriousMedical | CriticalMedical |
+                         RoutineFire | SeriousFire | CriticalFire
+
+type resource_type = Ambulance | FireTruck | PoliceUnit | Helicopter | HazmatTeam
+
+type weather_condition = Clear | Rain | Snow | Storm
+
+type traffic_level = Light | Moderate | Heavy | Gridlock
+
+type dispatch_decision = {
+  dispatch_approved: bool;
+  response_time_minutes: int;
+  requires_backup: bool;
+  escalation_needed: bool;
+}
+
+(* Incident category base priority *)
+let category_priority incident_category =
+  match incident_category with
+  | RoutineMedical -> 4
+  | SeriousMedical -> 8
+  | CriticalMedical -> 16
+  | RoutineFire -> 6
+  | SeriousFire -> 12
+  | CriticalFire -> 24
+
+(* Resource-incident compatibility matrix *)
+let resource_compatible incident_category resource_type =
+  match incident_category, resource_type with
+  | RoutineMedical, Ambulance -> true
+  | RoutineMedical, PoliceUnit -> true
+  | RoutineMedical, Helicopter -> true
+  | SeriousMedical, Ambulance -> true
+  | SeriousMedical, Helicopter -> true
+  | CriticalMedical, Ambulance -> true
+  | CriticalMedical, Helicopter -> true
+  | CriticalMedical, HazmatTeam -> true  (* Hazmat can assist critical *)
+  | RoutineFire, FireTruck -> true
+  | RoutineFire, PoliceUnit -> true
+  | SeriousFire, FireTruck -> true
+  | SeriousFire, HazmatTeam -> true
+  | SeriousFire, Helicopter -> true
+  | CriticalFire, FireTruck -> true
+  | CriticalFire, HazmatTeam -> true
+  | CriticalFire, Helicopter -> true
+  | _ -> false
+
+(* Weather affects travel time differently by resource type *)
+let weather_time_multiplier resource_type weather =
+  match resource_type, weather with
+  (* Ground units affected by weather *)
+  | Ambulance, Clear -> 10
+  | Ambulance, Rain -> 13
+  | Ambulance, Snow -> 18
+  | Ambulance, Storm -> 25
+  | FireTruck, Clear -> 10
+  | FireTruck, Rain -> 14
+  | FireTruck, Snow -> 20
+  | FireTruck, Storm -> 28
+  | PoliceUnit, Clear -> 10
+  | PoliceUnit, Rain -> 12
+  | PoliceUnit, Snow -> 16
+  | PoliceUnit, Storm -> 22
+  (* Air units heavily affected by weather *)
+  | Helicopter, Clear -> 10
+  | Helicopter, Rain -> 18
+  | Helicopter, Snow -> 40  (* Severely limited *)
+  | Helicopter, Storm -> 100 (* Nearly grounded *)
+  (* Hazmat slower in all conditions *)
+  | HazmatTeam, Clear -> 15
+  | HazmatTeam, Rain -> 20
+  | HazmatTeam, Snow -> 30
+  | HazmatTeam, Storm -> 45
+
+(* Traffic affects ground units differently than air *)
+let traffic_time_multiplier resource_type traffic =
+  match resource_type, traffic with
+  | Helicopter, _ -> 10  (* Air units bypass traffic *)
+  | Ambulance, Light -> 10
+  | Ambulance, Moderate -> 15
+  | Ambulance, Heavy -> 25
+  | Ambulance, Gridlock -> 50
+  | FireTruck, Light -> 10
+  | FireTruck, Moderate -> 14
+  | FireTruck, Heavy -> 22
+  | FireTruck, Gridlock -> 45
+  | PoliceUnit, Light -> 10
+  | PoliceUnit, Moderate -> 12  (* Police can use sirens *)
+  | PoliceUnit, Heavy -> 18
+  | PoliceUnit, Gridlock -> 35
+  | HazmatTeam, Light -> 10
+  | HazmatTeam, Moderate -> 18
+  | HazmatTeam, Heavy -> 30
+  | HazmatTeam, Gridlock -> 60
+
+(* Calculate response time *)
+let calculate_response_time distance resource_type weather traffic =
+  let weather_mult = weather_time_multiplier resource_type weather in
+  let traffic_mult = traffic_time_multiplier resource_type traffic in
+  (distance * weather_mult * traffic_mult) / 100
+
+(* Critical incidents bypass fuel constraints *)
+(* Critical (CriticalMedical, CriticalFire) can dispatch with low fuel *)
+(* BUT only if distance < 20 AND weather is not Storm *)
+let critical_override incident_category fuel_level distance weather =
+  let is_critical =
+    incident_category = CriticalMedical || incident_category = CriticalFire
+  in
+  let distance_ok = distance < 20 in
+  let weather_ok = weather <> Storm in
+  let fuel_marginal = fuel_level >= 15 in
+  is_critical && distance_ok && weather_ok && fuel_marginal
+
+(* Minimum fuel varies by incident priority *)
+let minimum_fuel_requirement incident_category =
+  let priority = category_priority incident_category in
+  if priority >= 20 then 25      (* Critical: 25% minimum *)
+  else if priority >= 10 then 35 (* Serious: 35% minimum *)
+  else 50                        (* Routine: 50% minimum *)
+
+(* Fuel 25-35% with distance 15-25 is ambiguous *)
+let in_fuel_dead_zone fuel_level distance =
+  fuel_level >= 25 && fuel_level <= 35 &&
+  distance >= 15 && distance <= 25
+
+(* Check if backup required *)
+let backup_required incident_category =
+  incident_category = CriticalMedical ||
+  incident_category = CriticalFire ||
+  incident_category = SeriousFire
+
+(* Core emergency dispatch decision *)
+let determine_dispatch_decision
+    (* Incident *)
+    incident_category
+    distance_to_incident
+    (* Resource *)
+    resource_type
+    fuel_level
+    resource_ready
+    (* Environment *)
+    weather
+    traffic =
+
+  (* Calculate priority *)
+  let priority = category_priority incident_category in
+
+  (* Check fuel dead zone first *)
+  let in_dead_zone = in_fuel_dead_zone fuel_level distance_to_incident in
+
+  if in_dead_zone then
+    (* Dead zone → dispatch but mark escalation needed *)
+    let response_time = calculate_response_time distance_to_incident resource_type weather traffic in
+    { dispatch_approved = true;
+      response_time_minutes = response_time;
+      requires_backup = true;
+      escalation_needed = true }
+  else
+    (* Check critical override *)
+    let use_override = critical_override incident_category fuel_level distance_to_incident weather in
+
+    if use_override then
+      (* Override: dispatch despite marginal fuel *)
+      let response_time = calculate_response_time distance_to_incident resource_type weather traffic in
+      { dispatch_approved = true;
+        response_time_minutes = response_time;
+        requires_backup = true;
+        escalation_needed = false }
+    else
+      (* Normal dispatch logic *)
+
+      (* Check individual conditions *)
+      let compatible = resource_compatible incident_category resource_type in
+
+      let min_fuel = minimum_fuel_requirement incident_category in
+      let fuel_ok = fuel_level >= min_fuel in
+
+      let response_time = calculate_response_time distance_to_incident resource_type weather traffic in
+      let time_ok = response_time <= 30 in
+
+      let weather_safe =
+        match resource_type, weather with
+        | Helicopter, Storm -> false
+        | Helicopter, Snow -> false
+        | _ -> true
+      in
+
+      (* Calculate dispatch score (5 factors) *)
+      let score =
+        (if compatible then 1 else 0) +
+        (if fuel_ok then 1 else 0) +
+        (if time_ok then 1 else 0) +
+        (if resource_ready then 1 else 0) +
+        (if weather_safe then 1 else 0)
+      in
+
+      (* Need 4 out of 5 for dispatch *)
+      if score >= 4 then
+        let needs_backup = backup_required incident_category in
+        { dispatch_approved = true;
+          response_time_minutes = response_time;
+          requires_backup = needs_backup;
+          escalation_needed = false }
+      else if score >= 3 then
+        (* Borderline: dispatch with escalation *)
+        { dispatch_approved = true;
+          response_time_minutes = response_time;
+          requires_backup = true;
+          escalation_needed = true }
+      else
+        (* Cannot dispatch *)
+        { dispatch_approved = false;
+          response_time_minutes = 0;
+          requires_backup = false;
+          escalation_needed = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all dispatch decision scenarios *)
+let all_dispatch_scenarios = determine_dispatch_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Helicopters be dispatched in Storm? *)
+let helicopter_storm_dispatch
+    incident_category distance_to_incident
+    resource_type fuel_level resource_ready
+    weather traffic =
+  let result = determine_dispatch_decision
+    incident_category distance_to_incident
+    resource_type fuel_level resource_ready
+    weather traffic
+  in
+  resource_type = Helicopter && weather = Storm && result.dispatch_approved
+[@@decomp top ()]
+
+(* Q3: Safety property - fuel dead zone always requires backup *)
+verify (fun
+    incident_category distance_to_incident
+    resource_type fuel_level resource_ready
+    weather traffic ->
+  let result = determine_dispatch_decision
+    incident_category distance_to_incident
+    resource_type fuel_level resource_ready
+    weather traffic
+  in
+  let in_dead_zone = in_fuel_dead_zone fuel_level distance_to_incident in
+
+  (* Dead zone should always require backup *)
+  in_dead_zone ==> result.requires_backup
+)

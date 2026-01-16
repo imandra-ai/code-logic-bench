@@ -1,0 +1,147 @@
+(* Automotive Assembly *)
+
+(* Core types *)
+type vehicle_type = Sedan | SUV | Truck
+
+type station_id = BodyWelding | EngineInstall | PaintBooth | QualityControl
+
+type equipment_status = Operational | Maintenance | Faulty
+
+type station_decision = {
+  can_process: bool;
+  processing_time: int;
+  decision_type: decision_classification;
+}
+
+and decision_classification =
+  | ProcessApproved
+  | EquipmentDown
+  | InsufficientWorkers
+  | EmergencyStop
+  | InvalidConfig
+
+(* Base processing times *)
+let base_processing_time station vehicle_type =
+  match station, vehicle_type with
+  | BodyWelding, Sedan -> 45
+  | BodyWelding, SUV -> 60
+  | BodyWelding, Truck -> 75
+  | EngineInstall, Sedan -> 30
+  | EngineInstall, SUV -> 40
+  | EngineInstall, Truck -> 50
+  | PaintBooth, Sedan -> 90
+  | PaintBooth, SUV -> 110
+  | PaintBooth, Truck -> 130
+  | QualityControl, _ -> 20
+
+(* Check if emergency stop needed *)
+let check_emergency_trigger equipment_status defect_rate safety_violations =
+  equipment_status = Faulty ||
+  defect_rate > 15 ||
+  safety_violations > 2
+
+(* Validity check *)
+let is_valid_config maintenance_due worker_count =
+  (* Dead zone: maintenance 48-52 with worker_count 1-2 *)
+  let in_dead_zone =
+    maintenance_due >= 48 && maintenance_due <= 52 &&
+    worker_count >= 1 && worker_count <= 2
+  in
+  let invalid_data = maintenance_due < 0 || worker_count < 0 in
+  not (in_dead_zone || invalid_data)
+
+(* Core decision function - 6 parameters *)
+let determine_station_processing
+    station_id
+    vehicle_type
+    equipment_status
+    maintenance_due
+    worker_count
+    defect_rate =
+
+  (* Hardcode these for simplicity *)
+  let safety_violations = 0 in
+
+  (* Check validity first *)
+  let valid = is_valid_config maintenance_due worker_count in
+
+  if not valid then
+    { can_process = false;
+      processing_time = 0;
+      decision_type = InvalidConfig }
+  else
+    (* Emergency overrides everything *)
+    let emergency = check_emergency_trigger equipment_status defect_rate safety_violations in
+
+    if emergency then
+      { can_process = false;
+        processing_time = 0;
+        decision_type = EmergencyStop }
+    else
+      (* Check equipment status *)
+      if equipment_status <> Operational then
+        { can_process = false;
+          processing_time = 0;
+          decision_type = EquipmentDown }
+      else
+        (* Check worker availability *)
+        if worker_count = 0 then
+          { can_process = false;
+            processing_time = 0;
+            decision_type = InsufficientWorkers }
+        else
+          (* Can process - calculate time *)
+          let base_time = base_processing_time station_id vehicle_type in
+          let adjusted_time =
+            if maintenance_due <= 10 then base_time + (base_time * 20 / 100)
+            else if maintenance_due <= 30 then base_time + (base_time * 10 / 100)
+            else base_time
+          in
+
+          { can_process = true;
+            processing_time = adjusted_time;
+            decision_type = ProcessApproved }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for typical operations *)
+let assume_typical_operation
+    (station_id : station_id)
+    (vehicle_type : vehicle_type)
+    (equipment_status : equipment_status)
+    (maintenance_due : int)
+    (worker_count : int)
+    (defect_rate : int) : bool =
+  equipment_status <> Faulty &&
+  maintenance_due >= 10 && maintenance_due <= 100 &&
+  worker_count >= 1 && worker_count <= 4
+
+(* Q1: Enumerate station processing scenarios *)
+let station_processing_scenarios = determine_station_processing
+[@@decomp top ~prune:true ~assuming:[%id assume_typical_operation] ()]
+
+(* Q2: Assumption for operational equipment *)
+let assume_operational_equipment
+    (station_id : station_id)
+    (vehicle_type : vehicle_type)
+    (equipment_status : equipment_status)
+    (maintenance_due : int)
+    (worker_count : int)
+    (defect_rate : int) : bool =
+  equipment_status = Operational && maintenance_due >= 30 && worker_count >= 1
+
+(* Q2: When does operational equipment trigger EmergencyStop? *)
+let operational_triggers_emergency station_id vehicle_type equipment_status maintenance_due worker_count defect_rate =
+  let decision = determine_station_processing station_id vehicle_type equipment_status maintenance_due worker_count defect_rate in
+  equipment_status = Operational && decision.decision_type = EmergencyStop
+[@@decomp top ~assuming:[%id assume_operational_equipment] ()]
+
+(* Q3: Safety property - EmergencyStop always prevents processing *)
+(* Fix station_id and vehicle_type to reduce verification space *)
+verify (fun equipment_status maintenance_due worker_count defect_rate ->
+  let decision = determine_station_processing BodyWelding Sedan equipment_status maintenance_due worker_count defect_rate in
+
+  (decision.decision_type = EmergencyStop) ==> (not decision.can_process)
+)

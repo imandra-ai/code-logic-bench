@@ -1,0 +1,101 @@
+model: "healthcare_appointment_scheduler"
+q1:
+  question: "How many distinct appointment scheduling decision scenarios exist?"
+  answer: "869 total scenarios: 276 Approved, 401 WaitList, 192 Rejected"
+  state_space_breakdown: |
+    Total: 869 scenarios
+    Approved: 276 (32%) - All approval criteria met
+    WaitList: 401 (46%) - Borderline cases or dead zone
+    Rejected: 192 (22%) - Insufficient conditions
+  key_thresholds:
+    no_show_count: [2, 3]
+    days_in_advance: [90]
+    time_slot: [720, 750]
+    daily_count: [18, 20]
+    patient_age: [65]
+    approval_score: [2, 3]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), approved_count: ([.[0].regions_str[] | select(.invariant_str == \"Approved\")] | length), waitlist_count: ([.[0].regions_str[] | select(.invariant_str == \"WaitList\")] | length), rejected_count: ([.[0].regions_str[] | select(.invariant_str == \"Rejected\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Routine appointments be approved with Pending insurance?"
+  answer: "YES - 100 scenarios where Routine + Pending → Approved"
+  multiplexer_pattern_demonstrated:
+    condition: "provider_premium = true AND patient_age >= 65"
+    mechanism: "insurance_acceptable returns true for Pending status in this case"
+    example:
+      insurance_status: "Pending"
+      patient_age: 65
+      provider_premium: true
+      priority: "Routine"
+      slot_available: true
+      pre_auth_provided: true
+      pre_auth_required: true
+      no_show_count: 2
+      days_in_advance: 90
+      result: "Approved (quorum 4/5: insurance_ok, slot, pre_auth, no_show OK)"
+  explanation: |
+    The multiplexer pattern changes insurance verification rules:
+    - Normally: Pending insurance → not acceptable
+    - Exception: Premium providers accept Pending for seniors (age >= 65)
+    This allows quorum (3/5) to be satisfied even with Pending insurance
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_routine_pending.json'
+q3:
+  question: "Can Emergency with ≥3 no-shows be approved?"
+  answer: "REFUTED - Counterexample found: Emergency + 3 no-shows CAN be approved"
+  property: "(priority = Emergency AND no_show_count >= 3) ==> result != Approved"
+  counterexample:
+    no_show_count: 3
+    priority: "Emergency"
+    insurance_status: "Verified"
+    days_in_advance: -2347
+    slot_available: true
+    pre_auth_required: false
+    patient_age: 65
+    provider_premium: true
+    daily_count: 21
+    result: "Approved via quorum path (not override path)"
+  why_refuted: |
+    The emergency_override function guards no_show_count < 3, preventing the OVERRIDE path.
+    However, Emergency appointments can still be approved via the NORMAL QUORUM path:
+
+    emergency_override(Emergency, 3) = false  → Skip override, use quorum
+    Quorum check:
+      - insurance_ok = true (Verified)
+      - slot_available = true
+      - pre_auth_ok = true (not required)
+      - no_show_ok = false (3 no-shows ≰ 2)
+      - days_ok = true (days_in_advance ≤ 90, even negative!)
+    Score = 3/5 → Approved
+
+    The override safety guard doesn't apply to the quorum path!
+  bug_exposed:
+    issue: "days_in_advance has no lower bound check"
+    problem: "days_ok = days_in_advance <= 90 accepts negative values"
+    impact: "Can 'book' appointments in the past via quorum path"
+    fix_needed: "Change to: days_in_advance >= 0 && days_in_advance <= 90"
+  key_insight: |
+    This refutation reveals a REAL BUG: the override pattern's safety constraint
+    only guards the fast-path (emergency override), not the slow-path (quorum approval).
+    Emergency appointments with poor patient history can still be approved if they
+    satisfy the quorum independently.
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_emergency_noshow_safety.json'
+analysis_metadata:
+  total_scenarios: 869
+  routine_pending_approved: 100
+  property_result: "REFUTED"
+  patterns_demonstrated:
+    pattern_1_override: "Emergency override guards no_show < 3, BUT doesn't prevent quorum approval"
+    pattern_2_multiplexer: "Insurance rules change based on provider_premium + patient_age"
+    pattern_3_dead_zone: "time_slot [720-750] + daily_count [18-20] → WaitList"
+    pattern_6_quorum: "3/5 conditions required, exposes gap in override safety"
+  model_insights:
+    - "869 scenarios with 3-way split: Approved (32%), WaitList (46%), Rejected (22%)"
+    - "Multiplexer allows 100 Routine+Pending approvals via senior exception"
+    - "Property refutation exposes TWO bugs: override doesn't block quorum path, days_in_advance allows negatives"
+    - "Dead zone accounts for significant WaitList percentage"
+  bug_analysis:
+    primary_bug: "Override safety (no_show < 3) only guards override path, not quorum path"
+    secondary_bug: "days_in_advance check allows negative values (past appointments)"
+    design_lesson: "Safety constraints on fast-paths don't automatically apply to slow-paths"

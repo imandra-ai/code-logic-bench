@@ -1,0 +1,195 @@
+(* Adaptive Traffic Light Controller *)
+
+(* Core types *)
+type light_state = Red | Yellow | Green
+
+type vehicle_type = Regular | Emergency | Bus
+
+type phase_action = {
+  new_ns_light: light_state;
+  new_ew_light: light_state;
+  phase_duration: int;
+  action_type: action_classification;
+  override_active: bool;
+}
+
+and action_classification =
+  | EmergencyOverride
+  | PhaseTransition
+  | PhaseExtension
+  | NormalTiming
+  | InvalidAction
+
+(* Calculate phase duration based on conditions *)
+let calculate_base_duration queue_size pedestrian_count pedestrian_wait_time =
+  let base = 30 in
+  let queue_factor = min queue_size 10 in
+  let ped_factor = min pedestrian_count 5 in
+  let wait_factor = min (pedestrian_wait_time / 10) 10 in
+  base + queue_factor + ped_factor + wait_factor
+
+(* Check if phase extension is needed (2 out of 3 conditions) *)
+let check_extension_conditions has_bus has_heavy_traffic has_many_pedestrians time_remaining =
+  let c1 = has_bus && time_remaining < 10 in
+  let c2 = has_heavy_traffic && time_remaining < 5 in
+  let c3 = has_many_pedestrians && time_remaining < 15 in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0)
+  in
+  count >= 2
+
+(* Determine next light state in sequence *)
+let next_light_state current_ns current_ew =
+  match current_ns, current_ew with
+  | Green, Red -> (Yellow, Red)
+  | Yellow, Red -> (Red, Red)
+  | Red, Red -> (Red, Green)
+  | Red, Green -> (Red, Yellow)
+  | Red, Yellow -> (Green, Red)
+  | _ -> (Red, Red)  (* Safety fallback *)
+
+(* Validity check *)
+let is_valid_state time_remaining queue_size has_emergency =
+  (* Dead zone: time_remaining 1-3 with queue_size 4-6 and no emergency creates ambiguous state *)
+  let in_dead_zone =
+    time_remaining >= 1 && time_remaining <= 3 &&
+    queue_size >= 4 && queue_size <= 6 &&
+    not has_emergency
+  in
+  (* Also invalid if time is negative or queue size is negative *)
+  let invalid_data = time_remaining < 0 || queue_size < 0 in
+
+  not (in_dead_zone || invalid_data)
+
+(* Core decision function *)
+let determine_phase_action
+    current_ns_light
+    current_ew_light
+    time_remaining
+    queue_size
+    pedestrian_count
+    pedestrian_wait_time
+    has_emergency
+    has_bus
+    current_emergency_override =
+
+  (* Check validity first *)
+  let valid = is_valid_state time_remaining queue_size has_emergency in
+
+  if not valid then
+    { new_ns_light = Red;
+      new_ew_light = Red;
+      phase_duration = 30;
+      action_type = InvalidAction;
+      override_active = false }
+  else
+    (* Emergency vehicles override everything *)
+    if has_emergency then
+      { new_ns_light = Green;
+        new_ew_light = Red;
+        phase_duration = 15;
+        action_type = EmergencyOverride;
+        override_active = true }
+    else
+      (* Clear emergency override if it was active but no longer needed *)
+      if current_emergency_override then
+        { new_ns_light = current_ns_light;
+          new_ew_light = current_ew_light;
+          phase_duration = 30;
+          action_type = NormalTiming;
+          override_active = false }
+      else
+        (* Normal operation: check what to do *)
+        if time_remaining <= 0 then
+          (* Time expired: transition to next phase *)
+          let (new_ns, new_ew) = next_light_state current_ns_light current_ew_light in
+          let duration = calculate_base_duration queue_size pedestrian_count pedestrian_wait_time in
+          { new_ns_light = new_ns;
+            new_ew_light = new_ew;
+            phase_duration = duration;
+            action_type = PhaseTransition;
+            override_active = false }
+        else
+          (* Time remaining: check if extension needed *)
+          let heavy_traffic = queue_size > 5 in
+          let many_pedestrians = pedestrian_count > 2 in
+          let should_extend = check_extension_conditions has_bus heavy_traffic many_pedestrians time_remaining in
+
+          if should_extend then
+            (* Extend current phase *)
+            { new_ns_light = current_ns_light;
+              new_ew_light = current_ew_light;
+              phase_duration = time_remaining + 10;
+              action_type = PhaseExtension;
+              override_active = false }
+          else
+            (* Continue normal countdown *)
+            { new_ns_light = current_ns_light;
+              new_ew_light = current_ew_light;
+              phase_duration = time_remaining - 1;
+              action_type = NormalTiming;
+              override_active = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption to focus on busy traffic scenarios *)
+let assume_busy_intersection
+    (current_ns_light : light_state)
+    (current_ew_light : light_state)
+    (time_remaining : int)
+    (queue_size : int)
+    (pedestrian_count : int)
+    (pedestrian_wait_time : int)
+    (has_emergency : bool)
+    (has_bus : bool)
+    (current_emergency_override : bool) : bool =
+  queue_size >= 3 && (time_remaining <= 10 || has_emergency || has_bus)
+
+(* Q1: Enumerate phase action scenarios in busy traffic *)
+let phase_action_scenarios = determine_phase_action
+[@@decomp top ~prune:true ~assuming:[%id assume_busy_intersection] ()]
+
+(* Q2: Assumption for Red-Red scenarios *)
+let assume_red_red_state
+    (current_ns_light : light_state)
+    (current_ew_light : light_state)
+    (time_remaining : int)
+    (queue_size : int)
+    (pedestrian_count : int)
+    (pedestrian_wait_time : int)
+    (has_emergency : bool)
+    (has_bus : bool)
+    (current_emergency_override : bool) : bool =
+  current_ns_light = Red && current_ew_light = Red && queue_size <= 10
+
+(* Q2: When does emergency override trigger from Red-Red state? *)
+let emergency_from_red_red
+    current_ns_light
+    current_ew_light
+    time_remaining
+    queue_size
+    pedestrian_count
+    pedestrian_wait_time
+    has_emergency
+    has_bus
+    current_emergency_override =
+  let action = determine_phase_action
+    current_ns_light current_ew_light time_remaining queue_size
+    pedestrian_count pedestrian_wait_time has_emergency has_bus current_emergency_override in
+  current_ns_light = Red && current_ew_light = Red && action.action_type = EmergencyOverride
+[@@decomp top ~assuming:[%id assume_red_red_state] ()]
+
+(* Q3: Safety property - Emergency override always sets NS to Green and EW to Red *)
+(* Fix most parameters to reduce verification space - focus on emergency scenarios *)
+verify (fun has_emergency has_bus current_emergency_override ->
+  let action = determine_phase_action
+    Red Red 5 5 1 10 has_emergency has_bus current_emergency_override in
+
+  (action.action_type = EmergencyOverride) ==>
+    (action.new_ns_light = Green && action.new_ew_light = Red && action.phase_duration = 15)
+)

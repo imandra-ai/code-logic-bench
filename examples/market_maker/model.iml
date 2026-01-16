@@ -1,0 +1,146 @@
+(* Market Maker *)
+
+(* Core types *)
+type position_direction = Long | Neutral | Short
+
+type volatility_regime = Low | Medium | High
+
+type quote_decision = FullSize | ReducedSize | NoQuote
+
+(* High volatility forces wide spreads *)
+(* BUT only if position is not at extreme (abs < 80% of max) *)
+let high_volatility_override volatility_regime position_pct =
+  volatility_regime = High && position_pct < 80
+
+(* Minimum spread depends on volatility regime *)
+let minimum_spread volatility_regime =
+  match volatility_regime with
+  | Low -> 10   (* 10 basis points *)
+  | Medium -> 25
+  | High -> 50
+
+(* Position 85-95% of max is ambiguous *)
+(* Too risky to quote full size, but not extreme enough to stop entirely *)
+let in_position_dead_zone position_pct =
+  position_pct >= 85 && position_pct <= 95
+
+(* Calculate position as percentage of max *)
+let position_percentage position max_position =
+  if max_position = 0 then 0
+  else (abs position * 100) / max_position
+
+(* Check if adverse selection detected *)
+let adverse_selection_detected consecutive_adverse =
+  consecutive_adverse >= 3
+
+(* Full size quoting needs 4 out of 6 conditions *)
+let calculate_quote_score
+    position_safe
+    spread_adequate
+    no_adverse
+    volatility_ok
+    depth_good
+    momentum_favorable =
+  let count =
+    (if position_safe then 1 else 0) +
+    (if spread_adequate then 1 else 0) +
+    (if no_adverse then 1 else 0) +
+    (if volatility_ok then 1 else 0) +
+    (if depth_good then 1 else 0) +
+    (if momentum_favorable then 1 else 0)
+  in
+  count
+
+(* Core market maker quoting decision *)
+let determine_quote_decision
+    (* Position state *)
+    position
+    max_position
+    consecutive_adverse
+    (* Market conditions *)
+    volatility_regime
+    spread_bps
+    market_depth
+    momentum =
+
+  (* Calculate position percentage *)
+  let position_pct = position_percentage position max_position in
+
+  (* Check position dead zone first *)
+  let in_dead_zone = in_position_dead_zone position_pct in
+
+  if in_dead_zone then
+    ReducedSize  (* Dead zone → quote with reduced size *)
+  else
+    (* Check if position at extreme (≥ 100%) *)
+    if position_pct >= 100 then
+      NoQuote  (* Stop quoting at max position *)
+    else
+      (* Check high volatility override *)
+      let is_vol_override = high_volatility_override volatility_regime position_pct in
+
+      if is_vol_override then
+        FullSize  (* High volatility with safe position → quote aggressively *)
+      else
+        (* Normal quoting logic with quorum *)
+
+        (* Check individual conditions *)
+        let position_safe = position_pct <= 70 in
+
+        let min_spread = minimum_spread volatility_regime in
+        let spread_adequate = spread_bps >= min_spread in
+
+        let no_adverse = not (adverse_selection_detected consecutive_adverse) in
+
+        let volatility_ok = volatility_regime <> High in
+
+        let depth_good = market_depth >= 300 in
+
+        let momentum_ok = abs momentum <= 50 in
+
+        (* Calculate quote score (quorum) *)
+        let score = calculate_quote_score
+          position_safe spread_adequate no_adverse volatility_ok depth_good momentum_ok
+        in
+
+        (* Need 4 out of 6 for full size *)
+        if score >= 4 then
+          FullSize
+        else if score >= 2 then
+          ReducedSize  (* Borderline conditions *)
+        else
+          NoQuote
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all quoting decision scenarios *)
+let all_quoting_scenarios = determine_quote_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can we quote FullSize when consecutive adverse selection is detected (≥3)? *)
+let fullsize_with_adverse
+    position max_position consecutive_adverse
+    volatility_regime spread_bps market_depth momentum =
+  let result = determine_quote_decision
+    position max_position consecutive_adverse
+    volatility_regime spread_bps market_depth momentum
+  in
+  consecutive_adverse >= 3 && result = FullSize
+[@@decomp top ()]
+
+(* Q3: Safety property - positions in dead zone never quote FullSize *)
+verify (fun
+    position max_position consecutive_adverse
+    volatility_regime spread_bps market_depth momentum ->
+  let result = determine_quote_decision
+    position max_position consecutive_adverse
+    volatility_regime spread_bps market_depth momentum
+  in
+  let position_pct = position_percentage position max_position in
+  let in_dead_zone = in_position_dead_zone position_pct in
+
+  (* Dead zone should never quote full size *)
+  in_dead_zone ==> result <> FullSize
+)

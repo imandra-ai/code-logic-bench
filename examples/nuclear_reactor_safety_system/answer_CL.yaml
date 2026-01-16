@@ -1,0 +1,148 @@
+model: "nuclear_reactor_safety_system"
+q1:
+  question: "How many distinct safety response scenarios exist in determine_safety_response, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "7,714 scenarios"
+  key_thresholds:
+    temperature: [550, 618, 620, 622, 640, 650]
+    pressure: [1500, 2000, 2200, 2390, 2400, 2410, 2450, 2500]
+    neutron_flux: [103, 105]
+    radiation_level: [80, 100]
+    control_rod_insertion: [70, 85]
+    xenon_level: [15, 25, 30]
+    time_since_last_scram: [6, 12]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_response_scenarios.json'
+    complexity_note: "16x increase from original (465 → 7,714). Added xenon interaction, time-based thresholds, nested overrides."
+q2:
+  question: "Under what exact conditions does the system initiate automatic SCRAM (emergency shutdown)?"
+  answer: "1,338 scenarios trigger SCRAM (out of 7,714 total)"
+  scram_ratio: "17.3% of scenarios trigger SCRAM"
+  conditions_structure: "SCRAM = f(recommended_state, safety_system_status, xenon_level, time_since_last_scram)"
+  key_conditions:
+    - "EmergencyShutdown + Operational → SCRAM"
+    - "EmergencyShutdown + Degraded → SCRAM"
+    - "EmergencyShutdown + Failed → NO SCRAM (system cannot execute)"
+    - "HotStandby + Operational → NO SCRAM"
+    - "HotStandby + Degraded → SCRAM (safety fallback)"
+    - "PowerOperation + Operational + recent_scram<6hrs + xenon≥25 → SCRAM (xenon oscillation protection)"
+    - "PowerOperation + Degraded + recent_scram<12hrs → SCRAM (conservative for degraded systems)"
+  override_interactions:
+    DelayScram: "Normally suppresses SCRAM for marginal conditions, BUT has nested exceptions"
+    DelayScram_exception_1: "Can delay EmergencyShutdown IF time<6hrs AND xenon<15 (xenon recovery window)"
+    DelayScram_exception_2: "BUT above only works if control_rods≥85% (higher safety margin required)"
+    DelayScram_shadowed: "Second condition is actually unreachable - both require same prerequisites"
+    SuppressAlarm: "Downgrades to Shutdown, preventing SCRAM unless already EmergencyShutdown"
+    BypassInterlock: "Can upgrade HotStandby→PowerOperation, but blocked if temp≥650°C"
+    BypassInterlock_exception: "UNLESS pressure<2000 PSI (low pressure reduces thermal risk)"
+    MaintenanceMode: "Forces Shutdown, but xenon≥25 prevents downgrade (criticality concern)"
+  example_complex_scenario:
+    description: "PowerOperation with recent SCRAM and high xenon triggers SCRAM"
+    conditions:
+      - "recommended_state = PowerOperation"
+      - "time_since_last_scram = 5 hrs (< 6)"
+      - "xenon_level = 28 (≥ 25)"
+      - "safety_system_status = Operational"
+    result: "SCRAM triggered (xenon oscillation protection after recent SCRAM)"
+    why_tricky: "LLMs likely miss that PowerOperation can trigger SCRAM under specific time+xenon conditions"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_triggers_scram.json'
+    complexity_increase: "10x from original (124 → 1,338 scenarios)"
+q3:
+  question: "Can the safety property 'Critical temperature (≥650°C) always triggers SCRAM when safety system is operational' ever be violated?"
+  answer: "REFUTED - Property can be violated (counterexample found)"
+  property: "(response_valid && temperature>=650 && safety_system_status=Operational) ==> initiate_scram"
+  counterexample:
+    temperature: 684
+    pressure: 38
+    neutron_flux: 54
+    radiation_level: 38
+    control_rod_insertion: 93
+    xenon_level: 0
+    time_since_last_scram: 23
+    safety_system_status: Operational
+    operator_override: SuppressAlarm
+    current_state: EmergencyShutdown
+    result: "NO SCRAM"
+  why_violated_detailed: |
+    Step-by-step logic chain that LLMs struggle to trace:
+
+    1. classify_severity:
+       - critical_count = 1 (only temp≥650)
+       - high_count = 1 (only temp≥620)
+       - NOT recent_scram (23hrs > 12hrs), can't use lowered threshold
+       - Special temp+pressure rule: temp≥640 && pressure≥2450?
+         → 684≥640 ✓ but 38≥2450 ✗ (FAILS)
+       - Result: critical_count=1 → HotStandby
+
+    2. apply_operator_override:
+       - base_state = HotStandby
+       - override = SuppressAlarm
+       - SuppressAlarm logic: if EmergencyShutdown then keep, else Shutdown
+       - Result: Shutdown
+
+    3. should_initiate_scram:
+       - recommended_state = Shutdown
+       - safety_system_status = Operational
+       - Shutdown + Operational → FALSE
+
+    Critical insights:
+    - Single critical parameter insufficient (need quorum of 2)
+    - Special combo rule requires BOTH high temp AND high pressure
+    - Operator override evaluated AFTER severity classification
+    - SCRAM decision based on FINAL state, not base severity
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_critical_temp_scram.json'
+    why_challenging_for_llms:
+      - "Temperature 34°C above critical looks like obvious SCRAM case"
+      - "Must understand quorum pattern: 2 of 4 critical conditions required"
+      - "Must track state transformations: severity → override → SCRAM decision"
+      - "Must recognize special combo rule has BOTH conditions (AND not OR)"
+      - "Must understand precedence: override happens after classification"
+      - "Easy to confuse 'high' (≥620) vs 'critical' (≥650) vs 'combo threshold' (≥640)"
+    llm_likely_mistakes:
+      - "temp≥650 → automatically SCRAM (missing quorum)"
+      - "temp=684 is so high it must trigger something (missing state machine logic)"
+      - "Operational system → SCRAM for critical conditions (missing override effect)"
+      - "Two parameters above thresholds → EmergencyShutdown (confusing high vs critical)"
+analysis_metadata:
+  total_regions: 7714
+  scram_scenarios: 1338
+  imandra_runtime: "Q1: ~90s, Q2: ~60s, Q3: ~30s with assumptions"
+  pattern_complexity:
+    quorum: "Need 2 of 4 critical conditions [temp≥650, pressure≥2500, flux≥105, radiation≥100] for EmergencyShutdown"
+    quorum_exception: "UNLESS recent_scram<12hrs AND xenon≥25, then only 1 critical needed"
+    special_combo: "temp≥640 AND pressure≥2450 also triggers EmergencyShutdown (even if not 'critical')"
+    override_nested: "DelayScram has 3-level exception nesting (base → exception → sub-exception)"
+    override_contradictory: "BypassInterlock: can't bypass with critical temp, EXCEPT when pressure<2000"
+    dead_zone: "temp∈[618,622] AND pressure∈[2390,2410] → invalid response"
+    dead_zone_shadowed: "Second dead zone branch (xenon>30) is mathematically unreachable"
+    multiplexer: "Xenon changes ECCS temperature threshold (650 → 620 when xenon≥25)"
+    stateful_decay: "time_since_last_scram changes both severity classification and SCRAM logic"
+    shadowed_branch: "critical_count≥1 AND high_count≥4 → unreachable (all critical implies >2 critical)"
+  edge_cases:
+    - "Single critical parameter (e.g., temp=684) doesn't trigger EmergencyShutdown (need 2)"
+    - "Special combo rule: temp=640+pressure=2450 triggers EmergencyShutdown with 0 critical conditions"
+    - "Recent SCRAM: lowers EmergencyShutdown threshold from 2 critical to 1 critical+xenon_high"
+    - "PowerOperation can trigger SCRAM if recent_scram<6hrs AND xenon≥25"
+    - "Degraded safety system triggers SCRAM even for HotStandby (not just EmergencyShutdown)"
+    - "DelayScram can override EmergencyShutdown IF time<6hrs AND xenon<15 AND rods≥85%"
+    - "BypassInterlock can bypass critical temp IF pressure<2000 (thermal stress reduced)"
+    - "MaintenanceMode can't downgrade if xenon≥25 (criticality control priority)"
+    - "Dead zone at boundary intersections creates invalid responses"
+    - "Containment isolation requires pressure≥1500 (below that, already compromised)"
+  llm_challenge_summary: |
+    This model demonstrates ImandraX's power through:
+
+    1. SCALE: 7,714 scenarios vs LLM's vague "hundreds or thousands"
+    2. PRECISION: 1,338 exact SCRAM conditions vs LLM's approximations
+    3. COUNTEREXAMPLES: temp=684°C violation that LLMs miss
+    4. UNREACHABLE CODE: Identifies shadowed branches that look valid
+    5. INTERACTION COMPLEXITY: 6 patterns create exponential state space
+
+    Without decomposition, even domain experts would struggle to:
+    - Enumerate all reachable scenarios
+    - Identify precise SCRAM conditions
+    - Find boundary-violating counterexamples
+    - Recognize vacuous code branches
+
+    ImandraX provides mathematical certainty where manual reasoning fails.

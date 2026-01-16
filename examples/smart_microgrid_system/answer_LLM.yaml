@@ -1,0 +1,277 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:23'
+  q1:
+    answer: 5 distinct scenarios.
+    reasoning: >-
+      - The function returns one of five unique shedding patterns:
+        - No deficit → shed nothing.
+        - Deficit ≤ 10 kW (Deferrable load size) → shed Deferrable only.
+        - Deficit > 10 kW but ≤ 40 kW (Deferrable + NonEssential) → shed Deferrable
+      + NonEssential.
+        - In Emergency mode only: deficit > 40 kW but ≤ 80 kW (Deferrable + NonEssential
+      + Essential) → shed Deferrable + NonEssential + Essential.
+        - In Emergency mode only: deficit > 80 kW → shed everything including Critical
+      (blackout case).
+  q2:
+    answer: Yes.
+    reasoning: >-
+      - Essential shedding is gated only by `mode == EMERGENCY` (`emergency_allows_essential_shed`).
+
+      - `battery_soc` (even ≥ 50) does not prevent Essential shedding; it only influences
+      `energy_status`, which is computed but never used to change decisions.
+
+      - Essential loads will be shed in Emergency mode when the deficit remains after
+      shedding Deferrable and NonEssential (i.e., deficit > 40 kW).
+  q3:
+    answer: Yes, in Emergency mode under an extreme deficit.
+    reasoning: >-
+      - `renewable_kw >= 80` does not block shedding; it only affects `energy_status`
+      and the deficit calculation.
+
+      - Critical loads are shed only in the Emergency branch when the deficit still
+      remains after shedding Deferrable (10) + NonEssential (30) + Essential (40)
+      = 80 kW.
+
+      - With `renewable_kw >= 80`, Critical can still be shed if `total_load_kw -
+      renewable_kw > 80` (e.g., very high total load), causing the “shed everything”
+      return path.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:25'
+  q1:
+    answer: 5 distinct load shedding scenarios
+    reasoning: >-
+      • The function returns 5 different LoadShedDecision configurations based on
+      deficit levels:
+        1. No shedding: (F, F, F, F) - when deficit = 0
+        2. Shed Deferrable only: (T, F, F, F) - when deficit <= 10 kW
+        3. Shed Deferrable + NonEssential: (T, T, F, F) - when deficit <= 40 kW (or
+      in non-Emergency modes with higher deficit)
+        4. Shed Deferrable + NonEssential + Essential: (T, T, T, F) - when deficit
+      <= 80 kW in Emergency mode
+        5. Complete blackout (shed all): (T, T, T, T) - when deficit > 80 kW in Emergency
+      mode • The scenarios are determined by the magnitude of energy deficit and system
+      mode
+
+      • System mode (GridTied, Islanded, Emergency) affects whether Essential/Critical
+      can be shed, but the distinct output patterns remain 5
+  q2:
+    answer: Yes, Essential loads can be shed when battery_soc >= 50
+    reasoning: >-
+      • Essential loads can be shed only in Emergency mode (when emergency_allows_essential_shed
+      returns True)
+
+      • The battery_soc parameter is used only in classify_energy_status function,
+      which doesn't directly prevent Essential load shedding
+
+      • If the system is in Emergency mode AND there's sufficient deficit (> 40 kW
+      after shedding Deferrable and NonEssential), Essential loads will be shed
+
+      • Example scenario: mode=EMERGENCY, battery_soc=50, renewable_kw=10, total_load_kw=150,
+      grid_connected=False
+        - Deficit = 150 - 10 = 140 kW
+        - After shedding Deferrable (10 kW): 130 kW deficit remains
+        - After shedding NonEssential (30 kW): 100 kW deficit remains
+        - Emergency mode allows Essential shedding, so Essential (40 kW) will be shed
+      • Therefore, battery_soc >= 50 does not prevent Essential load shedding if other
+      conditions are met
+  q3:
+    answer: Yes, Critical loads can be shed when renewable_kw >= 80
+    reasoning: >-
+      • Critical loads can be shed only in Emergency mode (GridTied mode protects
+      Critical loads)
+
+      • renewable_kw >= 80 results in EnergySourceStatus.ABUNDANT, but this status
+      is calculated and not used to prevent load shedding
+
+      • The actual shedding logic is based on deficit calculation: deficit = total_load_kw
+      - renewable_kw
+
+      • Example scenario: mode=EMERGENCY, battery_soc=20, renewable_kw=80, total_load_kw=200,
+      grid_connected=False
+        - Deficit = 200 - 80 = 120 kW
+        - After shedding Deferrable (10 kW): 110 kW deficit
+        - After shedding NonEssential (30 kW): 80 kW deficit
+        - After shedding Essential (40 kW): 40 kW deficit
+        - Still 40 kW deficit remains, so Critical (20 kW) will be shed in Emergency
+      mode • The energy_status classification is computed but never actually used
+      in the shedding decision logic
+
+      • Therefore, renewable_kw >= 80 alone does not prevent Critical load shedding
+      if there's extreme demand in Emergency mode
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:28'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - The load shedding logic in the code results in exactly 5 distinct configurations
+      of shed flags in the LoadShedDecision: no shedding, shed Deferrable only, shed
+      Deferrable and NonEssential, shed Deferrable, NonEssential, and Essential, and
+      shed all loads including Critical.
+
+      - These scenarios are determined by the progressive shedding based on deficit
+      and mode, with 5 return statements each covering a unique case.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Essential loads are shed only if the mode is EMERGENCY and the deficit exceeds
+      the combined power of Deferrable and NonEssential loads (10 + 30 = 40 kW).
+
+      - battery_soc is used only to classify energy status, which is not factored
+      into the shedding decision in the code.
+
+      - There are scenarios in EMERGENCY mode with large deficit where battery_soc
+      >= 50, allowing Essential loads to be shed.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - Critical loads are shed only in EMERGENCY mode when the deficit exceeds the
+      power of Deferrable, NonEssential, and Essential loads (10 + 30 + 40 = 80 kW).
+
+      - renewable_kw >= 80 classifies energy as ABUNDANT, but since this status does
+      not influence shedding logic, deficit calculation remains based on renewable_kw
+      and total_load_kw.
+
+      - If total_load_kw is sufficiently high (e.g., >101 kW with renewable_kw >=80),
+      the deficit can exceed 80 kW in EMERGENCY mode, requiring Critical loads to
+      be shed.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:39'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - There are 5 distinct Boolean combinations of load shedding returned by the
+      function:
+
+      1. No loads shed (Deficit = 0).
+
+      2. Deferrable only (Deficit <= 10).
+
+      3. Deferrable + NonEssential (Deficit <= 40 OR Mode != Emergency).
+
+      4. Deferrable + NonEssential + Essential (Deficit <= 80 AND Mode == Emergency).
+
+      5. All loads including Critical (Deficit > 80 AND Mode == Emergency).
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - The function `classify_energy_status` uses `battery_soc` to determine an energy
+      status, but the returned value `energy_status` is **never used** in the decision
+      logic.
+
+      - The decision to shed Essential loads is controlled exclusively by `emergency_allows_essential_shed(mode)`,
+      which returns True if `mode == SystemMode.EMERGENCY`.
+
+      - Logic flow: If the mode is EMERGENCY and the deficit > 40kW, Essential loads
+      will be shed regardless of the `battery_soc` value.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - To shed Critical loads, the code requires the deficit to exceed the sum of
+      all lower priority loads (Deferrable 10kW + NonEssential 30kW + Essential 40kW
+      = 80kW).
+
+      - The maximum total load defined by the `load_power` function is 100kW (Sum
+      of all priority values).
+
+      - If `renewable_kw` is >= 80, the maximum possible deficit is 20kW (100kW total
+      load - 80kW renewable).
+
+      - Since 20kW does not exceed the 80kW threshold, the decision logic can never
+      reach the step to shed Critical loads.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:40'
+  q1:
+    answer: '6'
+    reasoning: >-
+      - Analyzing the `determine_load_shedding` function, I identify the following
+      distinct return scenarios:
+
+      - Scenario 1: No deficit (deficit == 0) → No shedding at all (shed_deferrable=False,
+      shed_non_essential=False, shed_essential=False, shed_critical=False)
+
+      - Scenario 2: Small deficit covered by Deferrable → (shed_deferrable=True, others=False)
+
+      - Scenario 3: Deficit covered by Deferrable + NonEssential → (shed_deferrable=True,
+      shed_non_essential=True, others=False)
+
+      - Scenario 4: Emergency mode, deficit covered by Deferrable + NonEssential +
+      Essential → (shed_deferrable=True, shed_non_essential=True, shed_essential=True,
+      shed_critical=False)
+
+      - Scenario 5: Emergency mode, complete blackout (shed all including Critical)
+      → (all=True)
+
+      - Scenario 6: Non-Emergency mode, cannot shed Essential even if deficit remains
+      → (shed_deferrable=True, shed_non_essential=True, shed_essential=False, shed_critical=False)
+      - same output as Scenario 3 but different path
+
+      - Actually Scenarios 3 and 6 produce the same decision output, so there are
+      effectively 5 distinct decision outputs, but examining the code paths there
+      are 6 distinct return statements
+
+      - Counting distinct LoadShedDecision configurations: (F,F,F,F), (T,F,F,F), (T,T,F,F),
+      (T,T,T,F), (T,T,T,T) = 5 unique decision outcomes
+
+      - However, if counting code paths/scenarios that can occur: 6 return points
+      exist in the code (no deficit, deferrable only, deferrable+non-essential sufficient,
+      emergency essential sufficient, emergency all shed, non-emergency cannot shed
+      essential)
+
+      - The question asks for "distinct load shedding scenarios" which typically means
+      unique outcomes = 5, but counting all execution paths = 6
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Essential loads can be shed only when `emergency_allows_essential_shed(mode)`
+      returns True, which requires mode == SystemMode.EMERGENCY
+
+      - The battery_soc value affects `classify_energy_status` but this function's
+      result (EnergySourceStatus) is NOT used to gate Essential shedding
+
+      - The decision to shed Essential depends only on: (1) having a deficit after
+      shedding Deferrable and NonEssential, and (2) being in Emergency mode
+
+      - Example scenario: mode=Emergency, battery_soc=100 (healthy), renewable_kw=0,
+      total_load_kw=100, grid_connected=False
+        - deficit = 100 - 0 = 100
+        - After deferrable (10kW): 100 - 10 = 90 > 0
+        - After non-essential (30kW): 90 - 30 = 60 > 0
+        - Emergency mode allows essential shedding → shed_essential=True
+      - Therefore, Essential loads CAN be shed even when battery_soc >= 50 (or any
+      battery level), as long as we're in Emergency mode with sufficient deficit
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - When renewable_kw >= 80, the `classify_energy_status` function returns EnergySourceStatus.ABUNDANT
+      (first condition checked)
+
+      - More importantly, looking at `determine_load_shedding`: deficit = calculate_deficit(renewable_kw,
+      total_load_kw)
+
+      - calculate_deficit returns 0 when available_kw >= total_load_kw
+
+      - If renewable_kw >= 80, and total_load_kw <= 80, then deficit = 0, so no shedding
+      occurs at all
+
+      - If renewable_kw >= 80 but total_load_kw > renewable_kw (e.g., total_load_kw
+      = 150), there IS a deficit
+
+      - However, to shed Critical loads, we need: (1) Emergency mode, (2) deficit
+      remaining after shedding Deferrable+NonEssential+Essential > 0
+
+      - Deferrable=10kW, NonEssential=30kW, Essential=40kW, Critical=20kW → Total
+      capacity = 100kW
+
+      - If renewable_kw=80 and total_load_kw must be > 80+10+30+40 = 160 to reach
+      Critical shedding
+
+      - But total_load_kw is limited by actual loads: max = 20+40+30+10 = 100kW
+
+      - With renewable_kw=80 and max total_load_kw=100, deficit = 100-80 = 20kW
+
+      - After deferrable: 20-10=10kW remaining deficit
+
+      - After non-essential: 10-30=-20 ≤ 0, so we stop at shedding Deferrable+NonEssential
+
+      - Critical loads CANNOT be shed when renewable_kw >= 80 because the maximum
+      possible deficit (20kW) is covered by Deferrable+NonEssential (40kW)

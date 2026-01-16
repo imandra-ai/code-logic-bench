@@ -1,0 +1,42 @@
+model: "automated_loan_approval_system"
+q1:
+  question: "How many distinct approval scenarios exist in determine_loan_approval, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "234 scenarios (for typical loans: age 25-65, credit 550-800, amount 10k-300k)"
+  state_space_reduction: "Used ~assuming to focus on typical applications"
+  key_thresholds:
+    credit_score: [500, 550, 580, 620, 650, 700, 750, 800]
+    debt_to_income: [30, 40, 43, 45, 47, 50]
+    age: [18, 25, 65, 72, 74, 75]
+    loan_amount: [10000, 100000, 300000, 500000]
+    risk_score: [20, 40, 70]
+    interest_rate: [300, 3600]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_approval_scenarios.json'
+    use_of_assuming: "age 25-65, credit 550-800, loan_amount 10k-300k"
+q2:
+  question: "Can an applicant with Excellent credit (score >= 750) ever receive ManualReviewRequired decision? If so, under what exact conditions?"
+  answer: "YES - 12 scenarios where Excellent credit requires manual review"
+  example:
+    scenario: "credit=850 + debt_to_income=46 + loan_amount=500,000"
+    manual_review_trigger: "debt_to_income > 45"
+    result: "ManualReviewRequired despite Excellent credit"
+  explanation: "Manual review triggers on: risk_level=Extreme, loan > 500k, bankruptcy, or DTI > 45"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_excellent_manual.json'
+    use_of_assuming: "credit_score >= 750 && age 30-60"
+q3:
+  question: "Can the safety property 'applications with ManualReviewRequired are never auto-approved' ever be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "(decision_type = ManualReviewRequired) ==> (not approved)"
+  why_proven: "Manual review path explicitly sets approved=false in code structure"
+  fixed_parameters_in_verify: "Personal loan, age=45"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_manual_review_safety.json'
+analysis_metadata:
+  total_scenarios_q1: 234
+  excellent_manual_count_q2: 12
+  property_result_q3: "PROVEN"
+  pattern_complexity:
+    override: "Manual review (4 triggers) overrides normal approval flow"
+    dead_zone: "credit 580-620 + DTI 43-47 + age 72-74 → invalid"
+    multiplexer: "Loan type changes interest rate (Mortgage +0bp, Personal +300bp)"

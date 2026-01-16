@@ -1,0 +1,72 @@
+model: "smart_building_hvac"
+q1:
+  question: "How many distinct HVAC control decision scenarios exist in determine_hvac_control, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "612 scenarios"
+  key_thresholds:
+    temp_diff: [2, 3, 4]
+    battery_level: [10, 30, 50]
+    power_consumption: [5000]
+    maintenance_hours: [9000, 10000]
+  state_space_details:
+    categorical_combinations: 24
+    breakdown: "2 (occupancy) × 2 (season) × 3 (emergency) × 2 (external_power)"
+    symbolic_integers: 4
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_hvac_control_scenarios.json'
+    use_of_assuming: "temp_diff ∈ [0,6], battery_level ∈ [0,100], power_consumption ∈ [4000,6000], maintenance_hours ∈ [0,12000]"
+    use_of_basis: "temp_diff, battery_level, power_consumption, maintenance_hours (symbolic integers)"
+q2:
+  question: "Under what exact conditions does the system select Emergency mode? Include all scenarios where emergency overrides are active and any sub-cases where emergency override is prevented."
+  answer: "180 scenarios where Emergency mode is selected"
+  primary_trigger: "emergency_state = FireAlarm"
+  override_exceptions:
+    exception_1: "FireAlarm + battery < 10 + maintenance_hours > 10000 → Off (not Emergency)"
+    explanation_1: "Critical battery AND overdue maintenance forces Off for safety"
+  sample_emergency_scenarios:
+    scenario_1:
+      emergency_state: "FireAlarm"
+      battery_level: "≥ 10"
+      maintenance_hours: "≤ 10000"
+      result: "Emergency mode selected"
+    scenario_2:
+      emergency_state: "FireAlarm"
+      battery_level: "< 10"
+      maintenance_hours: "> 10000"
+      result: "Off mode (requires manual override)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_selects_emergency_mode.json'
+q3:
+  question: "Can the safety property 'During a fire alarm (FireAlarm), the system must either select Emergency mode or be Off with manual override required' ever be violated? If so, under what exact conditions?"
+  answer: "PROVEN - Property cannot be violated"
+  property: "(emergency_state = FireAlarm) ==> (selected_mode = Emergency || (selected_mode = Off && requires_override = true))"
+  why_proven: |
+    The apply_emergency_mode function exhaustively handles FireAlarm:
+    1. Default: FireAlarm → Emergency
+    2. Exception: FireAlarm + (battery < 10 && maintenance_hours > 10000) → Off
+    3. The needs_manual_override function ensures: (mode = Off && emergency_state = FireAlarm) → requires_override = true
+    Therefore, all FireAlarm cases result in either Emergency or (Off with override required).
+  edge_cases_covered:
+    battery_boundary: "Exactly battery = 10 is the critical threshold"
+    maintenance_boundary: "Exactly maintenance_hours = 10000 is the overdue threshold"
+    interaction: "Both conditions must be true simultaneously to trigger Off"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_fire_alarm_safety.json'
+analysis_metadata:
+  total_scenarios_q1: 612
+  emergency_scenarios_q2: 180
+  property_result_q3: "PROVEN"
+  patterns_used:
+    override: "FireAlarm forces Emergency, BUT battery critical + maintenance overdue forces Off"
+    dead_zone: "temp_diff = 3 creates ambiguous boundary in classification"
+    quorum: "2 out of 3 energy constraints required to downgrade modes"
+    multiplexer: "Season affects temperature interpretation (Summer vs Winter thresholds)"
+  use_of_decomp_features:
+    q1_prune: "~prune:true enables pruning redundant regions"
+    q1_q2_assuming: "Restricts numeric ranges to manageable subsets"
+    q1_q2_basis: "Makes integers symbolic to avoid enumeration explosion"
+  complexity_insights:
+    - "Q1: 612 scenarios from 24 categorical combinations × symbolic integer boundaries"
+    - "Q2: 180 Emergency scenarios (mostly FireAlarm cases, excluding critical battery + overdue maintenance)"
+    - "Q3: Safety property proven through exhaustive case analysis of FireAlarm handling"
+    - "Dead zone at temp_diff = 3 creates interesting MildHeating/MildCooling ambiguity"
+    - "Quorum pattern requires exactly 2+ energy constraints to trigger mode downgrade"

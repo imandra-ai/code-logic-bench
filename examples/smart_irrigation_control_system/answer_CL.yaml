@@ -1,0 +1,53 @@
+model: "smart_irrigation_control_system"
+q1:
+  question: "How many distinct irrigation decision scenarios exist across all crop types and stages?"
+  answer: "14 scenarios"
+  key_thresholds:
+    critically_dry: "(target_min - 20)"
+    water_minimum: 100
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can irrigation ever be approved when sensor_status = Faulty? If yes, under what conditions?"
+  answer: "YES - 2 scenarios where Faulty sensors get approved"
+  approved_conditions:
+    scenario: "Critical stage (Flowering) + critically_dry"
+    reason: "Emergency override executes before sensor check"
+  explanation: |
+    Control flow order:
+    1. Check critical stage + critically_dry → IF TRUE, approve immediately (bypasses sensor check)
+    2. Check sensor_status = Working → only checked if NOT in emergency path
+
+    Emergency path approves with Faulty sensors!
+  example:
+    crop: "Corn"
+    stage: "Flowering"
+    moisture_pct: -20
+    target_min: 1
+    sensor_status: "Faulty"
+    result: "approved = true (emergency override)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_faulty_sensor.json'
+q3:
+  question: "For Flowering stage crops, does critically_dry (moisture < target_min - 20) always trigger irrigation approval?"
+  answer: "PROVEN - Property always holds"
+  property: "(stage=Flowering && moisture_pct < target_min - 20) ==> approved"
+  why_proven: |
+    Flowering is a critical stage.
+    When moisture_pct < (target_min - 20), critically_dry = true.
+    Critical stage + critically_dry triggers emergency path (line 35).
+    Emergency path always sets approved = true.
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_flowering_protection.json'
+analysis_metadata:
+  total_scenarios_q1: 14
+  faulty_approval_count_q2: 2
+  property_result_q3: "PROVEN"
+  use_of_decomp_features:
+    q1_full_enumeration: "All crops × stages × moisture × sensor × water"
+    q2_filtering: "Tests emergency override with Faulty sensors"
+    q3_fixed_stage: "Fixes stage = Flowering to test critical protection"
+  complexity_insights:
+    - "Q1: 14 scenarios (3 crops × 3 stages with various conditions)"
+    - "Q2: Emergency override creates counterintuitive approval with Faulty sensors"
+    - "Q3: Critical stage protection is formally proven"

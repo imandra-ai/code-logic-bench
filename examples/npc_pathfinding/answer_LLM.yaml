@@ -1,0 +1,233 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:20'
+  q1:
+    answer: 25 distinct pathfinding scenarios
+    reasoning: >-
+      - NPC Types: 5 (CIVILIAN, GUARD, MERCHANT, WARRIOR, SCOUT)
+
+      - Terrain Types: 5 (OPEN, ROUGH, DIFFICULT, WATER, BLOCKED)
+
+      - Total possible combinations: 5 × 5 = 25
+
+      - Each combination represents a distinct pathfinding scenario based on NPC type
+      and terrain condition
+
+      - Note: Some scenarios result in invalid paths (e.g., CIVILIAN on WATER, MERCHANT
+      on DIFFICULT, any NPC on BLOCKED), but they are still distinct scenarios that
+      the system must evaluate
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The `can_traverse()` function explicitly checks: `if terrain == Terrain.WATER
+      and npc_type in (NpcType.CIVILIAN, NpcType.MERCHANT): return False`
+
+      - This means Civilian NPCs cannot traverse Water terrain
+
+      - When `can_traverse()` returns False, `determine_path_validity()` returns a
+      PathDecision with `path_valid=False`
+
+      - Therefore, Civilian NPCs can never successfully path through Water terrain
+      under any circumstances
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - When both have valid paths, estimated_cost = (terrain_cost × path_length)
+      // npc_speed
+
+      - Civilian speed: 1, Scout speed: 4
+
+      - For the same terrain and path_length, Scout's cost = (base_cost × path_length)
+      // 4
+
+      - Civilian's cost = (base_cost × path_length) // 1
+
+      - Scout's cost is always lower due to higher speed (4 vs 1)
+
+      - Scout does NOT have "equal or lower" cost—it always has strictly LOWER cost
+      (never equal)
+
+      - Example: OPEN terrain (cost=1), path_length=10: Civilian cost = 10, Scout
+      cost = 2
+
+      - The statement asks "equal or lower" but Scout's cost is always strictly lower,
+      never equal, making the premise false if interpreted as "can they be equal"
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:27'
+  q1:
+    answer: 25 distinct NPC-type/terrain combinations (5 NPC types × 5 terrain types).
+      Of these, 17 are traversable (can_go=True) and 8 are non-traversable (can_go=False)
+      under `can_traverse`.
+    reasoning: >-
+      - NPC types: 5 (Civilian, Guard, Merchant, Warrior, Scout)
+
+      - Terrain types: 5 (Open, Rough, Difficult, Water, Blocked)
+
+      - Distinct scenarios across NPC types and terrain conditions = 5 × 5 = 25 combinations
+
+      - Non-traversable combinations from `can_traverse`:
+        - BLOCKED: 5/5 NPCs cannot traverse (5 combos)
+        - WATER: Civilian + Merchant cannot traverse (2 combos)
+        - DIFFICULT: Merchant cannot traverse (1 combo)
+        - Total non-traversable = 5 + 2 + 1 = 8; traversable = 25 − 8 = 17
+  q2:
+    answer: No. Civilian NPCs can never successfully path through Water terrain in
+      this model.
+    reasoning: >-
+      - `can_traverse` explicitly returns False when `terrain == WATER` and `npc_type`
+      is CIVILIAN (or MERCHANT)
+
+      - If `can_go` is False, `determine_path_validity` immediately returns `path_valid=False`
+      with `estimated_cost=0`
+  q3:
+    answer: Yes. Whenever both have valid paths through the same terrain (i.e., non-Water,
+      non-Blocked), Scout’s `estimated_cost` is always less than or equal to Civilian’s.
+    reasoning: >-
+      - For valid paths, `estimated_cost = (terrain_cost(terrain) * path_length) //
+      npc_speed(npc_type)`
+
+      - For the same terrain and path_length, only speed differs:
+        - Civilian speed = 1
+        - Scout speed = 4
+      - Integer division by a larger positive speed cannot increase the result: `X
+      // 4 ≤ X // 1` for non-negative X
+
+      - Therefore Scout’s cost is always ≤ Civilian’s (often strictly lower; can be
+      equal only when the quotient happens to match due to flooring)
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:41'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - The distinct pathfinding scenarios are determined by the terrain traversal
+      capabilities of each NPC type.
+
+      - Civilian NPC can traverse OPEN, ROUGH, and DIFFICULT terrains (3 terrains).
+
+      - Merchant NPC can traverse OPEN and ROUGH terrains (2 terrains).
+
+      - Guard, Warrior, and Scout NPCs can traverse OPEN, ROUGH, DIFFICULT, and WATER
+      terrains (4 terrains).
+
+      - Overall, 3 distinct pathfinding scenarios based on these capability sets across
+      NPC types and terrain conditions.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The can_traverse function returns False for Civilian NPCs when the terrain
+      is WATER.
+
+      - Upon calling can_traverse(NpcType.CIVILIAN, Terrain.WATER), it returns False.
+
+      - Consequently, in determine_path_validity, path_valid is set to False if the
+      NPC cannot traverse the terrain.
+
+      - There is no scenario where a Civilian NPC can successfully have a valid path
+      through WATER terrain.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - When both Civilian and Scout have valid paths, it means they both can traverse
+      the same terrain.
+
+      - Common traversable terrains for both: OPEN, ROUGH, and DIFFICULT.
+
+      - Estimated cost = (terrain_cost * path_length) // npc_speed.
+
+      - Civilian's speed = 1, Scout's speed = 4.
+
+      - Ignoring path_length and terrain_cost (assuming positive), Scout's cost is
+      (cost * len) // 4, Civilian's is (cost * len) // 1.
+
+      - Since division by a larger number (4) results in a smaller or equal quotient
+      compared to division by 1, Scout's estimated_cost is always less than or equal
+      to Civilian's.
+
+      - Equality holds when (cost * len) is divisible by 4 and the quotient is integer.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: '25'
+    reasoning: >-
+      - The code defines an `NpcType` Enum with 5 members: CIVILIAN, GUARD, MERCHANT,
+      WARRIOR, and SCOUT.
+
+      - The code defines a `Terrain` Enum with 5 members: OPEN, ROUGH, DIFFICULT,
+      WATER, and BLOCKED.
+
+      - The question asks for scenarios across "all NPC types and terrain conditions,"
+      which implies the Cartesian product of these two categories calculation: 5 NPC
+      types * 5 Terrain types = 25 distinct scenarios.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The `can_traverse` function contains specific logic: `if terrain == Terrain.WATER
+      and npc_type in (NpcType.CIVILIAN, NpcType.MERCHANT): return False`.
+
+      - When the function `determine_path_validity` is called for a Civilian on Water
+      terrain, `can_traverse` returns `False`.
+
+      - This causes `determine_path_validity` to immediately return a `PathDecision`
+      where `path_valid=False`.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The `estimated_cost` is calculated using integer division: `(base_cost * path_length)
+      // speed`.
+
+      - The `npc_speed` function defines the speed for a CIVILIAN as 1 and for a SCOUT
+      as 4.
+
+      - Mathematically, dividing a non-negative integer by 4 (`x // 4`) always yields
+      a result less than or equal to dividing the same integer by 1 (`x // 1`). Therefore,
+      the Scout's cost will always be lower than or equal to the Civilian's for the
+      same path.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:28'
+  q1:
+    answer: '25'
+    reasoning: >-
+      - There are 5 NPC types: CIVILIAN, GUARD, MERCHANT, WARRIOR, SCOUT
+
+      - There are 5 terrain types: OPEN, ROUGH, DIFFICULT, WATER, BLOCKED
+
+      - Each NPC type can potentially encounter each terrain type
+
+      - Total distinct pathfinding scenarios = 5 NPC types × 5 terrain types = 25
+      scenarios
+
+      - Note: This counts the base NPC-terrain combinations. Other parameters (obstacles,
+      stuck state, etc.) create additional variation but the core pathfinding scenarios
+      are defined by NPC type and terrain.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The can_traverse() function explicitly checks: if terrain == Terrain.WATER
+      and npc_type in (NpcType.CIVILIAN, NpcType.MERCHANT): return False
+
+      - This means Civilian NPCs cannot traverse Water terrain under any circumstances
+
+      - When can_traverse returns False, determine_path_validity returns path_valid=False
+
+      - Therefore, Civilian NPCs can never successfully path through Water terrain
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The estimated_cost formula is: (base_cost * path_length) // speed
+
+      - Scout has speed = 4, Civilian has speed = 1
+
+      - For the same terrain and path_length, Scout's cost = (base_cost * path_length)
+      // 4
+
+      - For the same terrain and path_length, Civilian's cost = (base_cost * path_length)
+      // 1
+
+      - Since Scout's speed (4) is higher than Civilian's speed (1), dividing by a
+      larger number always results in an equal or lower cost
+
+      - The terrains where both have valid paths are: OPEN (cost 1), ROUGH (cost 2),
+      DIFFICULT (cost 4) - Civilian cannot traverse WATER, and neither can traverse
+      BLOCKED
+
+      - For any path_length and these terrain costs, Scout's estimated_cost will always
+      be ≤ Civilian's estimated_cost due to integer division by a larger speed value

@@ -1,0 +1,42 @@
+model: "ai_companion_behavior_system"
+q1:
+  question: "How many distinct behavior scenarios exist in determine_companion_behavior, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "521 scenarios (for loyalty >= Wary, trust 10-90)"
+  state_space_reduction: "Used ~assuming to focus on meaningful companions (loyalty >= Wary)"
+  key_thresholds:
+    trust_score: [10, 18, 20, 22, 50, 60, 90]
+    loyalty_levels: [Hostile(0), Distrustful(1), Wary(2), Neutral(3), Friendly(4), Devoted(5), Fanatical(6)]
+    abandonment_risk: [0, 25, 50, 75, 100]
+    compliance_threshold: 50
+    mood_modifiers: "Happy(+15), Content(+5), Angry(-15), Depressed(-10)"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_behavior_scenarios.json'
+    use_of_assuming: "loyalty_to_int loyalty >= 2 && trust_score >= 10 && trust_score <= 90"
+q2:
+  question: "Can a Devoted companion ever choose to LeaveParty? If so, under what exact conditions?"
+  answer: "YES - 2 scenarios where Devoted companion leaves"
+  example:
+    scenario: "Devoted + Depressed + needs_attention + trust_score <= 20"
+    abandonment_conditions: "c2=true (Depressed), c3=true (trust<=20), c4=true (needs_attention)"
+    result: "3/4 conditions met → abandonment_risk = 75% → LeaveParty"
+  explanation: "Even Devoted companions leave if neglected (3/4 abandonment conditions met)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_devoted_leaves.json'
+    use_of_assuming: "loyalty = Devoted && trust_score <= 50"
+q3:
+  question: "Can the safety property 'companions with abandonment_risk >= 75 always choose LeaveParty' ever be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "abandonment_risk_percent >= 75 ==> chosen_action = LeaveParty"
+  why_proven: "When abandonment >= 75 (3+ conditions), override logic explicitly sets chosen_action=LeaveParty"
+  fixed_parameters_in_verify: "Warrior, Combat, trust_score=15"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_abandonment_safety.json'
+analysis_metadata:
+  total_scenarios_q1: 521
+  devoted_leaves_count_q2: 2
+  property_result_q3: "PROVEN"
+  pattern_complexity:
+    override: "Abandonment (3/4 conditions) overrides loyalty level"
+    dead_zone: "Wary + trust 18-22 → invalid state"
+    quorum: "Abandonment requires 3 of 4: [LowLoyalty<=1, BadMood, LowTrust<=20, NeedsAttention]"
+    multiplexer: "Context (Combat/Social/NoContext) changes action interpretation"

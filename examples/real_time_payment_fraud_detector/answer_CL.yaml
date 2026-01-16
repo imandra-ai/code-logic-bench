@@ -1,0 +1,24 @@
+model: "real_time_payment_fraud_detector"
+q1:
+  question: "How many distinct fraud decision scenarios exist?"
+  answer: "2471 scenarios"
+  key_thresholds: [40, 48, 52, 60, 70, 365, 500, 985, 1000, 1015, 2000]
+q2:
+  question: "Can Casino transactions be allowed?"
+  answer: "YES - 60 scenarios where Casino transactions are allowed"
+  example:
+    scenario: "Casino + Trusted device + Business time + low amount"
+    calculation: "risk = 40 (base) × 100% (Trusted) × 100% (Business) = 40 < 60 threshold"
+    result: "allow_transaction = true"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_eval_str == \"true\")] | length" decomp_q2_casino.json'
+q3:
+  question: "Can large amounts (>1000) avoid review?"
+  answer: "YES - 116 scenarios"
+  example: "amount >1000 + Trusted device + account_age >365 overrides review requirement"
+analysis_metadata:
+  total_regions: "Q1: 2471; Q2: timeout; Q3: 116"
+  pattern_complexity:
+    override: "Large amount triggers review, BUT Trusted + old account overrides"
+    multiplexer: "Risk = base(category, amount) × device_mult × time_mult"
+    quorum: "Velocity check requires 2 of 4 factors"

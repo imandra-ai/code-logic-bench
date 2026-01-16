@@ -1,0 +1,36 @@
+model: "adaptive_quiz_engine"
+q1:
+  question: "How many distinct progression scenarios exist in determine_student_progression, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "1899 scenarios"
+  key_thresholds:
+    total_answered: [5, 7, 8, 10]
+    correct_answered: [2, 3]
+    current_streak: [0, 3]
+    current_confidence: [15, 30, 100]
+    success_rates: "20%, 25%, 40%"
+    response_time_ratios: "80%, 150%"
+    confidence_level: [3, 7, 8]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_progression_scenarios.json'
+q2:
+  question: "Can a student with current_streak >= 3 ever trigger an emergency reset? If so, under what exact conditions?"
+  answer: "NO - students with streak >= 3 cannot trigger emergency reset"
+  explanation: "Emergency reset is determined by total_answered/correct_answered ratio and current_confidence, not current_streak. The conditions are: total_answered >= 10 AND (correct_answered/total_answered < 20% OR current_confidence < 15). A streak >= 3 indicates recent good performance, but cannot overcome historical poor performance threshold."
+  why_intuitive: "Unlike the expected counterintuitive result, this makes sense: streak >= 3 means student answered last 3+ correctly, which prevents them from having < 20% success rate when total_answered >= 10"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_str.current_streak >= 3 and .invariant_str == \"true\")] | length" decomp_q2_emergency_reset.json'
+q3:
+  question: "Can the safety property 'emergency reset always sets difficulty to Easy and enables intervention' ever be violated?"
+  answer: "PROVEN - Property always holds, no violations possible"
+  property: "emergency_reset = true ==> (new_difficulty = Easy && intervention_needed = true)"
+  why_holds: "When emergency_reset is triggered, it overrides all other logic and explicitly sets new_difficulty=Easy, intervention_needed=true, and emergency_reset=true. This is enforced in the code structure."
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_emergency_safety.json'
+analysis_metadata:
+  total_regions: 1899
+  imandra_runtime: "All analyses completed successfully"
+  pattern_complexity:
+    override: "Emergency reset (total >= 10, success < 20% OR confidence < 15) overrides normal progression"
+    dead_zone: "total_answered∈[5,7] AND correct_answered∈[2,3] AND streak=0 → invalid"
+    quorum: "Intervention requires 2 of 4: [LowSuccess40%, NoStreak5Q, LowConfidence30, VeryLowSuccess25%]"
+    multiplexer: "Answer result (Correct/Incorrect/Partial/Timeout) changes confidence interpretation"

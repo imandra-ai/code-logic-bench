@@ -1,0 +1,109 @@
+model: "marketplace_order_fulfillment_system"
+q1:
+  question: "How many distinct fulfillment strategy scenarios exist?"
+  answer: "1254 total scenarios, 48 premium Express from non-Urban zones"
+  state_space_breakdown: |
+    Total: 1254 scenarios across all combinations
+    Premium Express from Remote: 48 scenarios (4%) - Focus subset for override pattern
+
+    ADT combinations: 5 tiers × 5 categories × 4 inventory × 5 methods × 4 zones = 2000 potential
+    Actual regions: 1254 (62% feasible due to compatibility constraints)
+  key_thresholds:
+    seller_sla: [6, 12, 24, 48, 72]
+    category_multiplier: [1, 2, 3, 4]
+    zone_processing: [2, 4, 8, 24]
+    method_delivery: [2, 6, 24, 72, 96]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), premium_express_remote: ([.[0].regions_str[] | select((.model_str.seller_tier == \"Platinum\" or .model_str.seller_tier == \"Enterprise\") and .model_str.requested_method == \"Express\" and (.model_str.warehouse_zone == \"Rural\" or .model_str.warehouse_zone == \"Suburban\"))] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Express be selected from Rural warehouses for Food products?"
+  answer: "NO - 0 scenarios (Exception clause blocks this combination)"
+  override_exception_demonstrated:
+    override_rule: "premium_express_override enables Rural→Express for premium sellers"
+    exception_clause: "category != Food (line 108)"
+    why_blocked: |
+      premium_express_override returns false for Food products:
+      - is_premium = true (Platinum/Enterprise)
+      - is_rural = true (Rural warehouse)
+      - not_food = FALSE (Food category)
+      - Result: false (override blocked)
+
+      Without override, normal logic applies:
+      - zone_supports_method(Rural, Express) = false (line 70)
+      - zone_ok = false → fallback to Standard
+    explanation: |
+      This demonstrates Pattern 1 with NESTED EXCEPTION:
+      - Base rule: Rural doesn't support Express
+      - Override: Premium sellers can bypass this
+      - EXCEPTION: Food products cannot use override (perishable risk from long Rural processing)
+
+      The exception creates triple-nested logic:
+      Rural Express normally DENIED → Premium Override ALLOWS → Food Exception RE-DENIES
+  key_insight: "Override patterns need exception clauses for safety-critical combinations"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_express_rural_food.json'
+q3:
+  question: "Can Express/SameDay be used when inventory status is Limited?"
+  answer: "PROVEN - Limited inventory with Express/SameDay ALWAYS downgrades to Standard"
+  property: "in_inventory_dead_zone ==> result.method_selected = Standard"
+  why_proven: |
+    The inventory dead zone check has highest precedence (line 145-153):
+
+    if in_dead_zone then
+      { method_selected = Standard; forced_downgrade = true }
+    else
+      ... (* override and normal logic *)
+
+    Dead zone applies when:
+      inventory_status = Limited AND (requested_method = Express OR SameDay)
+
+    This ensures risky combinations (limited stock + fast shipping promises)
+    always downgrade to Standard, regardless of seller tier or other factors.
+  dead_zone_definition:
+    inventory_levels:
+      - "Abundant: Can handle all methods"
+      - "Adequate: Can handle all methods"
+      - "Limited: Dead zone for Express/SameDay (line 128-130)"
+      - "Critical: Blocks Express/SameDay entirely (line 92-94)"
+    rationale: "Limited stock too risky for fast shipping promises"
+  safety_precedence:
+    level_1_critical: "Dead zone check (highest)"
+    level_2_override: "Premium Express override (can bypass zone restrictions)"
+    level_3_normal: "Normal compatibility checks (zone, stock, SLA)"
+  key_insight: "Dead zone prevents over-promising on uncertain inventory before any override can apply"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_inventory_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 1254
+  premium_express_remote: 48
+  express_rural_food_count: 0
+  property_result: "PROVEN"
+  model_richness:
+    line_count: 229
+    helper_functions: 8
+    match_statements: 60
+    adt_combinations: "5×5×4×5×4 = 2000 theoretical, 1254 feasible (62%)"
+  patterns_demonstrated:
+    pattern_1_override: |
+      Premium sellers (Platinum/Enterprise) enable Rural→Express,
+      BUT with TWO exception clauses:
+      1. category != Food (perishable risk)
+      2. inventory_status != Critical (stock risk)
+      Creates: Override → EXCEPT Food → EXCEPT Critical
+    pattern_2_multiplexer: |
+      calculate_fulfillment_time multiplexes on THREE dimensions:
+      - seller_tier → SLA hours (6-72)
+      - product_category → handling multiplier (1-4)
+      - warehouse_zone → processing hours (2-24)
+      Combined with method_delivery_hours creates rich time calculations
+    pattern_3_dead_zone: "inventory_status=Limited + (Express OR SameDay) → force Standard"
+  complexity_insights:
+    - "1254 scenarios from 5-parameter model with rich domain logic"
+    - "48 premium Express scenarios (4%) show override pattern scope"
+    - "0 Food+Rural+Express demonstrates exception clause effectiveness"
+    - "Compatibility matrices reduce 2000 theoretical to 1254 feasible (38% filtered)"
+    - "Dead zone safety proven across all 1254 scenarios"
+  design_lessons:
+    exception_clauses: "Overrides need careful exception handling for safety-critical combinations"
+    graduated_inventory_control: "Limited vs Critical provides two-tier risk management"
+    compatibility_pruning: "Rich matrices naturally reduce state space via infeasibility"

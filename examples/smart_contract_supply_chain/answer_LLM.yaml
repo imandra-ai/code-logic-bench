@@ -1,0 +1,313 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:53'
+  q1:
+    answer: '4'
+    reasoning: >-
+      - For Pharmaceuticals, jurisdiction is always permitted in US, EU, and APAC.
+
+      - Party: Supplier and Buyer are always certified; Logistics is not.
+
+      - Standards: Must have both ISO9001 and FDA certifications.
+
+      - Possible failures:
+        - If role is Logistics: Decision (approved=False, requires_audit=False, penalty_applies=False)
+        - If missing ISO9001 or FDA: Decision (approved=False, requires_audit=False,
+      penalty_applies=True)
+        - If reputation < 70: Decision (approved=False, requires_audit=True, penalty_applies=False)
+        - If payment_advance_pct < 30: Decision (approved=False, requires_audit=False,
+      penalty_applies=True) - If all conditions meet: Decision (approved=True, requires_audit=True,
+      penalty_applies=False)
+
+      - There are 4 distinct validation scenarios.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - Pharmaceuticals require both ISO9001 and FDA certifications.
+
+      - If FDA certification is missing (has_fda=False), quality standards check fails,
+      and the contract is not approved.
+
+      - There is no path to approval without FDA certification.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - Pharmaceuticals have mandatory audit requirements as per needs_mandatory_audit.
+
+      - In the approved contract path, requires_audit is set to needs_mandatory_audit,
+      which is True.
+
+      - Therefore, all approved Pharmaceuticals contracts require audit.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:53'
+  q1:
+    answer: 5 distinct validation scenarios (decision outcomes/paths) exist for Pharmaceuticals.
+    reasoning: >-
+      - Jurisdiction check never blocks Pharmaceuticals (US/EU/APAC all permit), so
+      no separate “jurisdiction denied” scenario.
+
+      - Party role: Logistics is not certified for Pharmaceuticals → immediate rejection
+      (no audit, no penalty).
+
+      - Missing required standards (ISO9001 and/or FDA) → rejection with penalty_applies=True.
+
+      - Reputation score < 70 → rejection with requires_audit=True (but no penalty).
+
+      - Payment advance % < 30 (with other checks passing) → rejection with penalty_applies=True.
+
+      - If all checks pass → approved, with mandatory audit.
+  q2:
+    answer: No. A Pharmaceuticals contract cannot be approved without FDA certification.
+    reasoning: >-
+      - Pharmaceuticals require the FDA standard via requires_standard(PHARMACEUTICALS,
+      FDA) == True.
+
+      - fda_ok is set to has_fda for Pharmaceuticals.
+
+      - Approval requires standards_ok, which is the AND of iso_ok and fda_ok (and
+      others), so has_fda must be True to reach the approved=True return.
+  q3:
+    answer: Yes. For any approved Pharmaceuticals contract, requires_audit is always
+      true.
+    reasoning: >-
+      - On the approved path, requires_audit is set to needs_mandatory_audit(category).
+
+      - needs_mandatory_audit returns True exactly when category == PHARMACEUTICALS.
+
+      - Therefore any approved Pharmaceuticals decision returns ContractDecision(approved=True,
+      requires_audit=True, penalty_applies=False).
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:55'
+  q1:
+    answer: '972'
+    reasoning: >-
+      To count validation scenarios for Pharmaceuticals, we need to count all possible
+      input combinations:
+
+      - PartyRole: 3 options (SUPPLIER, BUYER, LOGISTICS)
+
+      - ProductCategory: Fixed as PHARMACEUTICALS (1 option)
+
+      - Jurisdiction: 3 options (US, EU, APAC)
+
+      - has_iso9001: 2 options (True/False)
+
+      - has_fda: 2 options (True/False)
+
+      - has_ce: 2 options (True/False)
+
+      - has_haccp: 2 options (True/False)
+
+      - reputation_score: 101 possible values (0-100)
+
+      - payment_advance_pct: 101 possible values (0-100)
+
+
+      Total scenarios = 3 × 1 × 3 × 2 × 2 × 2 × 2 × 101 × 101 = 3 × 3 × 16 × 10,201
+      = 1,468,944
+
+
+      However, if we consider "validation scenarios" as distinct logical paths through
+      the code, we need to consider the decision points:
+
+      - Jurisdiction check: All 3 jurisdictions permit Pharmaceuticals
+
+      - Party certification: LOGISTICS cannot handle Pharmaceuticals (fails), SUPPLIER
+      and BUYER can (pass)
+
+      - Quality standards: Requires ISO9001 AND FDA
+
+      - Reputation: >= 70 (pass) or < 70 (fail)
+
+      - Payment: >= 30 (pass) or < 30 (fail)
+
+
+      Distinct logical paths = 3 jurisdictions × 3 roles × 2 ISO states × 2 FDA states
+      × 2 CE states × 2 HACCP states × 2 reputation outcomes × 2 payment outcomes
+      = 3 × 3 × 2 × 2 × 2 × 2 × 2 × 2 = 972 distinct validation scenarios
+  q2:
+    answer: 'No'
+    reasoning: >-
+      Analysis of approval path for Pharmaceuticals:
+
+      - The function `requires_standard(ProductCategory.PHARMACEUTICALS, QualityStandard.FDA)`
+      returns True because FDA is in the requirements set for PHARMACEUTICALS
+
+      - Line: `fda_ok = has_fda if requires_standard(category, QualityStandard.FDA)
+      else True`
+
+      - For Pharmaceuticals, this becomes: `fda_ok = has_fda` (since requires_standard
+      returns True)
+
+      - Line: `standards_ok = iso_ok and fda_ok and ce_ok and haccp_ok`
+
+      - If `has_fda = False`, then `fda_ok = False`, making `standards_ok = False`
+
+      - When `standards_ok = False`, the function returns `ContractDecision(approved=False,
+      requires_audit=False, penalty_applies=True)`
+
+      - Therefore, a Pharmaceuticals contract CANNOT be approved without FDA certification
+      (has_fda must be True)
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      Analysis of audit requirement for approved Pharmaceuticals contracts:
+
+      - The function `needs_mandatory_audit(category)` returns True when category
+      == ProductCategory.PHARMACEUTICALS
+
+      - For a contract to be approved, it must pass all validation checks and reach
+      the final return statement
+
+      - The final return statement is: `return ContractDecision(approved=True, requires_audit=needs_audit,
+      penalty_applies=False)`
+
+      - Where `needs_audit = needs_mandatory_audit(category)`
+
+      - For Pharmaceuticals, `needs_audit = needs_mandatory_audit(ProductCategory.PHARMACEUTICALS)
+      = True`
+
+      - Therefore, every approved Pharmaceuticals contract will have `requires_audit=True`
+
+      - This is explicitly stated in the docstring: "Pharmaceuticals have mandatory
+      audit requirements"
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:22'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - **Scenario 1 (Party Failure):** A `LOGISTICS` role triggers a rejection because
+      that role is only certified for Food or Electronics, not Pharmaceuticals.
+
+      - **Scenario 2 (Standards Failure):** Missing either `has_fda` or `has_iso9001`
+      triggers a rejection with a penalty.
+
+      - **Scenario 3 (Reputation Failure):** A `reputation_score` below 70 triggers
+      a rejection that requires an audit.
+
+      - **Scenario 4 (Payment Failure):** A `payment_advance_pct` below 30 triggers
+      a rejection with a penalty.
+
+      - **Scenario 5 (Success):** Meeting all criteria results in approval.
+
+      - **Note on Jurisdiction:** The code contains a jurisdiction check logic, but
+      based on the provided Enums, Pharmaceuticals are permitted in all defined jurisdictions
+      (US, EU, and APAC), making the jurisdiction rejection path unreachable for this
+      specific category.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The function `requires_standard` maps `ProductCategory.PHARMACEUTICALS` to
+      a set containing `QualityStandard.FDA`.
+
+      - Consequently, the boolean `fda_ok` evaluates strictly to the input `has_fda`.
+
+      - If `has_fda` is `False`, the cumulative result `standards_ok` becomes `False`.
+
+      - The code executes the `if not standards_ok:` block, which returns a `ContractDecision`
+      with `approved=False` immediately.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - An approved contract can only result from the final return statement of the
+      function.
+
+      - In this final return, the `requires_audit` field is assigned the value of
+      the variable `needs_audit`.
+
+      - The `needs_audit` variable is set by calling `needs_mandatory_audit(category)`.
+
+      - The function `needs_mandatory_audit` hardcodes a return of `True` specifically
+      when the category is `ProductCategory.PHARMACEUTICALS`.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:42'
+  q1:
+    answer: '36'
+    reasoning: >-
+      - For Pharmaceuticals contracts, we need to count all possible input combinations
+      that reach the validation logic
+
+      - Jurisdiction: All 3 jurisdictions (US, EU, APAC) permit Pharmaceuticals, so
+      all 3 are valid
+
+      - PartyRole: 3 roles (SUPPLIER, BUYER, LOGISTICS). However, LOGISTICS is only
+      certified for FOOD and ELECTRONICS, not PHARMACEUTICALS. So only 2 roles (SUPPLIER,
+      BUYER) pass party certification
+
+      - Quality standards for Pharmaceuticals require FDA and ISO9001: has_iso9001
+      (2 values), has_fda (2 values), has_ce (irrelevant but still 2 values), has_haccp
+      (irrelevant but still 2 values)
+
+      - However, for counting distinct scenarios/paths through the decision tree,
+      we consider: Jurisdiction (3) × Role that passes (2) × has_iso9001 (2) × has_fda
+      (2) × reputation scenarios × payment scenarios
+
+      - Actually, let me recalculate based on distinct decision outcomes:
+        - Path 1: Jurisdiction not permitted - Not applicable for Pharmaceuticals
+      (all jurisdictions permit it)
+        - Path 2: Party not certified - LOGISTICS role (3 jurisdictions × 1 role =
+      3 scenarios, but since LOGISTICS fails certification for Pharma)
+        - For SUPPLIER and BUYER roles: 3 jurisdictions × 2 roles = 6 base combinations
+        - For each of these 6: standards check (has_iso9001 and has_fda both required)
+        - Scenarios: jurisdiction(3) × role(2) × iso9001(2) × fda(2) × reputation_ok(2)
+      × payment_ok(2) = but with early exits
+      - Let me count by valid paths: 3 jurisdictions × 2 valid roles × 2 (iso9001)
+      × 2 (fda) × 2 (reputation: >=70 or <70) × 2 (payment: >=30 or <30)
+
+      - But we need to account for early exits. For Pharma with SUPPLIER/BUYER: 3×2×2×2
+      = 24 input combinations for quality standards alone, but many exit early
+
+      - Total distinct scenarios for Pharmaceuticals: 3 (jurisdictions) × 2 (valid
+      roles) × (1 fail standards + 1 fail reputation + 1 fail payment + 1 success
+      for each iso/fda combo where both pass)
+
+      - Actually: 3 × 2 × 2 × 2 = 24 for standards combinations, and for those that
+      pass standards (both true): 3 × 2 × 1 = 6, then each has reputation pass/fail
+      and payment pass/fail
+
+      - Total: For Pharmaceuticals: 3 jurisdictions × 2 roles × 2 (iso) × 2 (fda)
+      = 24, but considering reputation (2) and payment (2) for those passing standards:
+      the formula gives 3 × 2 × 2 × 2 × (potential paths based on sequential checks)
+      = 36 distinct input scenarios
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The requires_standard function defines that Pharmaceuticals require both FDA
+      and ISO9001 certifications
+
+      - In determine_contract_validity, fda_ok is set to has_fda when requires_standard
+      returns True for FDA
+
+      - For Pharmaceuticals, requires_standard(ProductCategory.PHARMACEUTICALS, QualityStandard.FDA)
+      returns True
+
+      - Therefore fda_ok = has_fda (the actual value passed in)
+
+      - standards_ok requires all of iso_ok, fda_ok, ce_ok, and haccp_ok to be True
+
+      - If has_fda is False, then fda_ok is False, and standards_ok is False
+
+      - When standards_ok is False, the function returns ContractDecision(approved=False,
+      ...)
+
+      - The only path to approved=True requires standards_ok=True, which requires
+      has_fda=True for Pharmaceuticals
+
+      - Therefore, a Pharmaceuticals contract cannot be approved without FDA certification
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The function needs_mandatory_audit(category) returns True if category == ProductCategory.PHARMACEUTICALS
+
+      - In determine_contract_validity, when a contract is approved (all checks pass),
+      needs_audit is set to needs_mandatory_audit(category)
+
+      - For Pharmaceuticals, needs_mandatory_audit returns True
+
+      - The final return statement for approved contracts is: ContractDecision(approved=True,
+      requires_audit=needs_audit, penalty_applies=False)
+
+      - Since needs_audit is True for Pharmaceuticals, requires_audit will always
+      be True for approved Pharmaceutical contracts
+
+      - There is no other code path that leads to approved=True with a different requires_audit
+      value for Pharmaceuticals

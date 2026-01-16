@@ -1,0 +1,280 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: 2,916 distinct decision scenarios
+    reasoning: >-
+      To calculate total scenarios, we need to consider all parameter combinations:
+
+      - Vehicle Types: 3 (Truck, Drone, Robot)
+
+      - Package Priority: 3 (Standard, Urgent, Emergency)
+
+      - Weather Conditions: 3 (Clear, Rain, Storm)
+
+      - Battery Level ranges: 9 distinct functional ranges per vehicle type
+        * For Trucks: <15, 15-20, 20-25 (dead zone), 25-40, 40-100
+        * For Drones: <15, 15-25, 25-35 (dead zone), 35-40, 40-100
+        * For Robots: <15, 15-20 (dead zone), 20-40, 40-100
+        * Effective ranges: 9 meaningful categories across all battery percentages
+      - Capacity scenarios: 3 (under 80%, at/over 80% but can fit package, cannot
+      fit package)
+
+      - Distance suitability: 2 (suitable for vehicle type, not suitable)
+
+      - Total combinations: 3 vehicles × 3 priorities × 3 weather × 9 battery ranges
+      × 3 capacity scenarios × 2 distance scenarios = 2,916 distinct scenarios
+  q2:
+    answer: Yes, Drones can be assigned deliveries during Storm weather under specific
+      conditions
+    reasoning: >-
+      Analyzing the code logic:
+
+      - _vehicle_weather_compatible() returns False for Drones in Storm (line checking
+      weather != STORM)
+
+      - However, emergency override bypasses weather compatibility checks
+
+      - Emergency override conditions: priority == PackagePriority.EMERGENCY AND battery_level
+      > 15
+
+      - The override returns ASSIGNED before weather_ok is evaluated in the quorum
+
+      - Exact conditions for Drone assignment in Storm:
+        * Package priority must be EMERGENCY
+        * Battery level must be > 15%
+        * Battery level must NOT be in dead zone (25-35% for Drones)
+        * Therefore: battery must be either 15 < battery ≤ 25 OR battery > 35
+      - Example: Drone with 40% battery delivering Emergency package in Storm → ASSIGNED
+  q3:
+    answer: No, vehicles in their battery dead zone can never be directly assigned
+      to deliveries
+    reasoning: >-
+      Based on code execution flow:
+
+      - The function checks _in_battery_dead_zone() immediately at the start (line
+      after function begins)
+
+      - Dead zone ranges: Truck (20-25%), Drone (25-35%), Robot (15-20%)
+
+      - If in_dead_zone is True, the function returns WAITLIST immediately
+
+      - This happens BEFORE the emergency override check
+
+      - This happens BEFORE the normal quorum-based assignment logic
+
+      - There are no other code paths that could result in ASSIGNED for dead zone
+      batteries
+
+      - The dead zone check is a hard blocker that returns early with WAITLIST
+
+      - Therefore, regardless of priority (even EMERGENCY), weather, capacity, or
+      distance, dead zone always results in WAITLIST, never ASSIGNED
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:58'
+  q1:
+    answer: 27 (based on the discrete combinations of VehicleType × PackagePriority
+      × WeatherCondition).
+    reasoning: >-
+      - The model has 3 vehicle types (Truck, Drone, Robot), 3 package priorities
+      (Standard, Urgent, Emergency), and 3 weather states (Clear, Rain, Storm).
+
+      - Distinct (vehicle, priority, weather) combinations = 3 × 3 × 3 = 27.
+
+      - Note: the *decision outcome* for any one of these 27 combinations still further
+      depends on continuous/numeric inputs (battery level, loads/capacity, distance),
+      so the number of possible input states overall is unbounded; 27 is the count
+      of discrete scenario combinations across the enum parameters.
+  q2:
+    answer: Yes. A Drone can be ASSIGNED during Storm only via the emergency override,
+      and only if it is not in the Drone battery dead zone.
+    reasoning: >-
+      - Normal logic grounds drones in storms: _vehicle_weather_compatible(DRONE,
+      STORM) returns False, so weather_ok would be False.
+
+      - However, the function checks emergency override *before* weather/quorum logic.
+
+      - Emergency override condition: priority == EMERGENCY and battery_level > 15.
+
+      - But the battery dead zone check happens even earlier and forces WAITLIST for
+      drones when 25 ≤ battery_level ≤ 35.
+
+      - Therefore, during STORM a Drone is ASSIGNED iff:
+        - priority is EMERGENCY, and
+        - battery_level > 15, and
+        - battery_level is NOT in [25, 35] (inclusive) (otherwise it returns WAITLIST
+      first).
+  q3:
+    answer: No. If a vehicle is in its battery dead zone, it is never directly assigned;
+      it is always WAITLISTed.
+    reasoning: >-
+      - The very first decision gate is the dead-zone check.
+
+      - If in_dead_zone is True, the function immediately returns AssignmentDecision.WAITLIST.
+
+      - This return happens before the emergency override and before the quorum scoring,
+      so no later logic can produce ASSIGNED while in the dead zone.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:01'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - The function can return WAITLIST first, if in battery dead zone.
+
+      - Then, it can return ASSIGNED for emergency override.
+
+      - Otherwise, it uses a quorum score and assigns ASSIGNED if score >=4.
+
+      - If score ==3, returns WAITLIST.
+
+      - If score <3, returns REJECTED.
+  q2:
+    answer: >-
+      Yes, Drones can be assigned deliveries during Storm weather in two ways:
+
+      1. If the package priority is Emergency and the battery level is between 15
+      and 25 (inclusive) exclus or above 35, the emergency override applies, assigning
+      the drone directly.
+
+      2. If the package is not Emergency, and the assignment score is at least 4 out
+      of 6 conditions (where weather_ok is False, so all 5 other conditions must be
+      True: battery_ok (>=35), capacity_ok, distance_ok (<=30), priority_ok (True
+      for Standard, or battery>=40 for Urgent), not_overloaded).
+    reasoning: >-
+      - The emergency override check happens before weather compatibility and allows
+      assignment for Emergency priority packages with battery >15, regardless of weather.
+
+      - For non-emergency packages, assignment requires a quorum score >=4, including
+      weather compatibility. Since weather_ok is False in Storm (weather!=Storm is
+      false), assignment requires all 5 other conditions to be True.
+
+      - Dead zone vehicles cannot be assigned, even for emergencies.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - Vehicles in battery dead zone return WAITLIST directly, bypassing other checks.
+
+      - There is no path in the code that allows assignment for vehicles in dead zone.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:05'
+  q1:
+    answer: '5'
+    reasoning: >-
+      There are 5 distinct logical paths (decision scenarios) through the code that
+      lead to a return statement:
+
+      1. Battery Dead Zone: logic detects dead zone → returns WAITLIST.
+
+      2. Emergency Override: not dead zone + emergency priority + sufficient battery
+      → returns ASSIGNED.
+
+      3. Quorum Assignment: standard logic + score ≥ 4 → returns ASSIGNED.
+
+      4. Quorum Waitlist: standard logic + score = 3 → returns WAITLIST.
+
+      5. Quorum Rejection: standard logic + score < 3 → returns REJECTED.
+  q2:
+    answer: Yes, Drones can be assigned during Storms.
+    reasoning: >-
+      Drones can be assigned in a Storm under two specific logic paths, provided the
+      Drone is not in the battery dead zone (25-35%):
+
+      1. Emergency Override: If Priority is EMERGENCY and Battery > 15%, the system
+      returns ASSIGNED immediately, bypassing the weather check entirely.
+
+      2. Quorum Success: Even if `_vehicle_weather_compatible` returns `False` (due
+      to Storm), the assignment score can still reach 4 or 5 out of 6. If the drone
+      meets 4 other criteria (e.g., Battery ≥ 35%, Capacity OK, Distance ≤ 30, Not
+      Overloaded), the system returns ASSIGNED despite the bad weather.
+  q3:
+    answer: 'No'
+    reasoning: Vehicles in the battery dead zone can never be assigned directly. The
+      `if in_dead_zone:` check is the very first logical operation in the `determine_vehicle_assignment`
+      function. If this evaluates to True, the function immediately returns `AssignmentDecision.WAITLIST`,
+      preventing the code from ever reaching the Emergency Override or Quorum logic
+      sections.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:38'
+  q1:
+    answer: 'The model has 3 vehicle types × 3 package priorities × 3 weather conditions
+      = 27 base scenario combinations. However, considering the continuous parameters
+      (battery_level, current_load, capacity, package_weight, distance) create multiple
+      distinct decision boundaries, the actual number of distinct decision scenarios
+      is much higher. Analyzing the key thresholds: battery has ~6-8 critical thresholds
+      (15%, 20%, 25%, 35%, 40% plus dead zone boundaries), capacity has 2 thresholds
+      (80% and 100%), and distance has 3 thresholds (30, 50, 200). This creates hundreds
+      of distinct decision scenarios when all parameter combinations are considered.'
+    reasoning: >-
+      - Base categorical combinations: 3 VehicleTypes × 3 PackagePriorities × 3 WeatherConditions
+      = 27
+
+      - Battery level thresholds that matter: 15% (emergency override), 20% (Robot
+      battery_ok and dead zone), 25% (Truck battery_ok and dead zone boundaries),
+      35% (Drone battery_ok and dead zone), 40% (Urgent priority_ok)
+
+      - Dead zones create additional regions: Truck (20-25%), Drone (25-35%), Robot
+      (15-20%)
+
+      - Capacity thresholds: current_load + package_weight <= capacity (capacity_ok),
+      current_load < capacity * 0.8 (not_overloaded)
+
+      - Distance thresholds: 30 (Drone), 50 (Robot), 200 (Truck)
+
+      - The quorum system (4 out of 6 conditions) creates multiple outcome boundaries
+
+      - Each continuous parameter region combined with categorical parameters creates
+      distinct scenarios
+
+      - The exact count depends on how "distinct scenarios" is defined, but considering
+      meaningful decision boundaries, there are several hundred distinct scenarios
+  q2:
+    answer: 'Yes, Drones can be assigned deliveries during Storm weather under exactly
+      one condition: Emergency priority packages when battery level is greater than
+      15% AND battery level is NOT in the drone''s dead zone (25-35%). Specifically,
+      battery must be > 15% and either < 25% or > 35%.'
+    reasoning: >-
+      - The _vehicle_weather_compatible function returns False for Drones in Storm
+      weather
+
+      - However, the code checks for emergency override BEFORE the normal quorum-based
+      assignment logic
+
+      - The _emergency_override function returns True when: priority == EMERGENCY
+      AND battery_level > 15
+
+      - But BEFORE emergency override is checked, the code checks for battery dead
+      zone
+
+      - For Drones, dead zone is 25 <= battery_level <= 35
+
+      - If in dead zone, returns WAITLIST immediately (never reaches emergency override)
+
+      - So for emergency override to apply: battery > 15% AND NOT in dead zone (battery
+      < 25 OR battery > 35)
+
+      - When emergency override triggers, it returns ASSIGNED immediately, bypassing
+      weather checks entirely
+
+      - Therefore: Drones CAN be assigned in Storm IF priority=EMERGENCY AND battery
+      > 15% AND (battery < 25% OR battery > 35%)
+  q3:
+    answer: No, vehicles in their battery dead zone can never be directly assigned
+      to deliveries. They always receive a WAITLIST decision.
+    reasoning: >-
+      - The code checks battery dead zone as the FIRST decision point in determine_vehicle_assignment
+
+      - Line: "if in_dead_zone: return AssignmentDecision.WAITLIST"
+
+      - This check happens BEFORE the emergency override check
+
+      - Dead zones by vehicle type: Truck (20-25%), Drone (25-35%), Robot (15-20%)
+
+      - Even emergency packages cannot override the dead zone check because the dead
+      zone return happens first
+
+      - The function immediately returns WAITLIST and never proceeds to any other
+      logic
+
+      - No conditions can bypass this early return when battery is in dead zone
+
+      - Therefore, direct ASSIGNED decision is impossible for vehicles in their dead
+      zone

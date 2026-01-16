@@ -1,0 +1,292 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:01'
+  q1:
+    answer: '9696'
+    reasoning: >-
+      - Module difficulty has 4 options (BEGINNER, INTERMEDIATE, ADVANCED, EXPERT).
+
+      - Style matches has 2 options (True or False).
+
+      - Competency level has 101 options (integers from 0 to 100).
+
+      - Engagement good has 2 options (True or False).
+
+      - Goal priority has 3 options (HIGH, MEDIUM, LOW).
+
+      - Goal aligned has 2 options (True or False).
+
+      - Total distinct combinations: 4 * 2 * 101 * 2 * 3 * 2 = 9696.
+
+      - Each combination represents a distinct scenario for the recommendation decision.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - Expert modules require 80% competency threshold.
+
+      - If competency level is below 80%, prerequisites are not met.
+
+      - The code excludes modules immediately if prerequisites are not met, before
+      checking other factors like high priority override.
+
+      - High priority override only applies after prerequisites are met and not in
+      dead zone.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - Competency in the dead zone (±5% around the difficulty threshold) is checked
+      first.
+
+      - If competency is in the dead zone, the module is deferred immediately, regardless
+      of other parameters.
+
+      - No further checks can lead to a direct recommendation when in the dead zone.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:02'
+  q1:
+    answer: 384 distinct decision scenarios
+    reasoning: >-
+      - Module difficulty (DifficultyLevel): 4 options (BEGINNER, INTERMEDIATE, ADVANCED,
+      EXPERT)
+
+      - Style matches (bool): 2 options (True, False)
+
+      - Competency level (int): 0-100, but analysis requires grouping into meaningful
+      ranges based on thresholds and dead zones. For each difficulty level, competency
+      creates 4 distinct behavioral regions: (1) below dead zone, (2) in dead zone,
+      (3) above dead zone but below threshold, (4) at or above threshold. However,
+      regions vary by difficulty. Analyzing all difficulties: competency creates 16
+      distinct behavioral states across the 4 difficulty levels
+
+      - Engagement good (bool): 2 options (True, False)
+
+      - Goal priority (GoalPriority): 3 options (LOW, MEDIUM, HIGH)
+
+      - Goal aligned (bool): 2 options (True, False)
+
+      - Distinct combinations: 4 (difficulty) × 2 (style) × 16 (competency regions)
+      × 2 (engagement) × 3 (priority) × 2 (aligned) = 1536 total combinations
+
+      - However, many combinations produce identical decision paths. After analyzing
+      decision tree logic: dead zone always defers (regardless of other params), below
+      threshold always excludes, high priority override creates specific path, quorum
+      scoring groups remaining cases
+
+      - Actual distinct decision scenarios considering unique outcomes and decision
+      paths: 4 × 2 × 16 × 2 × 3 / 2 = 384 meaningful distinct scenarios
+  q2:
+    answer: No, Expert-level modules cannot be recommended to students with competency
+      below 80%
+    reasoning: >-
+      - Expert modules require competency threshold of 80% (per _prerequisite_threshold
+      function)
+
+      - Dead zone check happens first: competency in range [75-85] returns DEFERRED
+      immediately
+
+      - For competency < 75 (below dead zone): prereq_met = (competency_level >= 80)
+      = False
+
+      - When prereq_met is False, the function returns EXCLUDED immediately (line:
+      "if not prereq_met: return RecommendationResult.EXCLUDED")
+
+      - This exclusion happens BEFORE the high_priority_override check
+
+      - High priority override only applies when "not style_match" is True AND competency
+      >= 30, but it's never reached because the exclusion occurs first
+
+      - Therefore, any competency below 80% for Expert modules results in either DEFERRED
+      (75-85 range) or EXCLUDED (below 75), never RECOMMENDED
+
+      - The prerequisite check is a hard gate that cannot be bypassed for competencies
+      below threshold
+  q3:
+    answer: No, modules cannot be directly recommended when student competency is
+      in the dead zone
+    reasoning: >-
+      - The dead zone check is the FIRST condition evaluated in determine_module_recommendation
+      function
+
+      - Dead zone is defined as ±5% around the difficulty threshold for each level
+
+      - For each difficulty: BEGINNER [35-45], INTERMEDIATE [55-65], ADVANCED [65-75],
+      EXPERT [75-85]
+
+      - If _in_competency_dead_zone returns True, the function immediately returns
+      DEFERRED
+
+      - This happens before any other logic: prerequisite checks, high priority override,
+      or quorum scoring
+
+      - The dead zone represents an "ambiguous zone near threshold" requiring assessment,
+      not recommendation
+
+      - No conditions or overrides can bypass this check - it's an absolute early
+      return
+
+      - Therefore, competency in the dead zone ALWAYS results in DEFERRED, never RECOMMENDED
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:25'
+  q1:
+    answer: 9,696
+    reasoning: >-
+      The total number of decision scenarios is the Cartesian product of the cardinality
+      of all input parameters defined in the function signature `determine_module_recommendation`.
+
+      - `module_difficulty`: 4 options (Beginner, Intermediate, Advanced, Expert)
+
+      - `style_matches`: 2 options (True, False)
+
+      - `competency_level`: 101 options (Integers 0 through 100 inclusive)
+
+      - `engagement_good`: 2 options (True, False)
+
+      - `goal_priority`: 3 options (Low, Medium, High)
+
+      - `goal_aligned`: 2 options (True, False)
+
+      - Calculation: 4 * 2 * 101 * 2 * 3 * 2 = 9,696 distinct scenarios.
+  q2:
+    answer: No, never.
+    reasoning: >-
+      - Steps 1 and 2 of the function `determine_module_recommendation` prevent this.
+
+      - Step 1: The 'Dead Zone' check catches competency levels within ±5% of the
+      threshold (75-85 for Expert) and returns `DEFERRED`.
+
+      - Step 2: The 'Prerequisite' check compares competency to the threshold (80).
+      If competency < 80 and not in the dead zone (i.e., < 75), `prereq_met` is False.
+      The function immediately returns `EXCLUDED`.
+
+      - The 'High Priority Override' logic (Step 3) is unreachable for competency
+      < 80 because the function exits at Step 2.
+  q3:
+    answer: No.
+    reasoning: >-
+      - The function `determine_module_recommendation` performs the `_in_competency_dead_zone`
+      check as the very first operation.
+
+      - If this check evaluates to `True`, the function immediately returns `RecommendationResult.DEFERRED`.
+
+      - There is no logic path that bypasses this initial check to reach a `RECOMMENDED`
+      result when the competency is in the dead zone.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:30'
+  q1:
+    answer: 6 distinct decision scenarios (mutually exclusive rule regions).
+    reasoning: >-
+      - The function has three early/structural gates plus three quorum outcomes.
+
+      - Scenario 1: competency in dead zone (threshold ±5%) ⇒ always DEFERRED.
+
+      - Scenario 2: not in dead zone and competency below difficulty threshold ⇒ EXCLUDED.
+
+      - Scenario 3: prerequisites met, not in dead zone, goal priority HIGH, and style
+      mismatch ⇒ RECOMMENDED via override.
+
+      - Otherwise (prereqs met, not in dead zone, no override) quorum scoring applies
+      and yields exactly three outcomes: RECOMMENDED (score≥3), DEFERRED (score=2),
+      or EXCLUDED (score=1).
+  q2:
+    answer: No. Expert modules cannot be recommended to students with competency <
+      80%.
+    reasoning: >-
+      - For Expert difficulty, prerequisite threshold = 80.
+
+      - The function defers first if competency is in the dead zone 75–85 (inclusive),
+      so 75–79 are deferred, not recommended.
+
+      - If competency is below 75 (i.e., <80 and not in dead zone), prerequisites
+      are not met, so it returns EXCLUDED immediately.
+
+      - The high-priority override is checked only after prerequisites are met, so
+      it cannot recommend below 80.
+
+      - In fact, even 80–85 are not recommended (they are deferred due to the dead-zone
+      check); recommendation requires ≥86 for Expert.
+  q3:
+    answer: No. Dead-zone competency always results in DEFERRED; recommendation is
+      impossible there.
+    reasoning: >-
+      - The dead-zone check is the first return path in the function.
+
+      - When competency is within (threshold−5) to (threshold+5) inclusive, the function
+      returns DEFERRED immediately.
+
+      - This short-circuits both the prerequisite check and the high-priority override/quorum
+      scoring, so RECOMMENDED cannot occur in the dead zone.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:33'
+  q1:
+    answer: 96 distinct module recommendation decision scenarios
+    reasoning: >-
+      • module_difficulty: 4 values (BEGINNER, INTERMEDIATE, ADVANCED, EXPERT)
+
+      • style_matches: 2 values (True, False)
+
+      • competency_level: While technically 0-100, the meaningful categories are:
+      below dead zone, in dead zone, above threshold - but this varies by difficulty.
+      For counting distinct scenarios, we consider conceptual categories relative
+      to thresholds.
+
+      • engagement_good: 2 values (True, False)
+
+      • goal_priority: 3 values (LOW, MEDIUM, HIGH)
+
+      • goal_aligned: 2 values (True, False)
+
+      • Total combinations: 4 × 2 × 2 × 3 × 2 = 96 input parameter combinations (treating
+      competency as binary above/below threshold for simplification, but actually
+      it's more nuanced)
+
+      • More precisely: 4 difficulty × 2 style × 3 competency zones (below dead zone,
+      in dead zone, above threshold+5) × 2 engagement × 3 priority × 2 aligned = 4
+      × 2 × 3 × 2 × 3 × 2 = 288 meaningful scenarios
+
+      • However, counting all explicit parameter combinations: 4 × 2 × 2 × 3 × 2 =
+      96 (with competency as continuous, creating infinite combinations, but 96 discrete
+      parameter type combinations)
+  q2:
+    answer: No, Expert-level modules requiring 80% competency can never be recommended
+      to students with competency below 80%.
+    reasoning: >-
+      • The dead zone for Expert modules is 75-85% (threshold 80 ± 5%)
+
+      • If competency is in the dead zone (75-85%), the function returns DEFERRED
+      immediately before any other logic
+
+      • If competency is below the dead zone (<75%), the prerequisite check fails
+      (competency < 80 threshold)
+
+      • When prerequisites are not met, the function returns EXCLUDED immediately
+
+      • The high priority override only applies AFTER the prerequisite check passes
+      - it cannot bypass the prerequisite requirement
+
+      • The override only bypasses style mismatch, not competency requirements
+
+      • Therefore, there is no path for a student with <80% competency to receive
+      RECOMMENDED for an Expert module
+
+      • Students with 75-85% get DEFERRED; students with <75% get EXCLUDED
+  q3:
+    answer: No, modules cannot be directly recommended when student competency is
+      in the dead zone (±5% around difficulty threshold).
+    reasoning: >-
+      • The dead zone check is the FIRST condition evaluated in determine_module_recommendation()
+
+      • If _in_competency_dead_zone() returns True, the function immediately returns
+      RecommendationResult.DEFERRED
+
+      • This happens before any other logic is evaluated (prerequisites, high priority
+      override, quorum scoring)
+
+      • The dead zone check cannot be bypassed by any other condition including high
+      priority goals
+
+      • The function explicitly returns DEFERRED for dead zone cases, never RECOMMENDED
+
+      • Dead zones are: BEGINNER 35-45%, INTERMEDIATE 55-65%, ADVANCED 65-75%, EXPERT
+      75-85%
+
+      • Any competency level falling in these ranges will always result in DEFERRED
+      regardless of all other parameters

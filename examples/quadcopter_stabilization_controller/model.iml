@@ -1,0 +1,125 @@
+(* Quadcopter Stabilization Controller *)
+
+(* Core types *)
+type flight_mode = Manual | Stabilize | AltHold | Hover | ReturnHome | Emergency
+
+type sensor_health = Healthy | Degraded | Failed
+
+type control_decision = {
+  approved: bool;
+  force_emergency_landing: bool;
+  limit_max_tilt: bool;
+  reduce_responsiveness: bool;
+}
+
+(* Check if mode allows autonomous flight *)
+let is_autonomous_mode mode =
+  mode = AltHold || mode = Hover || mode = ReturnHome
+
+(* Battery thresholds *)
+let battery_critical battery_pct =
+  battery_pct < 15
+
+let battery_low battery_pct =
+  battery_pct < 30
+
+(* Tilt safety *)
+let tilt_dangerous tilt_deg =
+  tilt_deg > 45
+
+(* Altitude safety *)
+let altitude_critical altitude_m =
+  altitude_m < 3  (* Below 3m is ground proximity *)
+
+(* Sensor degradation affects control *)
+let sensor_degradation_severe imu_health gps_health =
+  imu_health = Failed || (imu_health = Degraded && gps_health = Degraded)
+
+(* Emergency landing conditions *)
+let requires_emergency_landing battery_pct tilt_deg altitude_m imu_health =
+  let critical_battery = battery_critical battery_pct in
+  let dangerous_tilt = tilt_dangerous tilt_deg in
+  let near_ground = altitude_critical altitude_m in
+  let sensor_failed = imu_health = Failed in
+
+  (* Emergency if: critical battery OR (dangerous tilt AND near ground) OR sensor failed *)
+  critical_battery || (dangerous_tilt && near_ground) || sensor_failed
+
+(* Core control decision *)
+let determine_control_mode
+    mode
+    battery_pct
+    tilt_deg
+    altitude_m
+    imu_health
+    gps_health =
+
+  (* Check emergency landing conditions first *)
+  let emergency_needed = requires_emergency_landing battery_pct tilt_deg altitude_m imu_health in
+
+  if emergency_needed then
+    { approved = false;
+      force_emergency_landing = true;
+      limit_max_tilt = true;
+      reduce_responsiveness = true }
+  else
+    (* Check if autonomous mode is safe *)
+    let autonomous = is_autonomous_mode mode in
+
+    if autonomous then
+      (* Autonomous needs good sensors *)
+      let sensors_ok = not (sensor_degradation_severe imu_health gps_health) in
+
+      if not sensors_ok then
+        (* Degrade to manual control *)
+        { approved = false;
+          force_emergency_landing = false;
+          limit_max_tilt = true;
+          reduce_responsiveness = true }
+      else
+        (* Check battery for autonomous *)
+        let battery_ok = not (battery_low battery_pct) in
+
+        if not battery_ok then
+          (* Low battery: limit autonomous capabilities *)
+          { approved = false;
+            force_emergency_landing = false;
+            limit_max_tilt = true;
+            reduce_responsiveness = false }
+        else
+          (* Autonomous approved *)
+          { approved = true;
+            force_emergency_landing = false;
+            limit_max_tilt = false;
+            reduce_responsiveness = false }
+    else
+      (* Manual/Stabilize modes: always approved unless emergency *)
+      let limit_tilt = battery_low battery_pct || imu_health = Degraded in
+      let reduce_resp = gps_health = Degraded in
+
+      { approved = true;
+        force_emergency_landing = false;
+        limit_max_tilt = limit_tilt;
+        reduce_responsiveness = reduce_resp }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All control scenarios *)
+let all_control_scenarios = determine_control_mode
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can autonomous modes be approved when battery < 30? *)
+let autonomous_low_battery mode battery_pct tilt_deg altitude_m imu_health gps_health =
+  let decision = determine_control_mode mode battery_pct tilt_deg altitude_m imu_health gps_health in
+  let autonomous = (mode = AltHold || mode = Hover || mode = ReturnHome) in
+  autonomous && battery_pct < 30 && decision.approved
+[@@decomp top ()]
+
+(* Q3: Emergency landing guarantee *)
+verify (fun mode battery_pct tilt_deg altitude_m imu_health gps_health ->
+  let decision = determine_control_mode mode battery_pct tilt_deg altitude_m imu_health gps_health in
+  let critical_battery = battery_pct < 15 in
+  critical_battery ==> decision.force_emergency_landing
+)

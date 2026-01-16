@@ -1,0 +1,30 @@
+model: "coastal_erosion_monitoring_and_alert_system"
+q1:
+  question: "How many distinct alert scenarios exist in determine_alert?"
+  answer: 38
+  explanation: >
+    The decomposition identified 38 distinct regions representing all possible alert scenarios. This covers combinations of: - 3 coastal types (Sandy, Rocky, Estuary) - erosion_rate range (0-200 mm/day) - wave_height range (10-50 meters) - 3 sensor_status states (Active, Degraded, Failed) - 2 infrastructure_critical states With patterns: Dead Zone, Multiplexer (coastal type), Override (failed sensor), Quorum (2-of-3)
+
+q2:
+  question: "Under what conditions does evacuation trigger?"
+  answer: "Emergency level OR (Critical level AND infrastructure_critical=true)"
+  explanation: >
+    Evacuation (evacuate=true) occurs in two scenarios: 1. Alert level = Emergency (erosion_rate >= 150): ALWAYS evacuates regardless of infrastructure 2. Alert level = Critical (erosion_rate >= critical_threshold AND quorum met):
+
+
+       Evacuates ONLY IF infrastructure_critical=true
+    This is shown at lines 53 and 55 in model.iml. LLMs often miss that Critical doesn't automatically evacuate - it depends on infrastructure_critical flag.
+
+q3:
+  question: "Can failed sensors produce Emergency alerts?"
+  answer: "PROVEN - cannot happen"
+  explanation: >
+    The safety property holds. When sensor_status = Failed, the override at lines 35-36 immediately returns Advisory alert with no evacuation. This check happens BEFORE any erosion rate classification, so even with erosion_rate >= 150 (Emergency threshold), a failed sensor will only produce Advisory level.
+
+key_thresholds:
+  - "Dead zone: erosion 48-52, wave 28-32"
+  - "Sandy: 30/50/80/150 (Advisory/Warning/Critical/Emergency)"
+  - "Rocky: 50/80/120/150"
+  - "Estuary: 25/40/65/150"
+  - "Wave danger: > 25 meters"
+  - "Quorum: 2 of 3 (erosion>=threshold, wave>25, infrastructure_critical)"

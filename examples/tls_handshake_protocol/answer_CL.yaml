@@ -1,0 +1,53 @@
+model: "tls_handshake_protocol"
+q1:
+  question: "How many distinct handshake outcome scenarios exist in determine_handshake_outcome, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "40 scenarios"
+  key_thresholds:
+    security_policy_level: [2, 3, 4]
+    error_count: [3]
+    cipher_strength: [128, 192, 256]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_handshake_scenarios.json'
+q2:
+  question: "Under what exact conditions does a handshake succeed (can_proceed=true) but fail to provide forward secrecy (forward_secrecy=false)?"
+  answer: "YES - 4 scenarios where handshake succeeds without forward secrecy"
+  example:
+    scenario: "Session resumption with security_policy_level <= 3"
+    conditions:
+      - "has_session_ticket = true"
+      - "ticket_is_valid = true"
+      - "resumption_policy_ok = true (only if security_policy_level < 4)"
+      - "cipher meets policy requirements"
+      - "no replay attack detected"
+      - "error_count < 3"
+    result: "SessionResumption_Success with forward_secrecy=false"
+  key_insight: "Session resumption (PSK) never provides forward secrecy, but high security policy (level >= 4) blocks resumption to force full handshake with forward secrecy"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_no_forward_secrecy.json'
+    why_counterintuitive: "Session resumption is 'successful' but sacrifices forward secrecy for performance; only happens with low security policy"
+q3:
+  question: "Can the safety property 'High security policy (level >= 4) with successful handshake always provides forward secrecy' ever be violated?"
+  answer: "PROVEN - Property always holds, no counterexamples"
+  property: "(security_policy_level >= 4 && can_proceed) ==> forward_secrecy"
+  why_holds: "High security policy (>= 4) blocks session resumption AND requires X25519 for forward secrecy, so all successful high-security handshakes must provide forward secrecy"
+  edge_cases:
+    - "security_policy_level = 4 (exact boundary)"
+    - "error_count = 2 (just below threshold)"
+    - "SECP256R1 group rejected by high security policy (only X25519 accepted)"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_safety_property.json'
+analysis_metadata:
+  total_regions: 40
+  imandra_runtime: "All analyses completed successfully, no timeouts"
+  pattern_complexity:
+    override: "High security policy overrides valid session tickets, forcing full handshake"
+    multiplexer: "security_policy_level changes cipher strength requirements (128/192/256) and forward secrecy requirements"
+    stateful_decay: "error_count >= 3 is a trap state (InvalidState)"
+    dead_zone: "Session age 86400-86410 is ambiguous (mentioned in code but not fully exercised in simplified model)"
+  simplifications_from_original:
+    - "Reduced cipher suites from 3 to 2 (AES_256_GCM, AES_128_GCM)"
+    - "Reduced key exchange groups from 4 to 2 (X25519, SECP256R1)"
+    - "Reduced certificate status from 4 variants to 2 (Valid, Invalid)"
+    - "Abstracted time-based checks to boolean parameters (ticket_is_valid, resumption_policy_ok)"
+    - "Abstracted replay detection to boolean parameter"
+    - "This allows decomposition to complete while preserving core security logic"

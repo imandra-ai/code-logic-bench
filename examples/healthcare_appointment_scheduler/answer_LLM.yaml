@@ -1,0 +1,385 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:33'
+  q1:
+    answer: 23,040 distinct appointment scheduling decision scenarios
+    reasoning: >-
+      • Calculate total combinations of all input parameters:
+        - InsuranceStatus: 4 values (VERIFIED, PENDING, DENIED, EXPIRED)
+        - Priority: 3 values (ROUTINE, URGENT, EMERGENCY)
+        - no_show_count: Treated as 4 categories (0-2, 3+) = 4 distinct values
+        - patient_age: Treated as 2 categories (<65, >=65) = 2 distinct values
+        - pre_auth_provided: 2 values (True, False)
+        - pre_auth_required: 2 values (True, False)
+        - days_in_advance: Treated as 2 categories (<=90, >90) = 2 distinct values
+        - time_slot: Treated as 2 categories (dead zone range 720-750, other) = 2
+      distinct values
+        - daily_count: Treated as 2 categories (dead zone range 18-20, other) = 2
+      distinct values
+        - provider_premium: 2 values (True, False)
+        - slot_available: 2 values (True, False)
+      • Total combinations: 4 × 3 × 4 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = 24,576
+
+      • However, considering the actual decision logic paths and meaningful ranges
+      for no_show_count (0, 1, 2, 3, 4, 5...) as 5 representative values:
+
+      • Refined calculation: 4 × 3 × 5 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = 30,720
+
+      • More conservative estimate focusing on decision-relevant values: 4 × 3 × 4
+      × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = 24,576
+
+      • Accounting for meaningful scenarios (no_show_count: 0,1,2,3,4 = 5 values):
+      4 × 3 × 5 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = 30,720
+
+      • Most precise answer considering critical thresholds: 4 × 3 × 3 × 2 × 2 × 2
+      × 2 × 2 × 2 × 2 × 2 = 23,040 (using no_show: <3, =3, >3)
+  q2:
+    answer: Yes, Routine (non-emergency) appointments can be approved when patient
+      insurance status is Pending under specific conditions.
+    reasoning: >-
+      • For Routine priority with Pending insurance to be approved, the following
+      conditions must be met:
+
+      • Insurance must be acceptable: provider_premium=True AND patient_age >= 65
+      (per insurance_acceptable function)
+
+      • NOT in scheduling dead zone (720 <= time_slot <= 750 AND 18 <= daily_count
+      <= 20)
+
+      • NOT emergency override (doesn't apply to Routine priority anyway)
+
+      • Must achieve approval score >= 3 out of 5 conditions:
+        1. insurance_ok = True (provider_premium=True AND age>=65)
+        2. slot_available = True (required for APPROVED outcome)
+        3. pre_auth_ok = True (either pre_auth_required=False OR pre_auth_provided=True)
+        4. no_show_ok = True (no_show_count <= 2)
+        5. days_ok = True (days_in_advance <= 90)
+      • Exact conditions for approval: provider_premium=True, patient_age>=65, slot_available=True,
+      not in dead zone, and at least 2 of the remaining 3 conditions (pre_auth_ok,
+      no_show_ok, days_ok) must be True
+
+      • Example: Routine appointment with Pending insurance, premium provider, age
+      70, slot available, no pre-auth required, 1 no-show, 30 days advance → APPROVED
+      (score 5/5)
+  q3:
+    answer: No, Emergency priority appointments with 3 or more no-shows can NEVER
+      be approved. The safety property is VIOLATED.
+    reasoning: >-
+      • The emergency_override function has condition: priority == Priority.EMERGENCY
+      AND no_show_count < 3
+
+      • When no_show_count >= 3, emergency_override returns False, so emergency bypass
+      does NOT apply
+
+      • Without emergency override, appointment goes through normal approval logic
+
+      • In normal logic, no_show_ok = (no_show_count <= 2), which is False when no_show_count
+      >= 3
+
+      • This means one of the 5 approval conditions is automatically False (no_show_ok
+      = False)
+
+      • Maximum possible score becomes 4 out of 5 (if all other conditions are True)
+
+      • Score >= 3 can still be achieved (e.g., insurance_ok=True, slot_available=True,
+      pre_auth_ok=True, days_ok=True = 4/5)
+
+      • When score >= 3 AND slot_available=True, result is APPROVED
+
+      • SAFETY PROPERTY VIOLATION: Emergency appointments with no_show_count >= 3
+      CAN be approved through the quorum system
+
+      • Example violation: Emergency priority, 5 no-shows, verified insurance, premium
+      provider, slot available, no pre-auth required, 30 days advance, not in dead
+      zone → score=4/5 → APPROVED
+
+      • The system has a critical safety flaw: high-risk patients (3+ no-shows) with
+      emergency priority can still get approved if they satisfy enough other criteria
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:38'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - The core function determine_appointment_decision can return one of three possible
+      results: APPROVED, WAITLIST, or REJECTED.
+
+      - These represent the distinct appointment scheduling decision scenarios: approval,
+      waiting list placement, or rejection.
+
+      - All combinations of inputs lead to one of these three outcomes, making 3 distinct
+      scenarios.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Insurance acceptable for pending only if provider_premium is True and patient_age
+      >= 65.
+
+      - For non-emergency (priority != EMERGENCY), the emergency override does not
+      trigger.
+
+      - Approval requires at least 3 out of 5 conditions to be true, including slot_available
+      (for score >=3 and slot_available leads to APPROVED).
+
+      - Other conditions must also be satisfied: pre_auth_ok (if required, pre_auth_provided
+      must be true), no_show_ok (no_show_count <= 2), days_ok (days_in_advance <=
+      90).
+
+      - Routine appointments can be approved if not in dead zone (not 720 <= time_slot
+      <= 750 and 18 <= daily_count <= 20), and all conditions lead to score >=3 with
+      slot_available true.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The safety property assumes that emergency appointments with 3 or more no-shows
+      cannot be approved due to the emergency override condition (no_show_count <
+      3).
+
+      - However, the code allows emergency appointments to bypass the override check
+      and enter the normal quorum logic if no_show_count >= 3.
+
+      - In the quorum system, no_show_ok is false if no_show_count >= 3, but approval
+      can still occur if at least 3 of the 5 conditions are met (including slot_available
+      for APPROVED).
+
+      - For example, if insurance_ok, slot_available, pre_auth_ok, and days_ok are
+      true, and no_show_ok is false, the score is 4 (>=3), leading to APPROVED if
+      slot_available is true.
+
+      - This violates the intended safety property, as such appointments can be approved
+      without the emergency override.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:51'
+  q1:
+    answer: 34 distinct decision scenarios (equivalence classes by control-flow/boolean
+      conditions).
+    reasoning: >-
+      - The integer/enumeration inputs are only used via a finite set of predicates
+      (threshold/range checks), so “distinct scenarios” can be counted by the distinct
+      paths/boolean combinations the decision logic can observe.
+
+      - First override: in_dead_zone(time_slot,daily_count) ∈ {T,F}. If True, outcome
+      is always WAITLIST (1 scenario).
+
+      - Second override (only when not in dead zone): emergency_override(priority,no_show_count)
+      is True exactly when priority==EMERGENCY and no_show_count<3, yielding always
+      APPROVED (1 scenario).
+
+      - Otherwise, the normal quorum logic depends only on 5 booleans: insurance_ok,
+      slot_available, pre_auth_ok, no_show_ok, days_ok → 2^5 = 32 distinct combinations
+      (32 scenarios), even though many map to the same final result.
+
+      - Total distinct observable scenarios = 1 (dead zone) + 1 (emergency override)
+      + 32 (normal quorum combinations) = 34.
+  q2:
+    answer: Yes. Routine appointments can be approved with insurance status PENDING,
+      as long as the request is not in the dead zone, does not use emergency override
+      (it can’t, since it’s Routine), slot_available is True, and the quorum score
+      is ≥3.
+    reasoning: >-
+      - Dead zone check happens first: if (720<=time_slot<=750) and (18<=daily_count<=20)
+      ⇒ WAITLIST no matter what; so approval requires being outside this region.
+
+      - Routine priority never triggers emergency_override (override requires priority==EMERGENCY),
+      so Routine approvals use only the normal quorum logic.
+
+      - With insurance_status==PENDING:
+        - insurance_ok is True only when provider_premium==True AND patient_age>=65.
+        - otherwise insurance_ok is False.
+      - Approval condition in normal logic: score = insurance_ok + slot_available
+      + pre_auth_ok + no_show_ok + days_ok, and you must have score>=3 AND slot_available==True
+      (because even with score>=3 the function returns WAITLIST when slot_available
+      is False).
+
+      - Therefore, exact Routine+PENDING approval conditions (outside dead zone) are:
+        1) slot_available == True
+        2) At least 3 of the 5 conditions are True, where:
+           - insurance_ok == (provider_premium and patient_age>=65)
+           - pre_auth_ok == (not pre_auth_required) or pre_auth_provided
+           - no_show_ok == (no_show_count<=2)
+           - days_ok == (days_in_advance<=90)
+      - Equivalently, split by whether PENDING is “acceptable”:
+        - If provider_premium and age>=65 (insurance_ok True): need at least one of
+      {pre_auth_ok, no_show_ok, days_ok} to be True in addition to slot_available
+      True (since insurance_ok and slot_available already give 2 points).
+        - If not (insurance_ok False): need at least two of {pre_auth_ok, no_show_ok,
+      days_ok} to be True, with slot_available True.
+  q3:
+    answer: Yes. Emergency-priority appointments with 3+ no-shows can still be approved;
+      the safety property “never approve Emergency with no_show_count>=3” does NOT
+      hold.
+    reasoning: >-
+      - emergency_override only approves automatically when (priority==EMERGENCY and
+      no_show_count<3). With 3+ no-shows, override is disabled.
+
+      - But the subsequent normal quorum logic does not treat Priority.EMERGENCY specially;
+      it only uses no_show_ok = (no_show_count<=2) as one of 5 quorum inputs.
+
+      - For no_show_count>=3, no_show_ok is False, yet approval is still possible
+      if the other conditions yield score>=3 and slot_available is True.
+
+      - Concrete counterexample (outside dead zone):
+        - priority=EMERGENCY, no_show_count=3
+        - insurance_status=VERIFIED (insurance_ok=True)
+        - slot_available=True
+        - pre_auth_required=False (pre_auth_ok=True)
+        - days_in_advance=10 (days_ok=True)
+        - Then score = 1(insurance)+1(slot)+1(pre_auth)+0(no_show)+1(days)=4 ⇒ score>=3
+      and slot_available True ⇒ APPROVED. - Therefore, Emergency with 3+ no-shows
+      can be approved via the normal path, so the safety property is violated.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:21:01'
+  q1:
+    answer: 12,288
+    reasoning: >-
+      The number of distinct scenarios is calculated by the Cartesian product of the
+      equivalence partitions for all input parameters.
+
+      - InsuranceStatus: 4 options (Verified, Pending, Denied, Expired).
+
+      - Priority: 3 options (Routine, Urgent, Emergency).
+
+      - No-show count: 2 partitions (< 3, ≥ 3).
+
+      - Patient age: 2 partitions (< 65, ≥ 65).
+
+      - Days in advance: 2 partitions (≤ 90, > 90).
+
+      - Time slot: 2 partitions (Inside 720-750, Outside).
+
+      - Daily count: 2 partitions (Inside 18-20, Outside).
+
+      - Boolean flags (pre_auth_provided, provider_premium, slot_available, pre_auth_required):
+      2 options each (4 flags).
+
+
+      Calculation: 4 (Ins) * 3 (Prio) * 2 (NoShow) * 2 (Age) * 2 (Days) * 2 (Time)
+      * 2 (Count) * 2^4 (Bools) = 12 * 64 * 16 = 12,288 distinct combinations.
+  q2:
+    answer: Yes, under specific quorum conditions.
+    reasoning: >-
+      Routine appointments cannot use the emergency override, so they must pass the
+      standard quorum check (Score ≥ 3) and avoid the dead zone.
+
+      Conditions for approval when Insurance is PENDING:
+
+      1. **System constraints**: Not in a scheduling dead zone AND `slot_available`
+      is True.
+
+      2. **Quorum Score**: Must satisfy enough remaining conditions to reach a score
+      of 3 (since `slot_available` contributes 1 point).
+         - **Case A (Premium Senior)**: If `provider_premium` is True AND `patient_age`
+      ≥ 65, insurance is considered acceptable (+1 point). The patient needs only
+      **1** of the remaining conditions: `no_show_count` ≤ 2, `days_in_advance` ≤
+      90, or `pre_auth_ok`.
+         - **Case B (Others)**: If not a premium senior, insurance is not acceptable
+      (0 points). The patient needs **2** of the remaining conditions: `no_show_count`
+      ≤ 2, `days_in_advance` ≤ 90, or `pre_auth_ok`.
+  q3:
+    answer: Yes, they can be approved. (Safety property is not strictly enforced).
+    reasoning: >-
+      - **Override Failure**: The `emergency_override` function correctly returns
+      `False` because `no_show_count` (3+) is not less than 3.
+
+      - **Fallback Logic**: The system falls back to the standard `calculate_approval_score`
+      logic rather than rejecting immediately.
+
+      - **Quorum Success**: In the standard logic, the patient fails `no_show_ok`
+      (0 points). However, they can still achieve a passing score of 3 or 4 if other
+      conditions are perfect.
+
+      - **Example**: If `slot_available` is True (+1), `insurance_status` is Verified
+      (+1), and `pre_auth_provided` is True (+1), the score is 3.
+
+      - **Result**: The appointment is **APPROVED**. The implicit safety property
+      (that high no-show emergencies should be blocked) is violated because the fallback
+      mechanism treats them as standard candidates who can out-score their penalty.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:39'
+  q1:
+    answer: The total number of distinct appointment scheduling decision scenarios
+      is 27,648 (4 × 4 × 2 × 2 × 3 × 2 × 2 × 2 × 2 × 2 × 3 = 27,648), based on the
+      finite ranges of all input parameters.
+    reasoning: >-
+      - InsuranceStatus: 4 values (VERIFIED, PENDING, DENIED, EXPIRED)
+
+      - no_show_count: For decision logic purposes, effectively 4 distinct behavioral
+      categories (0, 1, 2, 3+) based on emergency_override (< 3) and no_show_ok (<=
+      2)
+
+      - patient_age: 2 categories (< 65, >= 65) for insurance_acceptable logic
+
+      - pre_auth_provided: 2 values (True, False)
+
+      - Priority: 3 values (ROUTINE, URGENT, EMERGENCY)
+
+      - days_in_advance: 2 categories (<= 90, > 90) for days_ok condition
+
+      - time_slot: 2 categories (720-750 dead zone, outside dead zone)
+
+      - daily_count: 2 categories (18-20 for dead zone check, outside 18-20)
+
+      - provider_premium: 2 values (True, False)
+
+      - slot_available: 2 values (True, False)
+
+      - pre_auth_required: 2 values (True, False)
+
+      - Calculation: 4 × 4 × 2 × 2 × 3 × 2 × 2 × 2 × 2 × 2 × 2 = 24,576 distinct behavioral
+      scenarios
+
+      - However, if counting raw combinations with reasonable bounds, the exact count
+      depends on how we bound continuous parameters
+  q2:
+    answer: Yes, Routine appointments with Pending insurance status can be approved
+      under specific conditions.
+    reasoning: >-
+      - For Pending insurance to be acceptable: provider_premium must be True AND
+      patient_age >= 65
+
+      - The appointment must NOT be in a dead zone (time_slot not in 720-750 OR daily_count
+      not in 18-20)
+
+      - The quorum system requires 3 out of 5 conditions to be met for approval
+
+      - With Pending insurance accepted (insurance_ok = True), the other conditions
+      are:
+        - slot_available: must be True for APPROVED (vs WAITLIST)
+        - pre_auth_ok: True if (pre_auth_required is False) OR (pre_auth_provided
+      is True)
+        - no_show_ok: no_show_count <= 2
+        - days_ok: days_in_advance <= 90
+      - Example exact conditions for approval: provider_premium=True, patient_age>=65,
+      not in dead zone, slot_available=True, and at least 2 other conditions satisfied
+      (e.g., pre_auth_ok=True, no_show_count<=2)
+
+      - With insurance_ok=True, slot_available=True, and any 1 more condition True,
+      score >= 3 and result is APPROVED
+  q3:
+    answer: No, Emergency priority appointments with 3 or more no-shows can NEVER
+      be APPROVED. This safety property holds.
+    reasoning: >-
+      - Emergency override requires: priority == EMERGENCY AND no_show_count < 3
+
+      - With no_show_count >= 3, emergency_override returns False, so emergency bypass
+      is NOT triggered
+
+      - The appointment then follows normal quorum logic
+
+      - With no_show_count >= 3: no_show_ok = False (since no_show_count <= 2 is required)
+
+      - Even with all other 4 conditions True (insurance_ok, slot_available, pre_auth_ok,
+      days_ok), score = 4
+
+      - Score of 4 >= 3 means the quorum is met
+
+      - HOWEVER, even with score >= 3, the result depends on slot_available:
+        - If slot_available = True: APPROVED
+        - If slot_available = False: WAITLIST
+      - CORRECTION: Re-analyzing - with no_show_count >= 3, no_show_ok = False. The
+      maximum possible score is 4 (insurance_ok, slot_available, pre_auth_ok, days_ok
+      all True)
+
+      - With score = 4 >= 3 and slot_available = True, the result IS APPROVED
+
+      - Therefore, Emergency appointments with 3+ no-shows CAN be approved if: not
+      in dead zone, insurance acceptable, slot available, pre_auth satisfied, and
+      days_in_advance <= 90 (need at least 3 of the remaining 4 conditions True)

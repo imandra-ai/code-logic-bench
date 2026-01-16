@@ -1,0 +1,185 @@
+(* GDPR Compliance Engine *)
+
+(* Core types *)
+type data_category = Personal | Sensitive | Health
+
+type lawful_basis =
+  | Consent
+  | LegalObligation
+  | LegitimateInterests
+
+type consent_quality = Explicit | Implicit | Withdrawn
+
+type transfer_destination = EUCountry | ThirdCountry
+
+type risk_level = Low | Medium | High | Critical
+
+type compliance_decision = {
+  processing_allowed: bool;
+  requires_pia: bool;
+  requires_dpo_review: bool;
+  consent_sufficient: bool;
+  transfer_allowed: bool;
+  risk_assessment: risk_level;
+}
+
+(* Core threshold: sensitive data requires explicit consent *)
+let requires_explicit_consent data_cat =
+  match data_cat with
+  | Sensitive | Health -> true
+  | Personal -> false
+
+(* Consent quality check with time decay *)
+let consent_meets_requirements data_cat consent_quality consent_age =
+  let explicit_needed = requires_explicit_consent data_cat in
+  let age_valid = consent_age <= 24 in  (* months *)
+
+  match consent_quality with
+  | Withdrawn -> false
+  | Implicit ->
+    if explicit_needed then false
+    else age_valid
+  | Explicit -> age_valid
+
+(* Lawful basis evaluation with override pattern *)
+let evaluate_lawful_basis basis data_cat consent_quality consent_age automated_decision =
+  match basis with
+  | LegalObligation ->
+    (* Override: Legal obligation allows processing... *)
+    let base_allowed = true in
+    (* ...EXCEPT when sensitive data + automated decision making *)
+    let sensitive_automated = requires_explicit_consent data_cat && automated_decision in
+    if sensitive_automated then false else base_allowed
+
+  | Consent ->
+    consent_meets_requirements data_cat consent_quality consent_age
+
+  | LegitimateInterests ->
+    (* Legitimate interests doesn't work for sensitive data *)
+    not (requires_explicit_consent data_cat)
+
+(* Transfer mechanism validation - multiplexer pattern *)
+let check_transfer_compliance destination data_cat transfer_safeguard_score =
+  match destination with
+  | EUCountry -> true
+  | ThirdCountry ->
+    (* Threshold varies by data category *)
+    let required_score =
+      match data_cat with
+      | Personal -> 60
+      | Sensitive -> 80
+      | Health -> 90
+    in
+    transfer_safeguard_score >= required_score
+
+(* Risk assessment with quorum pattern *)
+let assess_risk data_cat automated_decision profiling cross_border =
+  let c1 = requires_explicit_consent data_cat in
+  let c2 = automated_decision in
+  let c3 = profiling in
+  let c4 = cross_border in
+
+  let risk_factors =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+
+  if risk_factors >= 4 then Critical
+  else if risk_factors >= 3 then High
+  else if risk_factors >= 2 then Medium
+  else Low
+
+(* Dead zone: certain score ranges are ambiguous *)
+let is_valid_safeguard_score score consent_age =
+  (* Scores in 58-62 range with consent age 23-25 months are ambiguous *)
+  let in_dead_zone =
+    score >= 58 && score <= 62 &&
+    consent_age >= 23 && consent_age <= 25
+  in
+  (* Also invalid if score is extreme *)
+  let extreme_score = score < 0 || score > 100 in
+
+  not (in_dead_zone || extreme_score)
+
+(* Core decision function *)
+let determine_gdpr_compliance
+    data_cat
+    lawful_basis
+    consent_quality
+    consent_age
+    automated_decision
+    profiling
+    destination
+    transfer_safeguard_score =
+
+  (* Check validity first *)
+  let valid = is_valid_safeguard_score transfer_safeguard_score consent_age in
+
+  if not valid then
+    { processing_allowed = false;
+      requires_pia = false;
+      requires_dpo_review = false;
+      consent_sufficient = false;
+      transfer_allowed = false;
+      risk_assessment = Low }
+  else
+    (* Evaluate lawful basis with override logic *)
+    let basis_ok = evaluate_lawful_basis lawful_basis data_cat consent_quality consent_age automated_decision in
+
+    (* Check transfer compliance (multiplexer) *)
+    let transfer_ok = check_transfer_compliance destination data_cat transfer_safeguard_score in
+
+    (* Assess risk (quorum) *)
+    let risk = assess_risk data_cat automated_decision profiling (destination = ThirdCountry) in
+
+    (* Determine requirements *)
+    let needs_pia = (risk = High || risk = Critical) in
+    let needs_dpo = (risk = Critical) in
+
+    let final_allowed = basis_ok && transfer_ok in
+
+    { processing_allowed = final_allowed;
+      requires_pia = needs_pia;
+      requires_dpo_review = needs_dpo;
+      consent_sufficient = consent_meets_requirements data_cat consent_quality consent_age;
+      transfer_allowed = transfer_ok;
+      risk_assessment = risk }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Decomposition target - enumerate all distinct compliance scenarios *)
+(* Restrict input space to make decomposition tractable *)
+let assume_valid_inputs
+    (data_cat : data_category)
+    (lawful_basis : lawful_basis)
+    (consent_quality : consent_quality)
+    (consent_age : int)
+    (automated_decision : bool)
+    (profiling : bool)
+    (destination : transfer_destination)
+    (transfer_safeguard_score : int) : bool =
+  (* Restrict consent age to reasonable range *)
+  consent_age >= 0 && consent_age <= 30 &&
+  (* Restrict safeguard score to valid range plus boundaries *)
+  transfer_safeguard_score >= 55 && transfer_safeguard_score <= 95
+
+let compliance_scenarios data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score =
+  determine_gdpr_compliance data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score
+[@@decomp top ~prune:true ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q2: When can LegalObligation basis be rejected? *)
+let legal_obligation_rejected data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score =
+  let decision = determine_gdpr_compliance data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score in
+  lawful_basis = LegalObligation && not decision.processing_allowed
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q3: Safety property - Critical risk always requires DPO review *)
+verify (fun data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score ->
+  let valid = assume_valid_inputs data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score in
+  let decision = determine_gdpr_compliance data_cat lawful_basis consent_quality consent_age automated_decision profiling destination transfer_safeguard_score in
+  valid ==> ((decision.risk_assessment = Critical) ==> decision.requires_dpo_review)
+)

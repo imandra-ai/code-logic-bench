@@ -1,0 +1,58 @@
+model: "smart_warehouse_auto_controller"
+q1:
+  question: "How many task assignment scenarios exist for Hazardous items?"
+  answer: "24 scenarios"
+  key_thresholds:
+    battery_critical: 15
+    battery_hazardous: 50
+    battery_normal: 20
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_hazardous.json'
+    use_of_assuming: "item_type = Hazardous"
+q2:
+  question: "Can a task ever be approved when battery_level < 20? If yes, under what conditions?"
+  answer: "YES - 10 scenarios where battery < 20 but approved"
+  approved_conditions: "Critical priority + robot capable + battery >= 15"
+  explanation: |
+    Critical override (priority=Critical) activates BEFORE normal battery check.
+    Critical path requires battery >= 15, bypassing normal >= 20 requirement.
+  example:
+    robot_type: "InspectionRobot"
+    item_type: "Perishable"
+    priority: "Critical"
+    battery_level: 15
+    result: "approved = true (critical override)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_low_battery.json'
+q3:
+  question: "For Heavy items with TransportRobot, does approved=true always mean requires_supervision=false when humans_in_zone > 0?"
+  answer: "REFUTED - Property can be violated"
+  property: "(Heavy + TransportRobot + approved + humans_in_zone>0) ==> requires_supervision=false"
+  counterexample:
+    robot_type: "TransportRobot"
+    item_type: "Heavy"
+    priority: "Critical"
+    battery_level: 40
+    efficiency: -77190
+    zone_safety: "Caution"
+    humans_in_zone: 1
+    result: "Unexpected behavior due to negative efficiency"
+  root_cause: "Model doesn't constrain efficiency to be non-negative (0-100)"
+  model_bug: "efficiency can be negative, breaking duration calculation"
+  actual_supervision_logic: "requires_supervision = (Heavy OR Hazardous) AND humans_in_zone = 0"
+  note: "Property should hold with proper constraint: efficiency ∈ [0,100]"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_supervision.json'
+analysis_metadata:
+  total_scenarios_q1: 24
+  low_battery_approval_count_q2: 10
+  property_result_q3: "REFUTED (due to unconstrained efficiency)"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to safety-critical Hazardous items"
+    q2_filtering: "Tests critical override bypass"
+    q3_fixed_types: "Fixes robot_type=TransportRobot, item_type=Heavy"
+  discovered_issue:
+    location: "Q3 counterexample"
+    issue: "efficiency parameter has no range constraint"
+    impact: "Negative efficiency breaks duration calculation"
+    fix_needed: "Add constraint: efficiency >= 0 && efficiency <= 100"

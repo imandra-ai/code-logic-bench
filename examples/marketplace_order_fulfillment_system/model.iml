@@ -1,0 +1,220 @@
+(* Marketplace Order Fulfillment System *)
+
+(* Core types *)
+type seller_tier = Basic | Silver | Gold | Platinum | Enterprise
+
+type product_category = Electronics | Apparel | Food | Furniture | Books
+
+type fulfillment_method = Standard | Express | SameDay | Pickup | DropShip
+
+type warehouse_zone = Urban | Suburban | Rural | International
+
+type inventory_status = Abundant | Adequate | Limited | Critical
+
+type fulfillment_decision = {
+  method_selected: fulfillment_method;
+  can_use_air_carrier: bool;
+  estimated_hours: int;
+  forced_downgrade: bool;
+}
+
+(* Seller tier base SLA (hours) *)
+let seller_sla_hours tier =
+  match tier with
+  | Basic -> 72
+  | Silver -> 48
+  | Gold -> 24
+  | Platinum -> 12
+  | Enterprise -> 6
+
+(* Product category affects handling time multiplier *)
+let category_handling_multiplier category =
+  match category with
+  | Electronics -> 2    (* Careful handling *)
+  | Apparel -> 1
+  | Food -> 3           (* Special storage *)
+  | Furniture -> 4      (* Large items *)
+  | Books -> 1
+
+(* Warehouse zone base processing hours *)
+let zone_base_processing_hours zone =
+  match zone with
+  | Urban -> 2
+  | Suburban -> 4
+  | Rural -> 8
+  | International -> 24
+
+(* Fulfillment method base delivery hours *)
+let method_delivery_hours fm =
+  match fm with
+  | Standard -> 72
+  | Express -> 24
+  | SameDay -> 6
+  | Pickup -> 2
+  | DropShip -> 96
+
+(* Zone-method compatibility matrix (comprehensive) *)
+let zone_supports_method zone fm =
+  match zone, fm with
+  | Urban, SameDay -> true
+  | Urban, Express -> true
+  | Urban, Standard -> true
+  | Urban, Pickup -> true
+  | Urban, DropShip -> false
+  | Suburban, SameDay -> false  (* SameDay only in Urban *)
+  | Suburban, Express -> true
+  | Suburban, Standard -> true
+  | Suburban, Pickup -> true
+  | Suburban, DropShip -> false
+  | Rural, SameDay -> false
+  | Rural, Express -> false     (* Rural doesn't support Express normally *)
+  | Rural, Standard -> true
+  | Rural, Pickup -> false
+  | Rural, DropShip -> true
+  | International, SameDay -> false
+  | International, Express -> false
+  | International, Standard -> true
+  | International, Pickup -> false
+  | International, DropShip -> true
+
+(* Check if Air carrier can be used (depends on zone and method) *)
+let can_use_air zone fm =
+  match zone, fm with
+  | Urban, Express -> true
+  | Urban, SameDay -> true
+  | Suburban, Express -> true
+  | Rural, Express -> true  (* Only if override applies *)
+  | _ -> false
+
+(* Inventory status threshold checks *)
+let stock_sufficient_for_method inventory_status fm =
+  match inventory_status, fm with
+  | Critical, SameDay -> false  (* Can't promise SameDay with critical stock *)
+  | Critical, Express -> false  (* Can't promise Express either *)
+  | Critical, _ -> true         (* Critical can still do Standard/Pickup/DropShip *)
+  | Limited, SameDay -> false   (* Limited stock can't do SameDay *)
+  | Limited, _ -> true          (* Limited can handle Express/Standard/Pickup/DropShip *)
+  | Adequate, _ -> true         (* Adequate handles all methods *)
+  | Abundant, _ -> true         (* Abundant handles all methods *)
+
+(* Premium sellers can use Express from Rural *)
+(* Standard rule: Rural zone doesn't support Express (line 65) *)
+(* Override: Platinum/Enterprise enable Rural→Express via Air carrier *)
+(* EXCEPTION: Food products cannot use this override (perishable risk) *)
+(* EXCEPTION 2: Critical inventory blocks override *)
+let premium_express_override tier zone category inventory_status =
+  let is_premium = (tier = Platinum || tier = Enterprise) in
+  let is_rural = zone = Rural in
+  let not_food = category <> Food in
+  let stock_ok = inventory_status <> Critical in
+  is_premium && is_rural && not_food && stock_ok
+
+(* SLA requirement depends on tier AND category *)
+let calculate_fulfillment_time tier category zone fm =
+  let sla_base = seller_sla_hours tier in
+  let handling_mult = category_handling_multiplier category in
+  let zone_hours = zone_base_processing_hours zone in
+  let delivery_hours = method_delivery_hours fm in
+  (zone_hours * handling_mult) + delivery_hours
+
+(* Check if meets SLA *)
+let meets_sla tier category zone fm =
+  let total_time = calculate_fulfillment_time tier category zone fm in
+  let sla = seller_sla_hours tier in
+  total_time <= sla
+
+(* Limited inventory (not quite critical) with Express *)
+(* Too risky to promise fast shipping, but not critical enough to block *)
+let in_inventory_dead_zone inventory_status requested_method =
+  inventory_status = Limited &&
+  (requested_method = Express || requested_method = SameDay)
+
+(* Core fulfillment method selection *)
+let determine_fulfillment_strategy
+    (* Seller & Product *)
+    seller_tier
+    product_category
+    (* Inventory *)
+    inventory_status
+    (* Request *)
+    requested_method
+    (* Warehouse *)
+    warehouse_zone =
+
+  (* Check inventory dead zone first *)
+  let in_dead_zone = in_inventory_dead_zone inventory_status requested_method in
+
+  if in_dead_zone then
+    (* Dead zone → downgrade to Standard *)
+    let std_time = calculate_fulfillment_time seller_tier product_category warehouse_zone Standard in
+    { method_selected = Standard;
+      can_use_air_carrier = false;
+      estimated_hours = std_time;
+      forced_downgrade = true }
+  else
+    (* Check premium express override *)
+    let use_override = premium_express_override seller_tier warehouse_zone product_category inventory_status in
+
+    if use_override && requested_method = Express then
+      (* Premium forcing Express from Rural (non-Food, non-Critical) *)
+      let expr_time = calculate_fulfillment_time seller_tier product_category warehouse_zone Express in
+      { method_selected = Express;
+        can_use_air_carrier = true;  (* Override uses Air *)
+        estimated_hours = expr_time;
+        forced_downgrade = false }
+    else
+      (* Normal fulfillment logic *)
+
+      (* Check if zone supports requested method *)
+      let zone_ok = zone_supports_method warehouse_zone requested_method in
+
+      (* Check if inventory sufficient *)
+      let stock_ok = stock_sufficient_for_method inventory_status requested_method in
+
+      (* Check SLA *)
+      let sla_ok = meets_sla seller_tier product_category warehouse_zone requested_method in
+
+      (* All three must be satisfied for requested method *)
+      if zone_ok && stock_ok && sla_ok then
+        let can_air = can_use_air warehouse_zone requested_method in
+        let time = calculate_fulfillment_time seller_tier product_category warehouse_zone requested_method in
+        { method_selected = requested_method;
+          can_use_air_carrier = can_air;
+          estimated_hours = time;
+          forced_downgrade = false }
+      else
+        (* Fallback to Standard *)
+        let std_time = calculate_fulfillment_time seller_tier product_category warehouse_zone Standard in
+        { method_selected = Standard;
+          can_use_air_carrier = false;
+          estimated_hours = std_time;
+          forced_downgrade = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all fulfillment strategy scenarios *)
+let all_fulfillment_scenarios = determine_fulfillment_strategy
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Express ever be selected from Rural for Food? *)
+let express_rural_food
+    seller_tier product_category inventory_status requested_method warehouse_zone =
+  let result = determine_fulfillment_strategy
+    seller_tier product_category inventory_status requested_method warehouse_zone
+  in
+  warehouse_zone = Rural && product_category = Food && result.method_selected = Express
+[@@decomp top ()]
+
+(* Q3: Safety property - Limited inventory with Express/SameDay always downgrades *)
+verify (fun
+    seller_tier product_category inventory_status requested_method warehouse_zone ->
+  let result = determine_fulfillment_strategy
+    seller_tier product_category inventory_status requested_method warehouse_zone
+  in
+  let in_dead_zone = in_inventory_dead_zone inventory_status requested_method in
+
+  (* Dead zone should force downgrade to Standard *)
+  in_dead_zone ==> result.method_selected = Standard
+)

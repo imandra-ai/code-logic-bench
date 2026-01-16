@@ -1,0 +1,148 @@
+(* Flight Management System - Autopilot Mode Controller *)
+
+type flight_phase = Ground | Takeoff | Climb | Cruise | Descent | Approach | Landing
+type system_health = Normal | Degraded | Failed
+type altitude_state = Ground | VeryLow | Low | Medium | High | VeryHigh
+type weather_condition = Clear | LightTurbulence | ModerateTurbulence | Severe | Icing
+type autopilot_capability = FullCapability | LimitedCapability | MinimalCapability
+
+type ap_mode_decision = {
+  mode_allowed: bool;
+  capability_level: autopilot_capability;
+  requires_copilot_monitor: bool;
+  emergency_disconnect: bool;
+  mode_downgraded: bool;
+}
+
+(* Phase restrictions *)
+let phase_allows_ap (phase : flight_phase) =
+  match phase with
+  | Ground -> false
+  | Landing -> false  (* Manual landing required *)
+  | _ -> true
+
+(* Altitude compatibility with phase *)
+let altitude_phase_compatible phase alt_state =
+  match phase, alt_state with
+  | Approach, (VeryHigh | High) -> false
+  | Takeoff, (Medium | High | VeryHigh) -> false  (* Should still be climbing *)
+  | Cruise, (Ground | VeryLow | Low) -> false
+  | _, Ground -> false  (* Airborne phases incompatible with ground *)
+  | _, _ -> true
+
+(* Weather changes capability interpretation *)
+let determine_capability health weather =
+  match health, weather with
+  | Failed, _ -> MinimalCapability  (* Failed system minimal capability *)
+  | Normal, Clear -> FullCapability
+  | Normal, LightTurbulence -> FullCapability
+  | Normal, ModerateTurbulence -> LimitedCapability
+  | Normal, (Severe | Icing) -> MinimalCapability
+  | Degraded, Clear -> LimitedCapability
+  | Degraded, _ -> MinimalCapability
+
+(* Approach phase requires copilot monitoring EXCEPT in perfect conditions *)
+let requires_monitoring phase weather health =
+  match phase with
+  | Approach ->
+    (* Approach requires monitoring UNLESS weather is clear AND health is normal *)
+    not (weather = Clear && health = Normal)
+  | Descent -> weather = Severe || weather = Icing
+  | _ -> false
+
+(* Dead zone: certain altitude+phase+weather combinations are ambiguous *)
+let is_in_dead_zone alt_state phase weather =
+  (* VeryLow altitude during Descent with ModerateTurbulence is ambiguous *)
+  (alt_state = VeryLow && phase = Descent && weather = ModerateTurbulence) ||
+  (* Low altitude during Climb with Icing is ambiguous *)
+  (alt_state = Low && phase = Climb && weather = Icing)
+
+(* Quorum for emergency disconnect (2 of 4 conditions) *)
+let check_emergency_disconnect health phase alt_state weather =
+  let c1 = (health = Failed) in
+  let c2 = (phase = Approach && alt_state = VeryLow) in
+  let c3 = (weather = Severe || weather = Icing) in
+  let c4 = (alt_state = VeryLow && health = Degraded) in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count >= 2
+
+(* Check if capability downgrade occurred *)
+let is_downgraded capability health =
+  match health, capability with
+  | Normal, (LimitedCapability | MinimalCapability) -> true
+  | Degraded, MinimalCapability -> true
+  | _, _ -> false
+
+(* Core autopilot mode decision *)
+let determine_ap_mode phase health alt_state weather =
+  (* Check dead zone first *)
+  let in_dead_zone = is_in_dead_zone alt_state phase weather in
+
+  if in_dead_zone then
+    { mode_allowed = false;
+      capability_level = MinimalCapability;
+      requires_copilot_monitor = false;
+      emergency_disconnect = false;
+      mode_downgraded = false }
+  else
+    (* Check phase compatibility *)
+    let phase_ok = phase_allows_ap phase in
+
+    if not phase_ok then
+      { mode_allowed = false;
+        capability_level = MinimalCapability;
+        requires_copilot_monitor = false;
+        emergency_disconnect = false;
+        mode_downgraded = false }
+    else
+      (* Check altitude-phase compatibility *)
+      let alt_ok = altitude_phase_compatible phase alt_state in
+
+      (* Determine capability level *)
+      let capability = determine_capability health weather in
+
+      (* Check copilot monitoring requirement *)
+      let needs_monitor = requires_monitoring phase weather health in
+
+      (* Check emergency disconnect (quorum) *)
+      let emergency = check_emergency_disconnect health phase alt_state weather in
+
+      (* Emergency disconnects AP regardless *)
+      let mode_allowed =
+        if emergency then false
+        else (alt_ok && health <> Failed)
+      in
+
+      let downgraded = is_downgraded capability health in
+
+      { mode_allowed = mode_allowed;
+        capability_level = capability;
+        requires_copilot_monitor = needs_monitor;
+        emergency_disconnect = emergency;
+        mode_downgraded = downgraded }
+
+(* Analysis 
+====================
+*)
+
+let ap_mode_scenarios = determine_ap_mode
+[@@decomp top ~prune:true ()]
+
+let approach_with_monitoring phase health alt_state weather =
+  let decision = determine_ap_mode phase health alt_state weather in
+  phase = Approach &&
+  decision.mode_allowed &&
+  decision.requires_copilot_monitor
+[@@decomp top ()]
+
+verify (fun phase health alt_state weather ->
+  let decision = determine_ap_mode phase health alt_state weather in
+
+  (health = Failed) ==> (not decision.mode_allowed)
+)

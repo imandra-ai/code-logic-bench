@@ -1,0 +1,631 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:41'
+  q1:
+    answer: 'There are 18 distinct HVAC control decision scenarios. The numeric thresholds
+      are: temp_diff values of 2, 3, 4; battery_level thresholds at 10%, 30%, 50%;
+      maintenance_hours at 9000 and 10000; power_consumption at 5000; occupancy states
+      (2); season states (2); and emergency states (3).'
+    reasoning: >-
+      - **Temperature classification thresholds**: temp_diff >= 4 (NEED level), temp_diff
+      >= 2 (MILD level), temp_diff < 2 (COMFORTABLE), temp_diff == 3 (dead zone)
+
+      - **Battery thresholds**: <10% (critical for fire alarm exception), <30% (energy
+      constraint), >=50% (maintenance mode exception)
+
+      - **Maintenance thresholds**: >10000 hours (fire alarm exception & override
+      flag), <9000 hours (maintenance mode exception)
+
+      - **Power threshold**: >5000 (energy constraint)
+
+      - **Occupancy**: EMPTY vs OCCUPIED (2 states)
+
+      - **Season**: SUMMER vs WINTER (2 states) - affects temp_diff interpretation
+
+      - **Emergency states**: NO_EMERGENCY, FIRE_ALARM, MAINTENANCE_MODE (3 states)
+
+      - **Scenario count derivation**: The 18 scenarios come from combinations of:
+        - Empty building: 1 scenario (always OFF regardless of other factors, unless
+      emergency overrides apply)
+        - Occupied + Summer: 3 temp classifications (COMFORTABLE <2, MILD_COOLING
+      ≥2, NEED_COOLING ≥4) × dead zone interaction
+        - Occupied + Winter: 3 temp classifications (COMFORTABLE <2, MILD_HEATING
+      ≥2, NEED_HEATING ≥4) × dead zone interaction
+        - Emergency overrides: 2 fire alarm outcomes (EMERGENCY or OFF), 2 maintenance
+      outcomes (OFF or VENTILATION)
+        - Energy downgrade: Applied when 2+ of 3 constraints are met
+      - The exact count considers that base modes (OFF, VENTILATION, HEATING, COOLING)
+      can be transformed through emergency logic and then energy constraints
+  q2:
+    answer: 'The system selects Emergency mode under these exact conditions: (1) FireAlarm
+      is active AND NOT (battery_level < 10 AND maintenance_hours > 10000). The emergency
+      override is PREVENTED (system goes to OFF instead) when: FireAlarm is active
+      AND battery_level < 10 AND maintenance_hours > 10000. Emergency mode is never
+      downgraded by energy constraints.'
+    reasoning: >-
+      - **Primary Emergency trigger**: emergency_state == EmergencyState.FIRE_ALARM
+
+      - **Sub-exception that prevents Emergency mode**: When FireAlarm is active BUT
+      battery_level < 10 AND maintenance_hours > 10000, the system returns OFF instead
+      of EMERGENCY
+
+      - **Emergency mode logic flow**:
+        - If FIRE_ALARM and (battery < 10 AND maint_hours > 10000): → OFF
+        - If FIRE_ALARM and NOT (battery < 10 AND maint_hours > 10000): → EMERGENCY
+      - **MAINTENANCE_MODE never produces Emergency**: It produces either OFF or VENTILATION
+      depending on battery ≥ 50 and maint_hours < 9000
+
+      - **NO_EMERGENCY never produces Emergency**: Returns the base_mode unchanged
+
+      - **Energy constraint protection**: Even when energy_constraint_count >= 2,
+      Emergency mode is never downgraded (explicit check: "if mode_after_emergency
+      == HVACMode.EMERGENCY: final_mode = HVACMode.EMERGENCY")
+
+      - **Complete Emergency scenarios**:
+        - EMERGENCY selected: FireAlarm + (battery ≥ 10 OR maint_hours ≤ 10000)
+        - OFF selected instead: FireAlarm + battery < 10 + maint_hours > 10000
+  q3:
+    answer: 'YES, the safety property can be violated. The violation occurs when:
+      FireAlarm is active AND battery_level < 10 AND maintenance_hours > 10000 AND
+      energy_constraint_count < 2. In this scenario, the system selects OFF mode and
+      sets requires_override=True, which technically satisfies "Off with manual override
+      required". However, if the override flag is not properly enforced externally,
+      the system is OFF during a fire alarm without actually being in Emergency mode.'
+    reasoning: >-
+      - **Safety property examined**: "During FireAlarm, system must either select
+      Emergency mode OR be Off with manual override required"
+
+      - **Critical edge case identified**: FireAlarm + battery < 10 + maint_hours
+      > 10000
+        - This triggers the fire alarm sub-exception: returns OFF instead of EMERGENCY
+        - The override flag logic: `override_needed = (final_mode == HVACMode.OFF
+      and emergency_state == EmergencyState.FIRE_ALARM) or (maintenance_hours > 10000
+      and emergency_state != EmergencyState.NO_EMERGENCY)`
+        - In this case: final_mode = OFF, emergency_state = FIRE_ALARM, maintenance_hours
+      > 10000
+        - Result: requires_override = True (both conditions in the OR are satisfied)
+      - **Property technically NOT violated**: The system does select OFF with requires_override=True,
+      which matches the safety requirement
+
+      - **However, potential semantic violation**: The property assumes "Off with
+      manual override required" is safe, but this relies on external enforcement of
+      the override flag
+
+      - **Boundary conditions to consider**:
+        - Exact threshold: battery_level = 10 (boundary - below triggers exception)
+        - Exact threshold: maintenance_hours = 10000 (boundary - above triggers exception)
+        - If battery = 9.99% and maint_hours = 10000.01, system goes OFF during fire
+      - **Energy constraint interaction**: Even if energy_constraint_count >= 2, since
+      the mode after emergency is already OFF (or EMERGENCY in normal fire cases),
+      energy downgrade doesn't change the outcome
+
+      - **Conclusion**: The property is technically satisfied because requires_override=True
+      is set, but the system's safety depends entirely on external enforcement of
+      this flag during a fire alarm when battery is critical and maintenance is severely
+      overdue
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:19'
+  q1:
+    answer: >-
+      There are distinct control decision scenarios determined by specific numeric
+      thresholds across temperature, battery, maintenance, and power consumption variables.
+      The specific numeric thresholds defining these scenarios are:
+
+
+      1.  **Temperature Differentials (temp_diff):**
+          *   **2.0**: Threshold for 'Mild' heating/cooling needs (Classifies as Mild
+      if 2 <= diff < 4).
+          *   **3.0**: Explicit "Dead Zone" threshold. Even if classified as 'Mild',
+      a differential of exactly 3.0 forces the base mode to **Ventilation** instead
+      of Heating or Cooling.
+          *   **4.0**: Threshold for 'Need' heating/cooling (Classifies as Need if
+      diff >= 4).
+
+      2.  **Battery Level (battery_level %):**
+          *   **10.0**: Critical threshold during Fire Alarms. (Below 10 forces OFF
+      if maintenance is also overdue).
+          *   **30.0**: Low battery threshold counting towards Energy Constraints.
+          *   **50.0**: Threshold during Maintenance Mode (Below 50 forces OFF).
+
+      3.  **Maintenance Hours (maintenance_hours):**
+          *   **9000**: Limit for periodic Maintenance Mode (Above 9000 forces OFF
+      during Maintenance Mode).
+          *   **10000**: Critical limit during Fire Alarms (Above 10000 forces OFF
+      if battery is also critical).
+
+      4.  **Power Consumption:**
+          *   **5000**: Threshold counting towards Energy Constraints.
+
+      5.  **Energy Constraints Count (Quorum):**
+          *   **2**: If 2 or more constraints are met (Low Battery, High Power, No
+      External Power), Heating/Cooling modes are downgraded to Ventilation.
+    reasoning: >-
+      - **Temperature Logic:** The `classify_temp_need` function establishes boundaries
+      at 2 and 4. The `determine_hvac_control` function (Step 2) introduces a specific
+      logic branch for `in_dead_zone(temp_diff)` which checks for equality to 3, creating
+      a distinct outcome (Ventilation) within the Mild range.
+
+      - **Emergency Logic:** `apply_emergency_mode` defines specific cutoffs. For
+      FireAlarm, the combination of `battery_level < 10` and `maintenance_hours >
+      10000` is the tipping point. For MaintenanceMode, `battery_level >= 50` and
+      `maintenance_hours < 9000` allows Ventilation; otherwise OFF.
+
+      - **Energy Logic:** The `count_energy_constraints` function uses `battery_level
+      < 30`, `power_consumption > 5000`, and `not external_power`. The `determine_hvac_control`
+      function (Step 4) triggers mode downgrades only when the sum of these conditions
+      is `>= 2`.
+  q2:
+    answer: >-
+      The system selects **Emergency** mode **only** when the `emergency_state` is
+      `FireAlarm`, provided that the system works within safe operational limits.
+
+
+      **Exact conditions for Emergency Mode:**
+
+      1.  **Primary Trigger:** `emergency_state` must be `EmergencyState.FIRE_ALARM`.
+
+      2.  **AND Operational Integrity Check:** The system must **NOT** be in a critical
+      state defined by the combination of critically low battery AND critically overdue
+      maintenance.
+
+
+      **Scenarios:**
+
+      *   **Active Emergency:** `emergency_state` is `FIRE_ALARM` **AND** `battery_level
+      >= 10`. (Maintenance hours irrelevant).
+
+      *   **Active Emergency:** `emergency_state` is `FIRE_ALARM` **AND** `maintenance_hours
+      <= 10000`. (Battery level irrelevant).
+
+
+      **Sub-cases where Emergency Override is Prevented (System goes OFF):**
+
+      The system will **failsafe to OFF** instead of Emergency mode if **all** the
+      following are true:
+
+      *   `emergency_state` is `FIRE_ALARM`.
+
+      *   `battery_level` is **< 10**.
+
+      *   `maintenance_hours` is **> 10000**.
+
+      (Note: Regular `MaintenanceMode` or `NoEmergency` states never result in `HVACMode.EMERGENCY`).
+    reasoning: >-
+      - **Code Path:** In `apply_emergency_mode`, the first block checks `if emergency_state
+      == EmergencyState.FIRE_ALARM`.
+
+      - **Constraint:** Inside this block, there is an `if/else` structure. The system
+      returns `HVACMode.OFF` specifically when `battery_level < 10` AND `maintenance_hours
+      > 10000`.
+
+      - **Default:** The `else` clause for the Fire Alarm block returns `HVACMode.EMERGENCY`.
+
+      - **Energy Constraints:** The energy constraint logic in `determine_hvac_control`
+      explicitly checks `if mode_after_emergency == HVACMode.EMERGENCY` and ensures
+      `final_mode` remains `HVACMode.EMERGENCY`. Thus, environmental factors cannot
+      downgrade the Emergency mode.
+
+      - **Other Modes:** Step 2 (Base mode calculation) only produces Off, Ventilation,
+      Heating, or Cooling. Only the Fire Alarm path introduces the Emergency enum.
+  q3:
+    answer: >-
+      **No, the safety property is never violated.** The system complies with the
+      request to either be in Emergency mode OR be Off with a manual override required
+      during a Fire Alarm under all defined logical paths.
+
+
+      **Analysis of potential violation vectors:**
+
+      1.  **Mode Selection:** The function `apply_emergency_mode` guarantees that
+      during a `FireAlarm`, the return value is strictly either `HVACMode.EMERGENCY`
+      or `HVACMode.OFF`. No other mode (Ventilation, Heating, Cooling) is accessible.
+
+      2.  **Mode Stability:** The energy constraint logic (Step 4) explicitly prevents
+      downgrading `HVACMode.EMERGENCY` and does not alter `HVACMode.OFF`, preserving
+      the safety decision.
+
+      3.  **Override Flag:** The code calculates `requires_override` with the logic:
+      `(final_mode == HVACMode.OFF and emergency_state == EmergencyState.FIRE_ALARM)`.
+      This is a direct tautology of the safety requirement's second clause. If the
+      system failsafes to `OFF` during a Fire Alarm (due to critical battery/maintenance),
+      this flag is automatically set to `True`.
+
+
+      Therefore, the condition "Mode is Emergency OR (Mode is Off AND Override Required)"
+      is mathematically guaranteed to be True during any Fire Alarm state.
+    reasoning: >-
+      - **Path 1 (Standard Fire Alarm):** `apply_emergency_mode` returns `EMERGENCY`.
+      The variable `final_mode` becomes `EMERGENCY`. The safety property "select Emergency
+      mode" is satisfied.
+
+      - **Path 2 (Critical Failure during Fire Alarm):** `apply_emergency_mode` returns
+      `OFF` (triggered by `battery < 10` and `maint > 10000`). `final_mode` becomes
+      `OFF`. The variable `requires_override` evaluates `(final_mode == HVACMode.OFF
+      and emergency_state == EmergencyState.FIRE_ALARM)`. Since both are true, `requires_override`
+      is `True`. The safety property "be Off with manual override required" is satisfied.
+
+      - **Downgrade Logic:** The code `if energy_constraint_count >= 2` includes a
+      specific check: `if mode_after_emergency == HVACMode.EMERGENCY: final_mode =
+      HVACMode.EMERGENCY`. This ensures external power/consumption issues do not violate
+      the safety property by downgrading Emergency to Ventilation.
+
+      - **Override Logic:** The override check has a fallback OR condition (`maintenance_hours
+      > 10000 ...`), but the primary condition specifically addresses the Fire Alarm
+      + OFF combination, ensuring the flag is always raised in that specific edge
+      case.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:21'
+  q1:
+    answer: >-
+      There are **10 distinct selected_mode decision scenarios** (piecewise regions)
+      in `determine_hvac_control`, determined by a small set of numeric cutoffs plus
+      enum branches.
+
+
+      **Numeric thresholds that define the scenarios**
+
+      - Temperature classification (occupied): **temp_diff ≥ 2**, **temp_diff ≥ 4**,
+      and the dead-zone point **temp_diff == 3**.
+
+      - Fire-alarm sub-exception: **battery_level < 10** AND **maintenance_hours >
+      10000**.
+
+      - Maintenance-mode sub-exception: **battery_level ≥ 50** AND **maintenance_hours
+      < 9000**.
+
+      - Energy constraints (3 binary tests): **battery_level < 30**, **power_consumption
+      > 5000**, **external_power == False**.
+
+      - Energy quorum threshold: **energy_constraint_count ≥ 2** (2-out-of-3).
+
+      - Override flag threshold: **maintenance_hours > 10000** (when emergency_state
+      != NoEmergency) and the special case (final_mode Off AND FireAlarm).
+
+
+      **Where the “10” comes from (selected_mode only)**
+
+      - `EmergencyState.FIRE_ALARM`: 2 scenarios (Emergency vs Off)
+
+      - `EmergencyState.MAINTENANCE_MODE`: 2 scenarios (Ventilation vs Off)
+
+      - `EmergencyState.NO_EMERGENCY`: 6 scenarios (base Off, base Vent, base Heat
+      with/without downgrade, base Cool with/without downgrade)
+    reasoning: >-
+      - The function’s control flow is a cascade: (1) temp_need classification → (2)
+      base_mode → (3) emergency override → (4) energy downgrade.
+
+      - Emergency overrides collapse many temperature/energy combinations into a small
+      number of outcomes:
+        - FireAlarm yields only {Emergency, Off}.
+        - MaintenanceMode yields only {Ventilation, Off}.
+      - Only in NoEmergency can Heating/Cooling survive, and even then they split
+      on the quorum rule (energy_constraint_count ≥ 2) into {Heating vs Ventilation}
+      or {Cooling vs Ventilation}.
+
+      - Thresholds are exactly those used in comparisons: 2, 4, ==3, <10, >10000,
+      ≥50, <9000, <30, >5000, and the quorum ≥2.
+  q2:
+    answer: >-
+      `Emergency` mode is selected **iff**:
+
+
+      1) **EmergencyState == FIRE_ALARM**, **and**
+
+      2) it is **not** the sub-exception case **(battery_level < 10 AND maintenance_hours
+      > 10000)**.
+
+
+      Equivalently:
+
+      - If `emergency_state == FIRE_ALARM` and (**battery_level ≥ 10** OR **maintenance_hours
+      ≤ 10000**) ⇒ `final_mode = EMERGENCY`.
+
+      - Energy constraints (even 3/3) **never** downgrade Emergency: if it reaches
+      Emergency after Step 3, it stays Emergency after Step 4.
+
+
+      **FireAlarm cases where Emergency is prevented**
+
+      - If `emergency_state == FIRE_ALARM` AND `battery_level < 10` AND `maintenance_hours
+      > 10000` ⇒ `final_mode = OFF` (not Emergency).
+    reasoning: >-
+      - `apply_emergency_mode()` unconditionally overrides the base mode when in FireAlarm:
+        - returns Off only in the strict conjunction (battery_level < 10) ∧ (maintenance_hours
+      > 10000).
+        - otherwise returns Emergency.
+      - Step 4 explicitly protects Emergency from energy downgrades (`if mode_after_emergency
+      == EMERGENCY: final_mode = EMERGENCY`).
+
+      - Boundary conditions are strict:
+        - battery_level == 10 does NOT satisfy <10 → Emergency.
+        - maintenance_hours == 10000 does NOT satisfy >10000 → Emergency.
+  q3:
+    answer: >-
+      No—**given valid enum inputs** (i.e., `emergency_state` is actually `EmergencyState.FIRE_ALARM`),
+      the safety property cannot be violated.
+
+
+      During FireAlarm, the code can only produce:
+
+      - `final_mode = EMERGENCY` (normal case), or
+
+      - `final_mode = OFF` with `requires_override = True` (the battery-critical +
+      maintenance-overdue sub-exception).
+
+
+      So the property “During FireAlarm, must either be Emergency OR be Off with manual
+      override required” is always satisfied.
+
+
+      **Potential violation only outside the model’s type assumptions**
+
+      - If `emergency_state` is not the enum value `EmergencyState.FIRE_ALARM` at
+      runtime (e.g., a stray string "FireAlarm" or `None`), then `apply_emergency_mode()`
+      may fall through to the NoEmergency path and return a non-emergency/non-off
+      mode, which would violate the property. This is a type/validation issue, not
+      a violation under the stated model.
+    reasoning: >-
+      - In FireAlarm, `apply_emergency_mode()` outputs only Emergency or Off.
+
+      - The energy-saving downgrade stage preserves Emergency and never upgrades Off
+      to something else.
+
+      - When FireAlarm forces Off (battery_level < 10 and maintenance_hours > 10000),
+      `requires_override` is guaranteed True because `(final_mode == OFF and emergency_state
+      == FIRE_ALARM)` is True.
+
+      - Boundary checks are strict but still safe:
+        - battery_level == 10 or maintenance_hours == 10000 → Emergency (property
+      satisfied).
+        - NaN comparisons tend to make the Off-exception condition false, yielding
+      Emergency (still satisfies property).
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:23'
+  q1:
+    answer: 'There are 10 distinct HVAC control decision scenarios that correspond
+      to the 5 possible selected modes (Off, Ventilation, Heating, Cooling, Emergency),
+      each potentially with or without a required manual override, depending on conditions.
+      The exact numeric thresholds that determine these scenarios are the values used
+      in the code''s conditional logic: 2 and 4 for temperature differential boundaries,
+      3 for dead zone, 10 and 50 for battery level, 5000 for power consumption, and
+      9000 and 10000 for maintenance hours.'
+    reasoning: >-
+      - The determination of HVAC mode involves discrete thresholds that split input
+      ranges into intervals leading to different behaviors (e.g., temp_diff has intervals:
+      <2, [2,3), 3, (3,4], >=4 affecting temp_need and base_mode).
+
+      - After base_mode determination, emergency overrides and energy constraints
+      modify the mode, with thresholds splitting battery_level into <10, [10,30),
+      [30,50), >=50; power_consumption into <=5000, >5000; maintenance_hours into
+      <9000, >=9000; and energy quorum at 2+ constraints.
+
+      - There are exactly 5 modes currently selectable, but combines with override
+      requirements (true/false) yield 10 distinct WR output configurations (Decision
+      objects).
+
+      - Reasoning for 10: Mode determines fan_speed fixedly, region enum and override
+      add variation per mode based on emergency_state and maintenance_hours.
+  q2:
+    answer: The system selects Emergency mode when emergency_state is EmergencyState.FIRE_ALARM
+      and the sub-exception does not apply (i.e., it is not the case that battery_level
+      < 10 and maintenance_hours > 10000). The emergency override is active in all
+      cases when emergency_state is EmergencyState.FIRE_ALARM, and it is prevented
+      (with OFF selected instead) when battery_level < 10 and maintenance_hours >
+      10000.
+    reasoning: >-
+      - Emergency mode is only set in apply_emergency_mode when emergency_state ==
+      EmergencyState.FIRE_ALARM and the condition for the sub-exception (battery_level
+      < 10 and maintenance_hours > 10000) is false.
+
+      - Sub-exception - prevents override if both critical battery (battery_level
+      < 10) and overdue maintenance (maintenance_hours > 10000) occur simultaneously,
+      forcing OFF instead of Emergency.
+
+      - No other emergency_states (e.g., NO_EMERGENCY, MAINTENANCE_MODE) trigger Emergency
+      mode.
+  q3:
+    answer: The safety property is never violated. Under all conditions where emergency_state
+      is EmergencyState.FIRE_ALARM, the system selects either Emergency mode or OFF
+      mode, and when OFF is selected, requires_override is True. No edge cases or
+      boundary conditions exist where a different mode (e.g., Ventilation, Heating,
+      or Cooling) could be selected during FireAlarm, as the system always overrides
+      based on the FireAlarm state to Emergency or OFF.
+    reasoning: >-
+      - During FireAlarm, apply_emergency_mode forces final_mode to EMERGENCY unless
+      battery_level < 10 and maintenance_hours > 10000, in which case it sets to OFF,
+      then energy constraints do not downgrade EMERGENCY, and OFF stays OFF.
+
+      - For OFF, override_needed includes (final_mode == OFF and emergency_state ==
+      EmergencyState.FIRE_ALARM), so requires_override is always True.
+
+      - For EMERGENCY, override_needed can be True if maintenance_hours > 10000, but
+      the property only requires it for OFF, not prohibiting it for EMERGENCY.
+
+      - Boundary/edge conditions like battery_level exactly 10 (not <10, selects EMERGENCY),
+      maintenance_hours exactly 10000 (not >10000, selects EMERGENCY), or high energy
+      constraints do not cause violation since EMERGENCY is preserved and only EMERGENCY
+      or OFF is set.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:45'
+  q1:
+    answer: >-
+      There are approximately 12-15 distinct HVAC control decision scenarios based
+      on the following numeric thresholds:
+
+
+      **Temperature Thresholds:**
+
+      - temp_diff < 2: Comfortable (no action needed beyond ventilation)
+
+      - temp_diff >= 2 and < 4: Mild Heating/Cooling zone
+
+      - temp_diff == 3: Dead zone (special case within mild zone, forces Ventilation)
+
+      - temp_diff >= 4: Need Heating/Cooling (active climate control)
+
+
+      **Battery Level Thresholds:**
+
+      - battery_level < 10: Critical battery (emergency sub-exception trigger)
+
+      - battery_level < 30: Energy constraint trigger
+
+      - battery_level >= 50: Allows Ventilation during maintenance mode
+
+
+      **Power Consumption Threshold:**
+
+      - power_consumption > 5000: Energy constraint trigger
+
+
+      **Maintenance Hours Thresholds:**
+
+      - maintenance_hours > 10000: Critical maintenance overdue (emergency sub-exception)
+
+      - maintenance_hours < 9000: Allows Ventilation during maintenance mode
+
+
+      **Energy Constraint Quorum:**
+
+      - 0-1 constraints: Normal operation
+
+      - 2-3 constraints: Downgrade Heating/Cooling to Ventilation
+    reasoning: >-
+      - The system classifies temperature needs using thresholds: temp_diff >= 4 (Need
+      Heating/Cooling), temp_diff >= 2 (Mild), temp_diff < 2 (Comfortable)
+
+      - Dead zone check: temp_diff == 3 exactly triggers special ventilation behavior
+
+      - Battery thresholds: < 10 (critical for emergency override), < 30 (energy constraint),
+      >= 50 (maintenance exception)
+
+      - Power consumption threshold: > 5000 triggers energy constraint
+
+      - Maintenance hours: > 10000 (critical, forces Off during fire alarm), < 9000
+      (allows ventilation during maintenance)
+
+      - Energy constraints use quorum: 2 out of 3 conditions (battery < 30, power
+      > 5000, no external power) triggers mode downgrade
+
+      - Scenarios branch based on: occupancy (Empty vs Occupied), season (Summer vs
+      Winter), emergency state (3 values), and combinations of energy constraints
+  q2:
+    answer: >-
+      **Emergency mode is selected when:**
+
+      1. emergency_state == FireAlarm AND NOT (battery_level < 10 AND maintenance_hours
+      > 10000)
+         - This means: Fire alarm active with either battery >= 10% OR maintenance_hours
+      <= 10000
+
+      **Emergency override is PREVENTED (system goes to Off instead) when:**
+
+      1. emergency_state == FireAlarm AND battery_level < 10 AND maintenance_hours
+      > 10000
+         - Critical battery combined with severely overdue maintenance forces Off
+      even during fire alarm
+         - This is the sub-exception where safety systems are considered unreliable
+
+      **Important notes:**
+
+      - Emergency mode is NEVER downgraded by energy constraints (explicitly protected
+      in Step 4)
+
+      - Emergency mode only comes from FireAlarm state; MaintenanceMode results in
+      Off or Ventilation, not Emergency
+
+      - When Emergency mode is active, fan_speed is set to 100 (maximum)
+    reasoning: >-
+      - Emergency mode selection happens in apply_emergency_mode() function
+
+      - FireAlarm state: Normally forces Emergency mode
+
+      - Sub-exception: If battery_level < 10 AND maintenance_hours > 10000, system
+      goes to Off instead of Emergency
+
+      - The logic is: critical battery + severely overdue maintenance = safety systems
+      unreliable, so shut down
+
+      - MaintenanceMode state: Forces Off, with exception allowing Ventilation if
+      battery >= 50 and maintenance_hours < 9000
+
+      - NoEmergency state: Returns the base_mode unchanged
+
+      - Energy constraints (Step 4) explicitly preserve Emergency mode: "Never downgrade
+      emergency"
+
+      - Emergency mode is protected from the 2+ energy constraint downgrade that affects
+      Heating/Cooling modes
+  q3:
+    answer: >-
+      **The safety property is NEVER violated.**
+
+
+      The property states: "During FireAlarm, the system must either select Emergency
+      mode OR be Off with manual override required."
+
+
+      Analysis of all FireAlarm scenarios:
+
+
+      **Scenario 1: FireAlarm with battery_level >= 10 OR maintenance_hours <= 10000**
+
+      - Result: Emergency mode selected
+
+      - Property satisfied: System is in Emergency mode ✓
+
+
+      **Scenario 2: FireAlarm with battery_level < 10 AND maintenance_hours > 10000**
+
+      - Result: Off mode selected
+
+      - override_needed check: `(final_mode == HVACMode.OFF and emergency_state ==
+      EmergencyState.FIRE_ALARM)` evaluates to True
+
+      - Result: Off with requires_override = True
+
+      - Property satisfied: System is Off with manual override required ✓
+
+
+      **Edge cases verified:**
+
+      - Energy constraints cannot downgrade Emergency mode (explicitly protected)
+
+      - The override flag logic specifically handles the FireAlarm + Off case
+
+      - No boundary conditions allow FireAlarm to result in Ventilation, Heating,
+      or Cooling
+
+      - The sub-exception (critical battery + overdue maintenance) properly sets override
+      flag
+
+
+      The system design correctly implements the safety property with no violations
+      possible.
+    reasoning: >-
+      - The safety property requires: FireAlarm → (Emergency mode OR (Off mode AND
+      requires_override))
+
+      - Analyzing apply_emergency_mode for FireAlarm state:
+        - Default: Returns Emergency mode
+        - Exception: If battery_level < 10 AND maintenance_hours > 10000, returns
+      Off
+      - When FireAlarm results in Emergency: Energy constraints check (Step 4) explicitly
+      states "Never downgrade emergency" - Emergency mode is preserved
+
+      - When FireAlarm results in Off (sub-exception): The override_needed calculation
+      includes the condition `(final_mode == HVACMode.OFF and emergency_state == EmergencyState.FIRE_ALARM)`
+      which would be True
+
+      - Additionally, override_needed has condition `(maintenance_hours > 10000 and
+      emergency_state != EmergencyState.NO_EMERGENCY)` which would also be True in
+      this case
+
+      - Both paths during FireAlarm satisfy the safety property
+
+      - No edge cases found where FireAlarm could result in Ventilation, Heating,
+      or Cooling modes
+
+      - The dead zone logic only affects base_mode before emergency override is applied
+
+      - Energy constraints only downgrade Heating/Cooling to Ventilation, never affect
+      Emergency mode

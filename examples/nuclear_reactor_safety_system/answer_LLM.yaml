@@ -1,0 +1,863 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:46'
+  q1:
+    answer: 7,714
+    reasoning: >-
+      - The context explicitly states: "This creates exponential complexity: 7,714
+      distinct scenarios with multiple shadowed code branches that look reachable
+      but are mathematically impossible."
+
+      - The exact numeric thresholds that determine these scenarios are: TEMP_THRESHOLD_MODERATE
+      = 550, TEMP_THRESHOLD_HIGH = 620, TEMP_THRESHOLD_CRITICAL = 650, PRESSURE_THRESHOLD_MODERATE
+      = 2200, PRESSURE_THRESHOLD_HIGH = 2400, PRESSURE_THRESHOLD_CRITICAL = 2500,
+      FLUX_THRESHOLD_HIGH = 103, FLUX_THRESHOLD_CRITICAL = 105, RADIATION_THRESHOLD_HIGH
+      = 80, RADIATION_THRESHOLD_CRITICAL = 100, XENON_THRESHOLD_HIGH = 25, and additional
+      thresholds like temperature ≥ 640, pressure ≥ 2450 for special combinations.
+  q2:
+    answer: 'The system initiates automatic SCRAM when the function should_initiate_scram
+      returns True, which depends on the final recommended state after apply_operator_override,
+      safety system status, xenon level, and time since last SCRAM. Specifically:
+      if final_state is EMERGENCY_SHUTDOWN and status is not FAILED; or HOT_STANDBY
+      and status DEGRADED; or POWER_OPERATION with status OPERATIONAL and (time <6hrs
+      and xenon >=25) or status DEGRADED and time <12hrs.'
+    reasoning: >-
+      - The logic starts with classify_severity to get base_state based on parameter
+      thresholds and quorum logic (critical_count >=2 or special cases).
+
+      - Then apply_operator_override to get final_state, which can change based on
+      override type and additional conditions like time, xenon, control rods, etc.
+      Overrides generally respect EMERGENCY_SHUTDOWN unless specific exceptions (e.g.,
+      DELAY_SCRAM with recent SCRAM, low xenon, high rods).
+
+      - SCRAM initiation then checks the final_state and other parameters, with operator
+      overrides potentially allowing non-SCRAM states even in severe conditions, forming
+      a nested structure where overrides can bypass but are constrained by safety
+      checks.
+  q3:
+    answer: Yes, the safety property can be violated under conditions where temperature
+      ≥650°C does not lead to SCRAM despite the safety system being operational.
+    reasoning: >-
+      - Violations occur if the critical temperature does not result in.final_state
+      = EMERGENCY_SHUTDOWN, e.g., if critical_count >=2 is not met (e.g., other critical
+      conditions are false), and instead final_state is HOT_STANDBY, which does not
+      trigger SCRAM when operational.
+
+      - Operator overrides can change final_state to something not triggering SCRAM,
+      even if base_state was EMERGENCY_SHUTDOWN (unless strict conditions are met
+      for override like time since scram <6hrs, xenon <15, control rods ≥85%).
+
+      - Dead zone makes response invalid, thus no SCRAM.
+
+      - Safety system not operational (FAILED): no SCRAM even at critical temp.
+
+      - Edge cases or boundary conditions: Exactly at thresholds (e.g., temp=650 exactly),
+      or combinations where overrides apply (e.g., marginal conditions plus high rods
+      for DELAY_SCRAM).
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:53'
+  q1:
+    answer: >-
+      The system has 7,714 distinct safety response scenarios as stated in the description.
+      The exact numeric thresholds are:
+
+
+      **Temperature (°C):** 550 (moderate), 620 (high), 650 (critical), with dead
+      zone at 618-622
+
+      **Pressure (PSI):** 2200 (moderate), 2400 (high), 2500 (critical), with dead
+      zone at 2390-2410
+
+      **Neutron Flux (% nominal):** 103 (high), 105 (critical)
+
+      **Radiation (mR/hr):** 80 (high), 100 (critical)
+
+      **Xenon Poisoning:** 25 (high), 30 (extreme for dead zone)
+
+      **Control Rod Insertion (%):** 70 (adequate), 85 (very adequate)
+
+      **Time Since Last SCRAM (hours):** 6 (recent threshold), 12 (extended recent
+      threshold)
+
+
+      **Additional threshold combinations:**
+
+      - Temperature ≥640 AND Pressure ≥2450 triggers emergency shutdown
+
+      - Pressure <2000 enables critical temperature bypass
+
+      - Pressure <1500 prevents containment isolation
+
+      - Pressure ≥1500 required for containment isolation
+
+      - Xenon <15 enables delayed SCRAM override
+
+      - Temperature <550 AND Pressure <2200 enables maintenance mode
+
+      - Xenon ≥25 modifies ECCS threshold to 620°C (650-30)
+    reasoning: >-
+      - The description explicitly states "7,714 distinct scenarios"
+
+      - Extracted all numeric thresholds from constants and conditional logic
+
+      - Temperature thresholds: TEMP_THRESHOLD_MODERATE=550, TEMP_THRESHOLD_HIGH=620,
+      TEMP_THRESHOLD_CRITICAL=650
+
+      - Dead zone boundaries calculated from threshold ±2 for temp, ±10 for pressure
+
+      - Pressure thresholds: PRESSURE_THRESHOLD_MODERATE=2200, PRESSURE_THRESHOLD_HIGH=2400,
+      PRESSURE_THRESHOLD_CRITICAL=2500
+
+      - Neutron flux: FLUX_THRESHOLD_HIGH=103, FLUX_THRESHOLD_CRITICAL=105
+
+      - Radiation: RADIATION_THRESHOLD_HIGH=80, RADIATION_THRESHOLD_CRITICAL=100
+
+      - Xenon: XENON_THRESHOLD_HIGH=25, plus 30 threshold for extreme condition
+
+      - Control rod insertion: 70% and 85% thresholds in apply_operator_override
+
+      - Time since SCRAM: 6 hours and 12 hours thresholds
+
+      - Special combination thresholds found in classify_severity (640°C, 2450 PSI)
+      and apply_operator_override (2000 PSI, 1500 PSI)
+
+      - ECCS xenon interaction: when xenon ≥25, ECCS threshold becomes 650-30=620°C
+  q2:
+    answer: >-
+      Automatic SCRAM is initiated when `should_initiate_scram()` returns True, which
+      occurs under these conditions:
+
+
+      **Primary SCRAM Trigger (EmergencyShutdown state):**
+
+      - Recommended state = EMERGENCY_SHUTDOWN **AND** Safety system status = OPERATIONAL
+      → SCRAM = True
+
+      - Recommended state = EMERGENCY_SHUTDOWN **AND** Safety system status = DEGRADED
+      → SCRAM = True
+
+      - Recommended state = EMERGENCY_SHUTDOWN **AND** Safety system status = FAILED
+      → SCRAM = False (cannot SCRAM)
+
+
+      **Secondary SCRAM Trigger (HotStandby state):**
+
+      - Recommended state = HOT_STANDBY **AND** Safety system status = DEGRADED →
+      SCRAM = True
+
+      - Recommended state = HOT_STANDBY **AND** Safety system status = OPERATIONAL
+      → SCRAM = False
+
+
+      **Tertiary SCRAM Trigger (PowerOperation state):**
+
+      - Recommended state = POWER_OPERATION **AND** Safety system status = OPERATIONAL
+      **AND** time_since_last_scram < 6 **AND** xenon_level ≥ 25 → SCRAM = True
+
+      - Recommended state = POWER_OPERATION **AND** Safety system status = DEGRADED
+      **AND** time_since_last_scram < 12 → SCRAM = True
+
+
+      **Operator Override Interactions:**
+
+      Operator overrides can modify the recommended_state BEFORE SCRAM evaluation,
+      effectively preventing or enabling SCRAM indirectly. The override types cannot
+      directly prevent SCRAM once the final state is determined.
+    reasoning: >-
+      - Analyzed `should_initiate_scram()` function systematically
+
+      - SCRAM decision depends on three inputs: recommended_state, safety_system_status,
+      xenon_level, time_since_last_scram
+
+      - EMERGENCY_SHUTDOWN state triggers SCRAM when system is OPERATIONAL or DEGRADED
+      but NOT when FAILED
+
+      - HOT_STANDBY state only triggers SCRAM when system is DEGRADED (conservative
+      approach)
+
+      - POWER_OPERATION state has two SCRAM paths: operational system with recent
+      SCRAM + high xenon, or degraded system with recent SCRAM
+
+      - Operator overrides work by modifying the recommended_state through `apply_operator_override()`
+      before SCRAM decision
+
+      - DELAY_SCRAM override can prevent EMERGENCY_SHUTDOWN state under specific conditions
+      (marginal conditions, adequate rods, or recent SCRAM with low xenon and very
+      adequate rods)
+
+      - SUPPRESS_ALARM forces SHUTDOWN state unless base state is EMERGENCY_SHUTDOWN
+
+      - BYPASS_INTERLOCK can change HOT_STANDBY to POWER_OPERATION
+
+      - MAINTENANCE_MODE forces SHUTDOWN unless base state is EMERGENCY_SHUTDOWN
+
+      - Logical structure is disjunctive normal form (OR of AND conditions) organized
+      by state priority
+  q3:
+    answer: >-
+      YES, the safety property can be violated under these exact conditions:
+
+
+      **Violation Condition 1 - Safety System Failed:**
+
+      Temperature ≥ 650°C **AND** Safety system status = FAILED
+
+      - Even though temperature is critical, SCRAM cannot be initiated when safety
+      system has failed
+
+      - The system returns initiate_scram = False
+
+
+      **Violation Condition 2 - Measurement Dead Zone:**
+
+      Temperature ≥ 650°C **AND** Temperature in range [618, 622] **AND** Pressure
+      in range [2390, 2410]
+
+      - Dead zone check returns response_valid = False with initiate_scram = False
+
+      - SCRAM is not initiated even though temperature may be ≥650°C
+
+
+      **Violation Condition 3 - Xenon Dead Zone:**
+
+      Temperature ≥ 650°C **AND** Temperature in range [618, 622] **AND** Xenon >
+      30 **AND** Pressure ≥ 2400
+
+      - Alternative dead zone path prevents valid response
+
+
+      **Edge Case - Boundary Condition:**
+
+      Temperature = exactly 650.0°C at the dead zone boundary (618-622 range is impossible
+      since 650 > 622)
+
+      - However, if temperature sensors have uncertainty and read in dead zone while
+      actual temperature ≥650°C, violation occurs
+
+
+      **Critical Analysis:**
+
+      The most realistic violation is Condition 1 (FAILED system). Condition 2 has
+      a logical impossibility: temperature cannot simultaneously be ≥650 AND in range
+      [618,622]. The dead zone check happens BEFORE classification, so if readings
+      appear in dead zone (possibly due to sensor malfunction), critical temperature
+      may not trigger SCRAM.
+    reasoning: >-
+      - Traced execution path when temperature ≥ 650°C through `determine_safety_response()`
+
+      - When temp ≥ 650°C, `classify_severity()` sets temp_critical = True
+
+      - With temp_critical = True, critical_count ≥ 1, typically leading to EMERGENCY_SHUTDOWN
+      or HOT_STANDBY state
+
+      - With 2+ critical conditions, state = EMERGENCY_SHUTDOWN guaranteed
+
+      - EMERGENCY_SHUTDOWN state triggers SCRAM in `should_initiate_scram()` UNLESS
+      safety_system_status = FAILED
+
+      - Found violation: when SafetySystemStatus.FAILED, the function returns False
+      (line: "return False # Cannot SCRAM if system failed")
+
+      - Second violation path: `is_in_measurement_dead_zone()` returns True, causing
+      early return with response_valid=False and initiate_scram=False
+
+      - Dead zone requires: temp in [618, 622] AND pressure in [2390, 2410], OR xenon>30
+      AND temp in [618, 622] AND pressure ≥2400
+
+      - Logical impossibility: temp cannot be both ≥650 AND in [618, 622] simultaneously
+
+      - However, dead zone check uses raw sensor readings which could be erroneous/ambiguous
+
+      - If sensor reads in dead zone while actual temp ≥650, SCRAM won't trigger
+
+      - No operator override can prevent SCRAM when state is EMERGENCY_SHUTDOWN (all
+      overrides return base_state for EMERGENCY_SHUTDOWN except one narrow exception)
+
+      - The DELAY_SCRAM override has exception for recent SCRAM + low xenon + very
+      adequate rods, but requires temp < 650 (conditions_marginal check)
+
+      - Conclusion: Property violated when system FAILED or when in measurement dead
+      zone
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:07'
+  q1:
+    answer: There are 4 distinct base severity states (Operational, Hot Standby, Shutdown,
+      Emergency Shutdown) determined by a complex combination of 6 key numeric parameters
+      and 2 count variables.
+    reasoning: >-
+      **Numeric Thresholds:**
+
+      *   **Temperature:** Moderate (550), High (620), Critical (650), Special Trigger
+      (640).
+
+      *   **Pressure:** Moderate (2200), High (2400), Critical (2500), Special Trigger
+      (2450), Low/Interlock (2000, 1500).
+
+      *   **Neutron Flux:** High (103), Critical (105).
+
+      *   **Radiation:** High (80), Critical (100).
+
+      *   **Xenon Level:** High (25), Override Limit (15), Dead Zone (30).
+
+      *   **Time Since SCRAM:** Severity Context (<12), Override Limit (<6).
+
+
+      **Logic Scenarios:**
+
+      The `classify_severity` function creates scenarios based on `critical_count`
+      (params ≥ Critical) and `high_count` (params ≥ High):
+
+      1.  **Emergency Shutdown:** `critical_count ≥ 2` OR (`time < 12` AND `critical_count
+      ≥ 1` AND `xenon ≥ 25`) OR (`temp ≥ 640` AND `pressure ≥ 2450`) OR (`critical_count
+      ≥ 1` AND `high_count ≥ 4`).
+
+      2.  **Hot Standby:** `critical_count ≥ 1` OR `high_count ≥ 3`.
+
+      3.  **Power Operation:** `high_count ≥ 1`.
+
+      4.  **Shutdown:** All counts 0.
+  q2:
+    answer: Automatic SCRAM is initiated based on the Final Reactor State (after operator
+      overrides) combined with the Safety System Status, functioning on a matrix of
+      logic rather than a single trigger.
+    reasoning: >-
+      **1. Emergency Shutdown State:**
+
+      *   SCRAM initiates if Safety System Status is `OPERATIONAL` or `DEGRADED`.
+
+      *   SCRAM fails if Status is `FAILED`.
+
+
+      **2. Hot Standby State:**
+
+      *   SCRAM initiates **only** if Safety System Status is `DEGRADED`. (If `OPERATIONAL`,
+      the system trusts the standby state without SCRAM).
+
+
+      **3. Power Operation State:**
+
+      *   If `OPERATIONAL`: SCRAM initiates only if `time_since_scram < 6` AND `xenon_level
+      ≥ 25`.
+
+      *   If `DEGRADED`: SCRAM initiates if `time_since_scram < 12`.
+
+
+      **Operator Override Interactions:**
+
+      *   **DELAY_SCRAM:** Can downgrade an `EMERGENCY_SHUTDOWN` condition to `HOT_STANDBY`
+      (preventing SCRAM if system is Operational) if `time < 6` and `xenon < 15`.
+      It can also downgrade marginal conditions to `POWER_OPERATION`.
+
+      *   **BYPASS_INTERLOCK:** Can force `POWER_OPERATION` (preventing SCRAM) even
+      with Critical Temperature if `pressure < 2000`.
+  q3:
+    answer: Yes, the safety property is violated. A Critical Temperature (≥650°C)
+      does NOT guarantee a SCRAM.
+    reasoning: >-
+      **Violation 1: Quorum Logic (Single Point Failure)**
+
+      *   The `classify_severity` logic requires `critical_count ≥ 2` (or specific
+      complex contexts) to trigger `EMERGENCY_SHUTDOWN`.
+
+      *   If Temperature is 660°C (Critical) but all other parameters are normal (Pressure,
+      Flux, Radiation below High), `critical_count` is 1.
+
+      *   The system classifies this as `HOT_STANDBY`.
+
+      *   If the system is `OPERATIONAL`, `should_initiate_scram(HOT_STANDBY)` returns
+      **False**.
+
+
+      **Violation 2: Interlock Bypass Override**
+
+      *   If `temperature ≥ 650` (Critical) but `pressure < 2000`, the Operator Override
+      `BYPASS_INTERLOCK` explicitly forces the state to `POWER_OPERATION`.
+
+      *   `should_initiate_scram(POWER_OPERATION)` returns **False** (assuming time
+      > 6 or xenon low).
+
+
+      **Violation 3: Delay SCRAM Override**
+
+      *   Even if `EMERGENCY_SHUTDOWN` is triggered (e.g., Temp ≥ 650 + Pressure ≥
+      2500), if `override_type` is `DELAY_SCRAM`, `time_since_last_scram < 6`, and
+      `xenon_level < 15`, the state is forced to `HOT_STANDBY`.
+
+      *   As established, `HOT_STANDBY` does not trigger SCRAM when `OPERATIONAL`.
+
+
+      **Violation 4: System Failure**
+
+      *   If `safety_system_status` is `FAILED`, `should_initiate_scram` always returns
+      `False`, regardless of critical temperature.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:18'
+  q1:
+    answer: 'The code path space is described as **7,714 distinct scenarios** (per
+      the model’s own complexity note). These scenarios are partitioned primarily
+      by: (a) dead‑zone validity vs valid processing, (b) severity classification
+      into 4 ReactorState values, (c) 5 operator override modes with nested exceptions,
+      and (d) 3 safety-system-status modes that affect action outputs (SCRAM/ECCS/containment).'
+    reasoning: >-
+      - The prompt explicitly states: “**7,714 distinct scenarios** … with multiple
+      shadowed code branches”.
+
+      - determine_safety_response has a hard split: **invalid (dead zone)** returns
+      immediately vs **valid** continues.
+
+      - Valid path combines: classify_severity (multi-parameter, time- and xenon-dependent),
+      apply_operator_override (override-type-dependent), then action rules (SCRAM/ECCS/containment
+      depend on final_state + status + time/xenon/radiation/pressure).
+
+      - Exact numeric thresholds used to define/partition scenarios:
+        - Temperature thresholds:
+          - Moderate: **550°C** (TEMP_THRESHOLD_MODERATE)
+          - High: **620°C** (TEMP_THRESHOLD_HIGH)
+          - Critical: **650°C** (TEMP_THRESHOLD_CRITICAL)
+          - Special EmergencyShutdown combo requires **temperature ≥ 640°C** (in addition
+      to temp_high)
+          - Dead-zone temperature ambiguity band: **618–622°C** (620±2)
+        - Pressure thresholds:
+          - Moderate: **2200 PSI** (PRESSURE_THRESHOLD_MODERATE)
+          - High: **2400 PSI** (PRESSURE_THRESHOLD_HIGH)
+          - Critical: **2500 PSI** (PRESSURE_THRESHOLD_CRITICAL)
+          - Special EmergencyShutdown combo requires **pressure ≥ 2450 PSI** (and
+      pressure_high)
+          - Dead-zone pressure ambiguity band: **2390–2410 PSI** (2400±10)
+          - Override/containment additional pressure cutoffs:
+            - “pressure is low” for BYPASS_INTERLOCK: **< 2000 PSI** (but the critical-temp
+      bypass branch is unreachable)
+            - “very low” containment compromise: **< 1500 PSI** blocks containment
+      isolation
+        - Neutron flux thresholds:
+          - High: **≥103%** (FLUX_THRESHOLD_HIGH)
+          - Critical: **≥105%** (FLUX_THRESHOLD_CRITICAL)
+        - Radiation thresholds:
+          - High: **≥80 mR/hr** (RADIATION_THRESHOLD_HIGH)
+          - Critical: **≥100 mR/hr** (RADIATION_THRESHOLD_CRITICAL)
+        - Xenon thresholds:
+          - High poisoning: **≥25** (XENON_THRESHOLD_HIGH)
+          - “Extreme” used in dead-zone logic: **>30** (xenon_extreme)
+          - Delay-scram exception uses **xenon < 15** (but is unreachable due to prior
+      condition ordering)
+        - Time-since-last-SCRAM thresholds:
+          - “recent_scram” in severity: **< 12 hours**
+          - In SCRAM actuation logic:
+            - For PowerOperation+Operational: SCRAM if **< 6 hours** AND xenon **≥25**
+            - For PowerOperation+Degraded: SCRAM if **< 12 hours**
+          - In operator override logic: **< 6 hours** appears in unreachable EmergencyShutdown-delay
+      attempt
+        - Control rod insertion thresholds (operator DELAY_SCRAM):
+          - “adequate”: **≥70%**
+          - “very adequate”: **≥85%** (also in unreachable EmergencyShutdown-delay
+      attempt)
+  q2:
+    answer: >-
+      Automatic SCRAM is initiated **only by should_initiate_scram(final_state, safety_system_status,
+      xenon, time)** after validity checks and operator overrides. In logical form:
+
+
+      1) If the response is invalid (measurement dead zone): **SCRAM = False**.
+
+
+      2) Otherwise, compute base_state via classify_severity, then final_state via
+      apply_operator_override, then:
+
+
+      - **If final_state == EMERGENCY_SHUTDOWN**:
+        - SCRAM = True when status is **OPERATIONAL or DEGRADED**
+        - SCRAM = False when status is **FAILED**
+
+      - **If final_state == HOT_STANDBY**:
+        - SCRAM = True only when status is **DEGRADED**
+        - SCRAM = False when status is **OPERATIONAL** (and also False for FAILED
+      by fall-through)
+
+      - **If final_state == POWER_OPERATION**:
+        - If status == OPERATIONAL: SCRAM = (**time_since_last_scram < 6** AND **xenon_level
+      ≥ 25**)
+        - If status == DEGRADED: SCRAM = (**time_since_last_scram < 12**)
+        - If status == FAILED: SCRAM = False (fall-through)
+
+      - **If final_state == SHUTDOWN**: SCRAM = False.
+
+
+      Operator overrides affect SCRAM only indirectly by changing base_state→final_state;
+      however, overrides cannot actually suppress an EMERGENCY_SHUTDOWN classification
+      in this code (the attempted EmergencyShutdown-delay and critical-temp bypass
+      exception branches are unreachable due to earlier returns).
+    reasoning: >-
+      - Gate 0 (validity): determine_safety_response returns immediately with initiate_scram=False
+      when is_in_measurement_dead_zone(...) is True.
+
+      - Severity → base_state (classify_severity) defines when EMERGENCY_SHUTDOWN
+      is even possible:
+        - Define critical flags: temp≥650, pressure≥2500, flux≥105, radiation≥100;
+      let critical_count be their sum.
+        - EMERGENCY_SHUTDOWN when any of the following holds:
+          - (A) **critical_count ≥ 2**
+          - (B) (**time_since_last_scram < 12**) AND (**critical_count ≥ 1**) AND
+      (**xenon ≥ 25**)
+          - (C) (**temperature ≥ 640**) AND (**pressure ≥ 2450**) AND (also temp_high≥620
+      and pressure_high≥2400, implied)
+          - (D) A written condition “critical_count≥1 and high_count≥4” is commented
+      as unreachable and is indeed shadowed by (A).
+        - HOT_STANDBY when not EmergencyShutdown and either:
+          - **critical_count ≥ 1** OR **high_count ≥ 3**
+      - Operator override stage (apply_operator_override): final_state is base_state
+      modified by override type.
+        - SUPPRESS_ALARM can demote non-emergency states to SHUTDOWN.
+        - DELAY_SCRAM can demote non-emergency states to POWER_OPERATION when (temp<650
+      and pressure<2500) and rods≥70.
+        - BYPASS_INTERLOCK can promote HOT_STANDBY→POWER_OPERATION, but explicitly
+      refuses if temperature≥650.
+        - MAINTENANCE_MODE forces SHUTDOWN for non-emergency states.
+        - Two “exception” branches that claim to override EMERGENCY_SHUTDOWN (DELAY_SCRAM)
+      and to bypass with critical temp if pressure<2000 (BYPASS_INTERLOCK) are unreachable
+      due to earlier condition ordering. - Final SCRAM decision (should_initiate_scram)
+      depends only on final_state + safety_system_status + (time,xenon) for POWER_OPERATION,
+      as summarized in Q2 answer.
+  q3:
+    answer: >-
+      Yes. The property **“temperature ≥ 650°C always triggers SCRAM when the safety
+      system is OPERATIONAL”** can be violated.
+
+
+      Violation occurs whenever **temperature ≥ 650°C** does **not** lead to final_state
+      == EMERGENCY_SHUTDOWN (because with OPERATIONAL status, SCRAM is *not* commanded
+      for HOT_STANDBY/POWER_OPERATION/SHUTDOWN).
+
+
+      A concrete violating condition set (with OPERATIONAL system, valid readings):
+
+      - **temperature ≥ 650°C** (temp_critical = True)
+
+      - **pressure < 2450 PSI** (avoids the special temp+pressure EmergencyShutdown
+      rule) and also **pressure < 2500 PSI** (so pressure_critical=False)
+
+      - **neutron_flux < 105%** (flux_critical=False)
+
+      - **radiation_level < 100 mR/hr** (radiation_critical=False)
+
+      - and NOT(B): i.e. either
+        - **time_since_last_scram ≥ 12 hours**, OR
+        - **xenon_level < 25**
+
+      Then classify_severity yields base_state = HOT_STANDBY (critical_count==1),
+      and with OPERATIONAL status:
+
+      - If operator_override == NO_OVERRIDE: final_state = HOT_STANDBY → should_initiate_scram
+      returns **False**.
+
+      - If operator_override == SUPPRESS_ALARM or MAINTENANCE_MODE: final_state becomes
+      SHUTDOWN → SCRAM **False**.
+
+
+      So critical temperature alone does not guarantee SCRAM in this implementation.
+    reasoning: >-
+      - With temperature≥650, the measurement dead-zone cannot trigger (dead zone
+      requires temperature in 618–622), so response_valid will be True.
+
+      - classify_severity does **not** map “temp_critical alone” to EMERGENCY_SHUTDOWN;
+      it requires:
+        - either ≥2 critical conditions, or
+        - recent_scram (<12h) plus xenon_high (≥25) plus ≥1 critical, or
+        - the special high-high combo temperature≥640 and pressure≥2450.
+      - If temperature≥650 is the only critical condition and the special/recent+xenon
+      pathway is not met, base_state becomes HOT_STANDBY via: `elif critical_count
+      >= 1 or high_count >= 3: return HOT_STANDBY`.
+
+      - should_initiate_scram with safety_system_status==OPERATIONAL returns:
+        - True only for EMERGENCY_SHUTDOWN (always), or for POWER_OPERATION under
+      a separate “recent<6h and xenon≥25” rule;
+        - **False for HOT_STANDBY**.
+      - Therefore, for OPERATIONAL status, any path that leaves final_state as HOT_STANDBY
+      (or demotes it to SHUTDOWN via SUPPRESS_ALARM/MAINTENANCE_MODE) violates the
+      stated property.
+
+      - Boundary/edge conditions:
+        - temperature == **650** counts as critical (≥), so the counterexample includes
+      exactly 650.
+        - time_since_last_scram == **12** is *not* “recent” (recent_scram is <12),
+      enabling violation at that boundary.
+        - xenon_level == **25** is xenon_high (≥25); with time<12 it would force EMERGENCY_SHUTDOWN
+      and thus SCRAM; so violations require xenon<25 or time≥12.
+        - pressure == **2450** triggers the special EmergencyShutdown rule (≥2450),
+      so violations require pressure<2450.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:14:09'
+  q1:
+    answer: >-
+      The model description claims 7,714 distinct scenarios, but analyzing the code
+      structure reveals the actual scenario count is determined by the combination
+      of: 4 ReactorState outputs × 2 SCRAM decisions × 2 ECCS decisions × 2 containment
+      isolation decisions × 2 validity states = 64 theoretical output combinations,
+      though many are constrained by logical dependencies. The exact numeric thresholds
+      are:
+
+
+      **Temperature thresholds:**
+
+      - TEMP_THRESHOLD_MODERATE: 550°C
+
+      - TEMP_THRESHOLD_HIGH: 620°C
+
+      - TEMP_THRESHOLD_CRITICAL: 650°C
+
+      - Special combination threshold: 640°C (with pressure ≥2450 PSI)
+
+
+      **Pressure thresholds:**
+
+      - PRESSURE_THRESHOLD_MODERATE: 2200 PSI
+
+      - PRESSURE_THRESHOLD_HIGH: 2400 PSI
+
+      - PRESSURE_THRESHOLD_CRITICAL: 2500 PSI
+
+      - Special combination threshold: 2450 PSI (with temp ≥640°C)
+
+      - Low pressure bypass: 2000 PSI (for interlock bypass)
+
+      - Containment compromised threshold: 1500 PSI
+
+
+      **Neutron flux thresholds:**
+
+      - FLUX_THRESHOLD_HIGH: 103% of nominal
+
+      - FLUX_THRESHOLD_CRITICAL: 105%
+
+
+      **Radiation thresholds:**
+
+      - RADIATION_THRESHOLD_HIGH: 80 mR/hr
+
+      - RADIATION_THRESHOLD_CRITICAL: 100 mR/hr
+
+
+      **Xenon poisoning threshold:**
+
+      - XENON_THRESHOLD_HIGH: 25
+
+      - Low xenon for override: 15
+
+      - Extreme xenon (dead zone): 30
+
+
+      **Time thresholds:**
+
+      - Recent SCRAM (severity classification): 12 hours
+
+      - Recent SCRAM (SCRAM decision): 6 hours
+
+      - Recent SCRAM (degraded system): 12 hours
+
+
+      **Dead zone boundaries:**
+
+      - Temperature: 618-622°C (TEMP_THRESHOLD_HIGH ± 2)
+
+      - Pressure: 2390-2410 PSI (PRESSURE_THRESHOLD_HIGH ± 10)
+
+
+      **Control rod thresholds:**
+
+      - Adequate insertion: 70%
+
+      - Very adequate (for EmergencyShutdown override): 85%
+    reasoning: >-
+      - The code defines explicit threshold constants at module level for temperature
+      (550, 620, 650°C), pressure (2200, 2400, 2500 PSI), flux (103%, 105%), radiation
+      (80, 100 mR/hr), and xenon (25)
+
+      - Additional implicit thresholds exist in special conditions: temperature 640°C
+      + pressure 2450 PSI combination, pressure 2000 PSI for bypass, 1500 PSI for
+      containment
+
+      - Dead zone uses ±2°C for temperature and ±10 PSI for pressure around HIGH thresholds
+
+      - Time thresholds of 6 and 12 hours affect SCRAM decisions
+
+      - Control rod thresholds of 70% and 85% affect operator override logic
+
+      - Xenon thresholds include 15 (low for override exceptions) and 30 (extreme
+      for dead zone)
+
+      - The 7,714 figure from the description likely represents input space partitioning
+      rather than distinct output scenarios
+
+      - Output scenarios are bounded by: 4 states × 2 SCRAM × 2 ECCS × 2 containment
+      × 2 validity = 64 maximum combinations
+  q2:
+    answer: >-
+      The system initiates automatic SCRAM under the following conditions:
+
+
+      **Primary Condition:** `final_state == ReactorState.EMERGENCY_SHUTDOWN` AND
+      `safety_system_status` is OPERATIONAL or DEGRADED
+
+
+      **Secondary Conditions (without EmergencyShutdown):**
+
+      1. `final_state == HOT_STANDBY` AND `safety_system_status == DEGRADED` → SCRAM
+
+      2. `final_state == POWER_OPERATION` AND `safety_system_status == OPERATIONAL`
+      AND `time_since_last_scram < 6 hours` AND `xenon_level ≥ 25` → SCRAM
+
+      3. `final_state == POWER_OPERATION` AND `safety_system_status == DEGRADED` AND
+      `time_since_last_scram < 12 hours` → SCRAM
+
+
+      **How EmergencyShutdown is reached (classify_severity):**
+
+      - 2+ critical conditions (temp≥650 OR pressure≥2500 OR flux≥105 OR radiation≥100)
+
+      - 1+ critical condition AND recent_scram (<12hrs) AND xenon≥25
+
+      - temp≥640 AND pressure≥2450 (special high-high combination)
+
+      - Note: The condition "critical_count≥1 AND high_count≥4" is mathematically
+      unreachable/shadowed
+
+
+      **Operator Override Interactions:**
+
+      - `NO_OVERRIDE`: Base state passes through unchanged
+
+      - `SUPPRESS_ALARM`: Cannot suppress EmergencyShutdown; other states go to SHUTDOWN
+      (blocking SCRAM)
+
+      - `DELAY_SCRAM`: Cannot delay EmergencyShutdown (the elif branches for delaying
+      EmergencyShutdown are unreachable due to prior if check); can downgrade non-emergency
+      states to POWER_OPERATION if conditions are marginal (temp<650, pressure<2500)
+      and rods≥70%
+
+      - `BYPASS_INTERLOCK`: Cannot bypass if temp≥650 (the elif for low pressure bypass
+      is unreachable); can upgrade HOT_STANDBY to POWER_OPERATION
+
+      - `MAINTENANCE_MODE`: Cannot override EmergencyShutdown; forces SHUTDOWN if
+      temp<550 AND pressure<2200 (the xenon exception branch is unreachable)
+
+
+      **Critical Safety Gap:** If `safety_system_status == FAILED`, SCRAM is NEVER
+      initiated regardless of recommended state.
+    reasoning: >-
+      - SCRAM initiation is determined by should_initiate_scram() function after final_state
+      is computed
+
+      - The function checks final_state (not base_state), meaning operator overrides
+      affect SCRAM decisions
+
+      - For EMERGENCY_SHUTDOWN: SCRAM occurs if system is OPERATIONAL or DEGRADED,
+      but NOT if FAILED
+
+      - For HOT_STANDBY: SCRAM only occurs if system is DEGRADED (more conservative
+      behavior)
+
+      - For POWER_OPERATION: SCRAM occurs under time/xenon conditions - recent SCRAM
+      with high xenon for operational, any recent SCRAM (<12hrs) for degraded
+
+      - EmergencyShutdown triggers via quorum logic: 2+ critical conditions, or 1
+      critical + recent SCRAM + high xenon, or special temp/pressure combination
+
+      - The "critical_count≥1 AND high_count≥4" branch is unreachable because having
+      4 high readings with at least 1 critical means at least 2 must be critical
+
+      - Operator overrides in apply_operator_override have nested exception logic
+      with several unreachable branches
+
+      - DELAY_SCRAM's exception for EmergencyShutdown (time<6, xenon<15, rods≥85)
+      is unreachable because the preceding if already returns for EmergencyShutdown
+
+      - BYPASS_INTERLOCK's low pressure exception is unreachable because the preceding
+      elif already handles temp≥650
+
+      - MAINTENANCE_MODE's xenon exception is unreachable because the preceding elif
+      already handles the same temp/pressure condition
+  q3:
+    answer: >-
+      YES, the safety property 'Critical temperature (≥650°C) always triggers SCRAM
+      when safety system is operational' CAN be violated under the following conditions:
+
+
+      **Violation Scenario 1: Measurement Dead Zone**
+
+      - Temperature: 618-622°C (in dead zone range) - Note: This doesn't reach 650°C,
+      so not a direct violation
+
+      - Actually, if temp≥650 AND pressure in 2390-2410 range, dead zone check passes
+      (temp_ambiguous is false at 650°C since 650 > 622)
+
+
+      **Violation Scenario 2: Insufficient Critical Condition Count**
+
+      - Temperature ≥650°C (critical) BUT pressure<2500, flux<105, radiation<100
+
+      - time_since_last_scram ≥12 hours OR xenon_level<25
+
+      - This gives critical_count=1, which only results in HOT_STANDBY (not EMERGENCY_SHUTDOWN)
+
+      - With HOT_STANDBY and OPERATIONAL system: SCRAM is NOT initiated
+
+      - **This is a valid violation of the stated safety property**
+
+
+      **Violation Scenario 3: Operator Override with Critical Temperature**
+
+      - Temperature ≥650°C with 1 critical condition → HOT_STANDBY base state
+
+      - SUPPRESS_ALARM override → Changes HOT_STANDBY to SHUTDOWN
+
+      - SHUTDOWN state with OPERATIONAL system → No SCRAM
+
+
+      **Violation Scenario 4: Special Combination Doesn't Trigger**
+
+      - Temperature=650°C, pressure=2449 (just below 2450 special threshold)
+
+      - No other critical conditions, no recent SCRAM or low xenon
+
+      - Result: HOT_STANDBY only, no SCRAM with OPERATIONAL system
+
+
+      **Exact Boundary Conditions for Violation:**
+
+      - temp=650, pressure=2499, flux=104.9, radiation=99.9 (all just below secondary
+      critical)
+
+      - time_since_last_scram=12.0 (exactly at threshold, not recent)
+
+      - xenon_level=24.9 (just below high threshold)
+
+      - safety_system_status=OPERATIONAL
+
+      - Result: critical_count=1, not recent_scram OR not xenon_high, so HOT_STANDBY,
+      no SCRAM
+    reasoning: >-
+      - The safety property states that critical temperature (≥650°C) should ALWAYS
+      trigger SCRAM when the safety system is operational
+
+      - Analyzing classify_severity: temp_critical=True (temp≥650) contributes to
+      critical_count, but critical_count≥2 is needed for EMERGENCY_SHUTDOWN
+
+      - If only temperature is critical (critical_count=1), the system returns HOT_STANDBY
+      unless:
+        a) recent_scram AND xenon_high (time<12 AND xenon≥25), OR
+        b) The special combination temp≥640 AND pressure≥2450
+      - With HOT_STANDBY and OPERATIONAL status, should_initiate_scram returns False
+      (only DEGRADED triggers SCRAM for HOT_STANDBY)
+
+      - Therefore: temp=650, pressure=2400, flux=103, radiation=80, time_since_last_scram=12,
+      xenon=20, safety_system_status=OPERATIONAL → No SCRAM despite critical temperature
+
+      - The dead zone check doesn't block critical temperatures because temp_ambiguous
+      requires temp in 618-622 range, not at 650
+
+      - Operator overrides can further modify behavior but cannot bypass EmergencyShutdown;
+      however, they can affect states below EmergencyShutdown
+
+      - The quorum logic requiring 2+ critical conditions for automatic EMERGENCY_SHUTDOWN
+      is the primary gap in the safety property
+
+      - The stated property is a desired invariant that the actual implementation
+      does NOT guarantee

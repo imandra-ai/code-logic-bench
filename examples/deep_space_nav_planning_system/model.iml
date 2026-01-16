@@ -1,0 +1,105 @@
+(* Deep Space Navigation Planning System *)
+
+(* Core types *)
+type maneuver_type = Burn | Coast | Aerobrake
+
+type propulsion_mode = Chemical | Ion | RCS | Off
+
+type nav_state = Cruise | Approach | Emergency
+
+type fuel_level = Abundant | Moderate | Low | Critical
+
+type trajectory_decision = {
+  maneuver: maneuver_type;
+  propulsion: propulsion_mode;
+  safe: bool;
+}
+
+(* Dead zone for distance/velocity combinations *)
+let in_orbital_dead_zone distance_to_target velocity =
+  distance_to_target >= 9800 && distance_to_target <= 10200 && velocity >= 48 && velocity <= 52
+
+(* fuel level changes maneuver interpretation *)
+let fuel_level_to_propulsion fuel_level =
+  match fuel_level with
+  | Abundant -> Chemical
+  | Moderate -> Ion
+  | Low -> RCS
+  | Critical -> Off
+
+(* need 3 out of 4 safety conditions *)
+let safety_quorum_met distance_safe velocity_safe fuel_adequate trajectory_clear =
+  let count =
+    (if distance_safe then 1 else 0) +
+    (if velocity_safe then 1 else 0) +
+    (if fuel_adequate then 1 else 0) +
+    (if trajectory_clear then 1 else 0)
+  in
+  count >= 3
+
+(* Core decision function *)
+let determine_trajectory
+    nav_state
+    distance_to_target
+    velocity
+    fuel_level
+    trajectory_clear =
+
+  (* Dead zone check *)
+  if in_orbital_dead_zone distance_to_target velocity then
+    { maneuver = Coast; propulsion = Off; safe = false }
+  else
+    (* Emergency state forces safe mode *)
+    if nav_state = Emergency then
+      { maneuver = Coast; propulsion = Off; safe = false }
+    else
+      (* Distance-based decisions *)
+      let close = distance_to_target < 5000 in
+      let very_close = distance_to_target < 1000 in
+      let fast = velocity > 50 in
+
+      if very_close && fast then
+        { maneuver = Aerobrake; propulsion = RCS; safe = false }
+      else
+        (* Check safety quorum *)
+        let distance_safe = distance_to_target > 500 in
+        let velocity_safe = velocity < 100 in
+        let fuel_adequate = fuel_level <> Critical in
+        let quorum = safety_quorum_met distance_safe velocity_safe fuel_adequate trajectory_clear in
+
+        if quorum then
+          let prop = fuel_level_to_propulsion fuel_level in
+          if close then
+            { maneuver = Burn; propulsion = prop; safe = true }
+          else
+            { maneuver = Coast; propulsion = Ion; safe = true }
+        else
+          { maneuver = Coast; propulsion = Off; safe = false }
+
+(* Analysis
+====================
+ *)
+
+let assume_reasonable_inputs
+    (nav_state : nav_state)
+    (distance_to_target : int)
+    (velocity : int)
+    (fuel_level : fuel_level)
+    (trajectory_clear : bool) : bool =
+  distance_to_target >= 500 && distance_to_target <= 15000 &&
+  velocity >= 20 && velocity <= 120
+
+let trajectory_scenarios = determine_trajectory
+[@@decomp top ~prune:true ~assuming:[%id assume_reasonable_inputs] ()]
+
+let triggers_aerobrake nav_state distance_to_target velocity fuel_level trajectory_clear =
+  let traj = determine_trajectory nav_state distance_to_target velocity fuel_level trajectory_clear in
+  traj.maneuver = Aerobrake
+[@@decomp top ~assuming:[%id assume_reasonable_inputs] ()]
+
+verify (fun nav_state distance_to_target velocity fuel_level trajectory_clear ->
+  let traj = determine_trajectory nav_state distance_to_target velocity fuel_level trajectory_clear in
+
+  (assume_reasonable_inputs nav_state distance_to_target velocity fuel_level trajectory_clear &&
+   nav_state = Emergency) ==> (traj.propulsion = Off)
+)

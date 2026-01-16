@@ -1,0 +1,304 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:23'
+  q1:
+    answer: 7 distinct control decision scenarios (unique ControlDecision output combinations).
+    reasoning: >-
+      - The function returns a fixed ControlDecision for each of several branches.
+
+      - Unique outputs are:
+        - Emergency: (approved=False, force_emergency_landing=True, limit_max_tilt=True,
+      reduce_responsiveness=True)
+        - Autonomous + bad sensors: (False, False, True, True)
+        - Autonomous + low battery: (False, False, True, False)
+        - Approved with no limits: (True, False, False, False) (occurs for safe autonomous
+      and also for manual/stabilize when no limits apply)
+        - Manual/stabilize with limit only: (True, False, True, False)
+        - Manual/stabilize with reduced responsiveness only: (True, False, False,
+      True)
+        - Manual/stabilize with both constraints: (True, False, True, True)
+      - Although manual/stabilize can yield 4 combinations of the two flags, one of
+      them duplicates the safe-autonomous output, yielding 7 distinct outcomes total.
+  q2:
+    answer: No. AltHold/Hover/ReturnHome are never approved when battery_pct < 30.
+    reasoning: >-
+      - Autonomous modes go through the `autonomous` branch.
+
+      - There, `battery_ok = not battery_low(battery_pct)` and `battery_low` is defined
+      as `battery_pct < 30`.
+
+      - If battery_pct < 30, then battery_ok is False and the function returns `approved=False`
+      (with force_emergency_landing=False).
+  q3:
+    answer: Yes. battery_pct < 15 always forces force_emergency_landing=true.
+    reasoning: >-
+      - `battery_critical(battery_pct)` is defined as `battery_pct < 15`.
+
+      - `requires_emergency_landing` returns `critical_battery or ...`, so critical
+      battery alone makes `emergency_needed=True` regardless of other inputs.
+
+      - `determine_control_mode` checks `emergency_needed` first and immediately returns
+      a decision with `force_emergency_landing=True`.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:24'
+  q1:
+    answer: 5 distinct control decision scenarios
+    reasoning: >-
+      - The function returns a ControlDecision with 4 boolean fields (approved, force_emergency_landing,
+      limit_max_tilt, reduce_responsiveness)
+
+      - Analyzing all code paths:
+        1. Emergency landing required: (False, True, True, True)
+        2. Autonomous mode + severe sensor degradation: (False, False, True, True)
+        3. Autonomous mode + low battery: (False, False, True, False)
+        4. Autonomous mode approved: (True, False, False, False)
+        5. Manual/Stabilize modes (approved=True, force_emergency_landing=False, with
+      varying limit_max_tilt and reduce_responsiveness based on battery and sensor
+      health) - For manual/stabilize modes, multiple combinations are possible based
+      on battery_low and sensor degradation states
+
+      - However, counting unique ControlDecision tuples across all possible input
+      combinations:
+        - Emergency: 1 scenario
+        - Autonomous rejected (sensors): 1 scenario
+        - Autonomous rejected (battery): 1 scenario
+        - Autonomous approved: 1 scenario
+        - Manual modes: Can produce (True, False, False, False), (True, False, True,
+      False), (True, False, False, True), (True, False, True, True) = 4 variations
+      - Total distinct ControlDecision outputs: 5 unique tuples across all paths
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - Autonomous modes are AltHold, Hover, and ReturnHome (defined in is_autonomous_mode
+      function)
+
+      - For autonomous modes to be approved (approved=True), the code must pass through
+      the autonomous branch without early returns
+
+      - In the autonomous branch, there's a check: battery_ok = not battery_low(battery_pct)
+
+      - battery_low(battery_pct) returns True when battery_pct < 30
+
+      - If battery_pct < 30, then battery_ok = False
+
+      - When battery_ok is False, the function returns ControlDecision(approved=False,
+      ...) - rejecting the autonomous mode
+
+      - This check happens before the autonomous mode can be approved
+
+      - Therefore, autonomous flight modes can NEVER be approved when battery_pct
+      < 30
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - battery_critical(battery_pct) returns True when battery_pct < 15
+
+      - requires_emergency_landing checks: critical_battery OR (dangerous_tilt AND
+      near_ground) OR sensor_failed
+
+      - If battery_pct < 15, critical_battery = True
+
+      - In requires_emergency_landing, the condition uses OR logic, so critical_battery=True
+      makes the entire function return True
+
+      - However, this doesn't ALWAYS guarantee force_emergency_landing=True in all
+      code paths
+
+      - Wait, reviewing more carefully: if requires_emergency_landing returns True,
+      emergency_needed=True at the start of determine_control_mode
+
+      - When emergency_needed=True, the function immediately returns with force_emergency_landing=True
+
+      - Therefore, whenever battery_pct < 15, requires_emergency_landing returns True,
+      which causes determine_control_mode to return force_emergency_landing=True
+
+      - Answer: YES, battery_pct < 15 ALWAYS triggers force_emergency_landing=True
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:31'
+  q1:
+    answer: '8'
+    reasoning: >-
+      - The function determine_control_mode can return 8 distinct ControlDecision
+      instances based on different conditions.
+
+
+      - 1 for emergency landing (when emergency_needed is True, regardless of mode).
+
+
+      - 1 for autonomous mode with severe sensor degradation (approved=False, force_emergency_landing=False,
+      limit_max_tilt=True, reduce_responsiveness=True).
+
+
+      - 1 for autonomous mode with low battery but good sensors (approved=False, force_emergency_landing=False,
+      limit_max_tilt=True, reduce_responsiveness=False).
+
+
+      - 1 for approved autonomous mode (approved=True, force_emergency_landing=False,
+      limit_max_tilt=False, reduce_responsiveness=False).
+
+
+      - 4 for non-autonomous modes (approved=True, force_emergency_landing=False),
+      with variations depending on battery, IMU, and GPS health:
+        - limit_max_tilt=False, reduce_responsiveness=False (when battery >=30, IMU
+      healthy, GPS healthy or any other combination not meeting the limits).
+        - limit_max_tilt=True, reduce_responsiveness=False (when battery <30 or IMU
+      degraded, and GPS healthy).
+        - limit_max_tilt=False, reduce_responsiveness=True (when battery >=30, IMU
+      healthy, and GPS degraded).
+        - limit_max_tilt=True, reduce_responsiveness=True (when battery <30 or IMU
+      degraded, and GPS degraded).
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - For autonomous modes (AltHold, Hover, ReturnHome), the code checks if battery_ok,
+      which is True only if battery_pct >= 30.
+
+      - If battery_pct < 30, battery_ok is False, causing the function to return approved=False
+      even if sensors are good.
+
+      - Therefore, autonomous modes cannot be approved when battery_pct < 30.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - battery_critical is True when battery_pct < 15.
+
+      - requires_emergency_landing returns True if critical_battery is True (among
+      other conditions, but 'or' means as long as critical_battery is True).
+
+      - If emergency_needed is True, the function immediately returns ControlDecision
+      with force_emergency_landing=True, overriding any other approvals.
+
+      - There is no condition or path where battery_pct < 15 but force_emergency_landing
+      is not set to True, since the emergency check happens first.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:03'
+  q1:
+    answer: '5'
+    reasoning: >-
+      There are 5 distinct logical decision paths (scenarios) leading to a return
+      statement based on the code structure:
+
+      1. Emergency Landing: Triggered globally if critical conditions are met (approved=False).
+
+      2. Autonomous/Sensor Fail: Autonomous mode denied due to severe sensor degradation
+      (approved=False).
+
+      3. Autonomous/Low Battery: Autonomous mode denied due to low battery (<30%)
+      (approved=False).
+
+      4. Autonomous/Approved: Autonomous mode fully approved with healthy sensors
+      and battery (approved=True).
+
+      5. Manual/Stabilize: Non-autonomous modes are always approved, but safety flags
+      (tilt/responsiveness) are calculated dynamically based on conditions (approved=True).
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - Autonomous modes include ALT_HOLD, HOVER, and RETURN_HOME.
+
+      - The `determine_control_mode` function checks `is_autonomous_mode`.
+
+      - Inside the autonomous block, the code checks `battery_ok = not battery_low(battery_pct)`.
+
+      - `battery_low` is defined as `battery_pct < 30`.
+
+      - If `battery_pct < 30`, `battery_ok` is False, causing the system to return
+      a ControlDecision with `approved=False`.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The function `requires_emergency_landing` checks `battery_critical(battery_pct)`,
+      which is true when `battery_pct < 15`.
+
+      - The return statement in `requires_emergency_landing` uses an `or` operator:
+      `critical_battery or ...`. If the battery is critical, this function returns
+      `True`.
+
+      - In `determine_control_mode`, if `emergency_needed` is `True`, the code immediately
+      returns a ControlDecision with `force_emergency_landing=True`.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:36'
+  q1:
+    answer: 7 distinct control decision scenarios
+    reasoning: >-
+      • Scenario 1: Emergency landing required (critical battery OR (dangerous tilt
+      AND near ground) OR IMU failed) → ControlDecision(approved=False, force_emergency_landing=True,
+      limit_max_tilt=True, reduce_responsiveness=True)
+
+      • Scenario 2: Autonomous mode with severe sensor degradation (IMU failed OR
+      (IMU degraded AND GPS degraded)) → ControlDecision(approved=False, force_emergency_landing=False,
+      limit_max_tilt=True, reduce_responsiveness=True)
+
+      • Scenario 3: Autonomous mode with low battery (battery_pct < 30) but sensors
+      OK → ControlDecision(approved=False, force_emergency_landing=False, limit_max_tilt=True,
+      reduce_responsiveness=False)
+
+      • Scenario 4: Autonomous mode approved (sensors OK AND battery >= 30%) → ControlDecision(approved=True,
+      force_emergency_landing=False, limit_max_tilt=False, reduce_responsiveness=False)
+
+      • Scenario 5: Non-autonomous mode (Manual/Stabilize/Emergency) with limit_tilt=True
+      AND reduce_resp=True (low battery OR degraded IMU, AND degraded GPS)
+
+      • Scenario 6: Non-autonomous mode with limit_tilt=True AND reduce_resp=False
+      (low battery OR degraded IMU, AND GPS not degraded)
+
+      • Scenario 7: Non-autonomous mode with limit_tilt=False AND reduce_resp=True
+      (battery OK AND IMU healthy, but GPS degraded)
+
+      • Scenario 8: Non-autonomous mode with limit_tilt=False AND reduce_resp=False
+      (battery OK AND IMU healthy AND GPS not degraded)
+
+      • Wait, re-counting: The non-autonomous branch produces 4 variations based on
+      limit_tilt (2 values) × reduce_resp (2 values), but these are distinct ControlDecision
+      tuples
+
+      • Total: 1 (emergency) + 3 (autonomous paths) + 4 (non-autonomous variations)
+      = 8, but some may have identical output tuples
+
+      • Distinct ControlDecision tuples: (False,True,True,True), (False,False,True,True),
+      (False,False,True,False), (True,False,False,False), (True,False,True,True),
+      (True,False,True,False), (True,False,False,True), (True,False,False,False)
+
+      • After deduplication: 7 distinct scenarios (the autonomous approved scenario
+      shares tuple with one non-autonomous scenario)
+  q2:
+    answer: No, autonomous flight modes (AltHold, Hover, ReturnHome) can never be
+      approved when battery_pct < 30
+    reasoning: >-
+      • When battery_pct < 30 (low battery), the function battery_low() returns True
+
+      • For autonomous modes (ALT_HOLD, HOVER, RETURN_HOME), after passing the emergency
+      check and sensor check, the code explicitly checks: battery_ok = not battery_low(battery_pct)
+
+      • If battery_ok is False (meaning battery < 30%), the code returns ControlDecision(approved=False,
+      ...)
+
+      • The only path to approved=True for autonomous modes requires battery_ok to
+      be True, which means battery_pct >= 30
+
+      • Therefore, autonomous modes are NEVER approved when battery_pct < 30
+
+      • Note: If battery_pct < 15, emergency landing is triggered first, so this low
+      battery check (15-29%) specifically handles the case where battery is low but
+      not critical
+  q3:
+    answer: Yes, battery_pct < 15 (critical battery) always triggers force_emergency_landing=true
+    reasoning: >-
+      • The function battery_critical() returns True when battery_pct < 15
+
+      • The function requires_emergency_landing() includes critical_battery as one
+      of its OR conditions: "return critical_battery or (dangerous_tilt and near_ground)
+      or sensor_failed"
+
+      • This means if battery_pct < 15, requires_emergency_landing() will return True
+      regardless of other conditions
+
+      • In determine_control_mode(), the emergency check happens FIRST before any
+      other logic
+
+      • When emergency_needed is True, the function immediately returns ControlDecision(approved=False,
+      force_emergency_landing=True, limit_max_tilt=True, reduce_responsiveness=True)
+
+      • No other code path is reachable when battery_pct < 15 because the emergency
+      check short-circuits the logic
+
+      • Therefore, battery_pct < 15 ALWAYS results in force_emergency_landing=True

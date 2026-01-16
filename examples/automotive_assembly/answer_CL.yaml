@@ -1,0 +1,41 @@
+model: "automotive_assembly"
+q1:
+  question: "How many distinct station processing scenarios exist in determine_station_processing, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "57 scenarios (for typical operations: equipment not Faulty, maintenance 10-100, workers 1-4)"
+  state_space_reduction: "Used ~assuming to focus on typical station operations"
+  key_thresholds:
+    maintenance_due: [10, 30, 48, 52, 100]
+    worker_count: [0, 1, 2, 4]
+    defect_rate: [15]
+    safety_violations: [2]
+    processing_time_adjustment: "+10%, +20%"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_station_scenarios.json'
+    use_of_assuming: "equipment != Faulty, maintenance 10-100, workers 1-4"
+q2:
+  question: "Can a station with Operational equipment status ever trigger EmergencyStop? If so, under what exact conditions?"
+  answer: "YES - 3 scenarios where Operational equipment triggers emergency"
+  example:
+    scenario: "Operational + defect_rate=16 + maintenance 48-52 + workers >= 3"
+    emergency_trigger: "defect_rate > 15"
+    result: "EmergencyStop despite Operational equipment"
+  explanation: "Emergency triggers on: Faulty equipment OR defect_rate > 15 OR safety_violations > 2"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_operational_emergency.json'
+    use_of_assuming: "equipment = Operational && maintenance >= 30 && workers >= 1"
+q3:
+  question: "Can the safety property 'EmergencyStop always prevents processing' ever be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "(decision_type = EmergencyStop) ==> (not can_process)"
+  why_proven: "EmergencyStop path explicitly sets can_process=false in code structure"
+  fixed_parameters_in_verify: "BodyWelding station, Sedan vehicle"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_emergency_halt_safety.json'
+analysis_metadata:
+  total_scenarios_q1: 57
+  operational_emergency_count_q2: 3
+  property_result_q3: "PROVEN"
+  pattern_complexity:
+    override: "Emergency (3 triggers) overrides operational status"
+    dead_zone: "maintenance 48-52 + workers 1-2 → invalid config"
+    multiplexer: "Vehicle type changes processing time significantly (Sedan 45, Truck 75 for welding)"

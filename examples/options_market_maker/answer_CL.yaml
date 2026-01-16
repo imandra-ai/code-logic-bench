@@ -1,0 +1,27 @@
+model: "options_market_maker"
+q1:
+  question: "How many distinct quoting scenarios exist across all option types and market conditions?"
+  answer: "38 scenarios"
+  key_thresholds:
+    vol_bps: [1500, 3000, 5000]
+    days_to_expiry: 7
+    moneyness_ratios: [80, 95, 105, 120]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_quotes.json'
+q2:
+  question: "Can provide_quote=true ever occur when delta_pct > max_delta_pct?"
+  answer: "NO - Delta limits are strict (0 scenarios)"
+  explanation: "Delta check (line 83) immediately halts quoting if limits exceeded"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_delta_exceeded.json'
+q3:
+  question: "When volatility is Extreme AND days_to_expiry <= 7, can provide_quote ever be true?"
+  answer: "PROVEN - Extreme vol + near expiry always halts quoting"
+  property: "(vol_bps >= 5000 && days_to_expiry <= 7 && within_limits) ==> not provide_quote"
+  why_proven: "Combined risk check (line 95-99) halts quoting when both conditions met"
+  metadata:
+    extraction: 'cat vg_q3_extreme_risk.json | jq ".[0] | keys"'
+analysis_metadata:
+  total_scenarios_q1: 38
+  delta_exceeded_q2: 0
+  property_result_q3: "PROVEN"

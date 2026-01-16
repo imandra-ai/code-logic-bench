@@ -1,0 +1,111 @@
+(* Coastal Erosion Monitoring and Alert System *)
+
+(* Core types *)
+type alert_level = Normal | Advisory | Warning | Critical | Emergency
+
+type coastal_type = Sandy | Rocky | Estuary
+
+type sensor_status = Active | Degraded | Failed
+
+type alert_decision = {
+  level: alert_level;
+  evacuate: bool;
+}
+
+(* Dead zone for ambiguous erosion + wave combinations *)
+let in_measurement_dead_zone erosion_rate wave_height =
+  erosion_rate >= 48 && erosion_rate <= 52 && wave_height >= 28 && wave_height <= 32
+
+(* coastal type changes threshold interpretation *)
+let base_erosion_threshold coastal_type level =
+  match coastal_type, level with
+  | Sandy, Advisory -> 30
+  | Sandy, Warning -> 50
+  | Sandy, Critical -> 80
+  | Rocky, Advisory -> 50
+  | Rocky, Warning -> 80
+  | Rocky, Critical -> 120
+  | Estuary, Advisory -> 25
+  | Estuary, Warning -> 40
+  | Estuary, Critical -> 65
+  | _, Normal -> 0
+  | _, Emergency -> 150
+
+(* need 2 out of 3 danger indicators *)
+let danger_quorum_met erosion_rate threshold wave_height infrastructure_critical =
+  let c1 = erosion_rate >= threshold in
+  let c2 = wave_height > 25 in
+  let c3 = infrastructure_critical in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0)
+  in
+  count >= 2
+
+(* Core decision function *)
+let determine_alert
+    coastal_type
+    erosion_rate
+    wave_height
+    sensor_status
+    infrastructure_critical =
+
+  (* Dead zone check *)
+  if in_measurement_dead_zone erosion_rate wave_height then
+    { level = Advisory; evacuate = false }
+  else
+    (* Failed sensor forces advisory *)
+    if sensor_status = Failed then
+      { level = Advisory; evacuate = false }
+    else
+      (* Classify base level *)
+      let threshold_emergency = base_erosion_threshold coastal_type Emergency in
+      let threshold_critical = base_erosion_threshold coastal_type Critical in
+      let threshold_warning = base_erosion_threshold coastal_type Warning in
+      let threshold_advisory = base_erosion_threshold coastal_type Advisory in
+
+      if erosion_rate >= threshold_emergency then
+        { level = Emergency; evacuate = true }
+      else if erosion_rate >= threshold_critical then
+        (* Check quorum for critical *)
+        let quorum = danger_quorum_met erosion_rate threshold_critical wave_height infrastructure_critical in
+        if quorum then
+          { level = Critical; evacuate = infrastructure_critical }
+        else
+          { level = Warning; evacuate = false }
+      else if erosion_rate >= threshold_warning then
+        { level = Warning; evacuate = false }
+      else if erosion_rate >= threshold_advisory then
+        { level = Advisory; evacuate = false }
+      else
+        { level = Normal; evacuate = false }
+
+(* Analysis
+====================
+ *)
+
+let assume_reasonable_inputs
+    (coastal_type : coastal_type)
+    (erosion_rate : int)
+    (wave_height : int)
+    (sensor_status : sensor_status)
+    (infrastructure_critical : bool) : bool =
+  erosion_rate >= 0 && erosion_rate <= 200 &&
+  wave_height >= 10 && wave_height <= 50
+
+let alert_scenarios = determine_alert
+[@@decomp top ~prune:true ~assuming:[%id assume_reasonable_inputs] ()]
+
+let triggers_evacuation coastal_type erosion_rate wave_height sensor_status infrastructure_critical =
+  let alert = determine_alert coastal_type erosion_rate wave_height sensor_status infrastructure_critical in
+  alert.evacuate
+[@@decomp top ~assuming:[%id assume_reasonable_inputs] ()]
+
+verify (fun coastal_type erosion_rate wave_height sensor_status infrastructure_critical ->
+  let alert = determine_alert coastal_type erosion_rate wave_height sensor_status infrastructure_critical in
+
+  (assume_reasonable_inputs coastal_type erosion_rate wave_height sensor_status infrastructure_critical &&
+   sensor_status = Failed) ==> (alert.level <> Emergency)
+)

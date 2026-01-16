@@ -1,0 +1,37 @@
+model: "procedural_dungeon_generator"
+q1:
+  question: "How many distinct room placement scenarios exist across all room types and difficulty tiers?"
+  answer: "38 scenarios"
+  key_thresholds:
+    distance_minimums: "Combat=2, Treasure=3, Puzzle=4, Secret=5, Boss=8"
+    boss_max_distance: 15
+    boss_combat_prerequisite: 3
+    room_limits: "vary by type and difficulty"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_placements.json'
+q2:
+  question: "Can a Boss room ever be placed at distance_from_entrance < 8?"
+  answer: "NO - Boss strictly requires distance >= 8 (0 scenarios)"
+  explanation: "Boss min_distance check (line 41) blocks placement below 8, returns TooClose"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_boss_close.json'
+q3:
+  question: "For Boss room placement, does having distance ∈ [8,15] and existing_combat_count >= 3 always result in Approved?"
+  answer: "REFUTED - Still need to check room count limit"
+  counterexample:
+    difficulty: "Medium"
+    distance_from_entrance: 13
+    existing_room_count: 1
+    existing_combat_count: 3
+    result: "Rejected (Boss max_count = 1, already at limit)"
+  explanation: "Even with valid distance and combat prerequisite, room count limit check can reject"
+  metadata:
+    extraction: 'cat vg_q3_boss_placement.json | jq ".[0] | keys"'
+analysis_metadata:
+  total_scenarios_q1: 38
+  boss_close_count_q2: 0
+  property_result_q3: "REFUTED"
+  complexity_insights:
+    - "Q1: 38 scenarios from room type × difficulty × distance × count combinations"
+    - "Q2: Boss distance strictly enforced (no exceptions)"
+    - "Q3: Multiple constraints must ALL pass (distance AND sequence AND count limit)"

@@ -1,0 +1,38 @@
+model: "smart_contract_supply_chain"
+q1:
+  question: "How many contract validation scenarios exist for Pharmaceuticals?"
+  answer: "33 scenarios"
+  key_thresholds:
+    reputation_score: 70
+    payment_advance_pct: 30
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_pharma.json'
+    use_of_assuming: "category = Pharmaceuticals"
+q2:
+  question: "Can a Pharmaceuticals contract ever be approved without FDA certification?"
+  answer: "NO - FDA is mandatory for Pharmaceuticals (0 scenarios)"
+  explanation: |
+    Pharmaceuticals requires FDA standard (line 23).
+    FDA check enforced at line 69: if requires_standard Pharmaceuticals FDA then has_fda.
+    If has_fda = false, standards_ok = false, approval blocked.
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_no_fda.json'
+q3:
+  question: "For approved Pharmaceuticals contracts, must requires_audit always be true?"
+  answer: "PROVEN - All approved Pharmaceuticals require audit"
+  property: "(category=Pharmaceuticals && approved) ==> requires_audit"
+  why_proven: "Mandatory audit check (line 101): needs_audit = needs_mandatory_audit Pharmaceuticals = true"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_audit.json'
+analysis_metadata:
+  total_scenarios_q1: 33
+  pharma_no_fda_count_q2: 0
+  property_result_q3: "PROVEN"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to Pharmaceuticals category"
+    q2_filtering: "Tests if FDA can be bypassed"
+    q3_property: "Tests mandatory audit requirement"
+  complexity_insights:
+    - "Q1: Pharmaceuticals creates 33 scenarios (3 roles × 3 jurisdictions × standards × reputation × payment)"
+    - "Q2: FDA is strictly required - no bypass possible"
+    - "Q3: Audit is mandatory for all approved Pharmaceuticals"

@@ -1,0 +1,52 @@
+model: "dynamic_cross_docking_operations"
+q1:
+  question: "How many distinct routing scenarios exist in determine_routing_decision, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "2935 scenarios"
+  key_thresholds:
+    product_volume: [57, 58, 62, 63]
+    time_to_deadline: [29, 30]
+    product_value: [10000, 10001]
+    dock_distance: [100, 101]
+    dock_capacity: "Available=100, PartiallyOccupied=60, FullyOccupied=0, Maintenance=0"
+    priority_capacity_adjustment: "Normal=0, High=-10, Emergency=-30"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_routing_scenarios.json'
+q2:
+  question: "Can a Hazardous product ever be routed to a dock in Maintenance status? If so, under what exact conditions?"
+  answer: "NO - Hazardous products cannot be routed to Maintenance docks under any conditions"
+  explanation: >
+    While emergency override CAN route products to Maintenance docks (24 scenarios total, all with Fragile products), Hazardous products are NEVER routed to Maintenance. Emergency override triggers for 228 total scenarios across product types: Standard=153, Fragile=42, Hazardous=33. The Hazardous emergency scenarios use non-Maintenance docks.
+
+  emergency_override_breakdown:
+    total_scenarios: 228
+    by_product: "Standard=153, Fragile=42, Hazardous=33"
+    maintenance_dock_scenarios: 24
+    hazardous_to_maintenance: 0
+  why_counterintuitive: >
+    Emergency override can bypass Maintenance status, but the combination of Hazardous product type with Maintenance dock status doesn't produce valid routing scenarios in the decomposition.
+
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_str.product_type == \"Hazardous\" and .model_str.dock_status == \"Maintenance\" and .invariant_str == \"true\")] | length" decomp_q2_triggers_emergency_override.json'
+q3:
+  question: "Can the safety property 'Hazardous products routed to maintenance docks must have emergency override' ever be violated?"
+  answer: "PROVEN - Property always holds, no counterexamples"
+  property: "(Hazardous && Maintenance && route_approved) ==> requires_emergency_override"
+  why_holds: >
+    The property is vacuously true because the antecedent is never satisfied - there are no scenarios where Hazardous products are successfully routed to Maintenance docks (with or without emergency override). The precondition (Hazardous && Maintenance && route_approved) is always false, making the implication trivially true.
+
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_hazardous_maintenance_safety.json'
+analysis_metadata:
+  total_regions: 2935
+  imandra_runtime: "All analyses completed successfully within timeout"
+  pattern_complexity:
+    multiplexer: "Temperature zone changes handling time interpretation (Ambient=1x, Refrigerated=2x, Frozen=3x)"
+    override: "Emergency priority bypasses capacity and maintenance, EXCEPT for temperature incompatibility and Hazardous special handling"
+    quorum: "Emergency override requires 3 of 4: [Emergency priority, time<30, value>10000, distance>100]"
+    dead_zone: "product_volume∈[58,62] AND dock_status=PartiallyOccupied → invalid routing"
+  interesting_findings:
+    - "Standard products dominate emergency override scenarios (153 out of 228)"
+    - "Only Fragile products (not Hazardous or HighValue) route to Maintenance with emergency override"
+    - "Temperature compatibility acts as hard constraint with no override possible"
+    - "Hazardous + Emergency does NOT reduce handling time (safety constraint)"
+    - "Dead zone creates 5-unit ambiguous region (58-62) for PartiallyOccupied docks"

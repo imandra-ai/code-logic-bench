@@ -1,0 +1,606 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:27'
+  q1:
+    answer: 'There are 7 distinct handshake outcome scenarios, corresponding to the
+      7 enum values in HandshakeOutcome: FULL_HANDSHAKE_SUCCESS, SESSION_RESUMPTION_SUCCESS,
+      SECURITY_DOWNGRADE, CERTIFICATE_FAILURE, COMPATIBILITY_FAILURE, REPLAY_ATTACK,
+      INVALID_STATE. The exact numeric thresholds that determine these scenarios are:
+      security_policy_level >= 2 (sets minimum cipher strength to 192), security_policy_level
+      >= 3 (sets minimum cipher strength to 256), security_policy_level >= 4 (disables
+      session resumption and requires forward secrecy for full handshake success),
+      session_age >= 86400 and <= 86410 (makes resumption ambiguous and returns False
+      from resumption_allowed_by_policy), session_age < 86400 (allows resumption for
+      security_policy_level < 4), and error_count >= 3 (triggers INVALID_STATE).'
+    reasoning: >-
+      - The HandshakeOutcome enum defines 7 possible outcomes, each corresponding
+      to a distinct scenario based on conditions in the code.
+
+      - Numeric thresholds come from minimum_cipher_strength_for_policy (conditional
+      on security_policy_level >=2 for 192, >=3 for 256), resumption_allowed_by_policy
+      (security_policy_level >=4 disables it, session_age in [86400, 86410] disables
+      it, otherwise allows if <86400), and error_count >=3.
+  q2:
+    answer: 'A handshake succeeds (can_proceed=true) but fails to provide forward
+      secrecy (forward_secrecy=false) under two logical conditions: (1) when performing
+      session resumption success, i.e., if has_session_ticket and ticket_is_valid
+      and resumption_policy_ok; or (2) when performing full handshake with a group
+      that does not provide forward secrecy, i.e., if (not has_session_ticket or not
+      (ticket_is_valid and resumption_policy_ok)) and cert_status == VALID and actual_strength
+      >= minimum_cipher_strength_for_policy(security_policy_level) and not provides_forward_secrecy(client_group)
+      and security_policy_level < 4.'
+    reasoning: >-
+      - can_proceed=true and forward_secrecy=false only for SESSION_RESUMPTION_SUCCESS
+      (which has forward_secrecy=False) and FULL_HANDSHAKE_SUCCESS with fs=false (when
+      group does not provide forward secrecy).
+
+      - The conditions combine as an OR: either resumption success, OR full handshake
+      success with the above checks passing and group not providing forward secrecy
+      and policy <4 (to avoid SECURITY_DOWNGRADE).
+  q3:
+    answer: No, the safety property 'High security policy (level >= 4) with successful
+      handshake always provides forward secrecy' is never violated. It holds because
+      for security_policy_level >= 4, resumption_policy_ok (derived from resumption_allowed_by_policy)
+      is always False, preventing SESSION_RESUMPTION_SUCCESS; and for full handshakes,
+      it requires forward_secrecy for success, otherwise returning SECURITY_DOWNGRADE.
+    reasoning: >-
+      - The code enforces the property: resumption is never allowed for level >=4,
+      and full handshake success requires fs.
+
+      - No edge cases or boundary conditions violate it, as level=4 is treated the
+      same as >=4, and session_age does not override the >=4 condition.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:32'
+  q1:
+    answer: 'There are 7 distinct handshake outcome scenarios. The exact numeric thresholds
+      are: error_count >= 3 (INVALID_STATE), security_policy_level >= 4 (affects forward
+      secrecy requirement and resumption blocking), security_policy_level >= 3 (requires
+      cipher strength >= 256), and security_policy_level >= 2 (requires cipher strength
+      >= 192).'
+    reasoning: >-
+      • The 7 distinct outcomes are: FULL_HANDSHAKE_SUCCESS, SESSION_RESUMPTION_SUCCESS,
+      SECURITY_DOWNGRADE, CERTIFICATE_FAILURE, COMPATIBILITY_FAILURE, REPLAY_ATTACK,
+      and INVALID_STATE
+
+      • Threshold 1: error_count >= 3 triggers INVALID_STATE
+
+      • Threshold 2: security_policy_level >= 4 blocks session resumption (in resumption_allowed_by_policy)
+      and requires forward secrecy
+
+      • Threshold 3: security_policy_level >= 3 sets minimum cipher strength to 256
+      bits
+
+      • Threshold 4: security_policy_level >= 2 sets minimum cipher strength to 192
+      bits
+
+      • Additional threshold in resumption_allowed_by_policy: 86400 <= session_age
+      <= 86410 blocks resumption (ambiguous age range)
+
+      • These thresholds control branching logic that determines which of the 7 outcomes
+      occurs
+  q2:
+    answer: 'A handshake succeeds (can_proceed=true) without forward secrecy (forward_secrecy=false)
+      under exactly two conditions: (1) SESSION_RESUMPTION_SUCCESS: when has_session_ticket=true
+      AND ticket_is_valid=true AND resumption_policy_ok=true, OR (2) FULL_HANDSHAKE_SUCCESS:
+      when all compatibility and security checks pass BUT client_group=SECP256R1 (which
+      doesn''t provide forward secrecy) AND security_policy_level < 4.'
+    reasoning: >-
+      • Condition 1 - SESSION_RESUMPTION_SUCCESS (can_proceed=true, forward_secrecy=false):
+        - has_session_ticket must be true
+        - AND ticket_is_valid must be true
+        - AND resumption_policy_ok must be true
+        - This path explicitly sets forward_secrecy=False because PSK resumption doesn't
+      provide forward secrecy • Condition 2 - FULL_HANDSHAKE_SUCCESS without forward
+      secrecy (can_proceed=true, forward_secrecy=false):
+        - All preliminary checks must pass (no replay, error_count < 3, compatible
+      cipher/group, sufficient cipher strength)
+        - AND either (has_session_ticket=true with invalid/blocked resumption) OR
+      (has_session_ticket=false)
+        - AND cert_status must be VALID
+        - AND client_group must be SECP256R1 (provides_forward_secrecy returns false
+      for this group)
+        - AND security_policy_level must be < 4 (otherwise SECURITY_DOWNGRADE is returned)
+      • Logical structure: These are two disjoint paths through the decision tree,
+      connected by OR logic
+  q3:
+    answer: 'Yes, the safety property CAN be violated. When security_policy_level
+      >= 4 AND a successful SESSION_RESUMPTION occurs, forward secrecy is NOT provided.
+      This happens when: security_policy_level >= 4 AND has_session_ticket=true AND
+      ticket_is_valid=true AND resumption_policy_ok=true.'
+    reasoning: >-
+      • The violation occurs due to a logic gap in the implementation
+
+      • Path to violation:
+        1. security_policy_level >= 4 (high security requirement)
+        2. has_session_ticket = true
+        3. ticket_is_valid = true
+        4. resumption_policy_ok = true (this is a PARAMETER, not derived from policy
+      level) • Critical flaw: resumption_policy_ok is passed as a parameter to determine_handshake_outcome,
+      separate from security_policy_level
+
+      • The resumption_allowed_by_policy function would return false for security_policy_level
+      >= 4, BUT this is only used if the caller sets resumption_policy_ok correctly
+
+      • If resumption_policy_ok=true is passed despite security_policy_level >= 4,
+      the code returns SESSION_RESUMPTION_SUCCESS with forward_secrecy=false and can_proceed=true
+
+      • The security_policy_level >= 4 check that blocks non-forward-secrecy connections
+      only applies in the full handshake paths (both with and without session tickets
+      that fail resumption)
+
+      • It does NOT apply in the SESSION_RESUMPTION_SUCCESS path (line ~118-124)
+
+      • Boundary condition: Exactly at security_policy_level = 4 is where the violation
+      first becomes possible
+
+      • This represents a security vulnerability where parameter inconsistency can
+      bypass high-security requirements
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:45'
+  q1:
+    answer: >-
+      7 distinct outcome scenarios (one per returned HandshakeOutcome): REPLAY_ATTACK,
+      INVALID_STATE, COMPATIBILITY_FAILURE, SECURITY_DOWNGRADE, SESSION_RESUMPTION_SUCCESS,
+      CERTIFICATE_FAILURE, FULL_HANDSHAKE_SUCCESS.
+
+      Numeric thresholds that gate these scenarios:
+
+      - replay_detected is a boolean gate (no numeric threshold).
+
+      - error_count >= 3 → INVALID_STATE.
+
+      - security_policy_level thresholds in minimum_cipher_strength_for_policy():
+        - level >= 3 → min cipher strength = 256
+        - level >= 2 → min cipher strength = 192
+        - else (<2) → min cipher strength = 128
+      - actual_strength < min_strength → SECURITY_DOWNGRADE.
+
+      - high-security forward-secrecy requirement: security_policy_level >= 4 AND
+      provides_forward_secrecy(client_group)=False → SECURITY_DOWNGRADE (in full-handshake
+      path).
+
+      - cipher strengths used in comparisons: AES_128_GCM=128, AES_256_GCM=256.
+    reasoning: >-
+      - The function returns exactly one HandshakeDecision per early-return branch;
+      enumerating all branches yields 7 reachable outcomes.
+
+      - Numeric cutoffs used directly in determine_handshake_outcome are:
+        - error_count cutoff at 3.
+        - security_policy_level cutoffs at 2, 3 (via min strength) and 4 (extra FS
+      requirement).
+        - min-strength values 128/192/256 and actual strengths 128/256 determine SECURITY_DOWNGRADE.
+      - The session_age thresholds (86400–86410, <86400) exist only inside resumption_allowed_by_policy()
+      and are not referenced by determine_handshake_outcome; instead it consumes the
+      boolean resumption_policy_ok.
+  q2:
+    answer: >-
+      Handshake can succeed (can_proceed=True) while forward_secrecy=False in exactly
+      two disjoint logical cases:
+
+
+      A) Session resumption success (always no forward secrecy):
+
+      can_proceed=true ∧ forward_secrecy=false when
+
+      - replay_detected = False
+
+      - error_count < 3
+
+      - has_compatible_cipher(client_cipher, server_cipher) = True
+
+      - has_compatible_group(client_group, server_group) = True
+
+      - cipher_strength(client_cipher) >= minimum_cipher_strength_for_policy(security_policy_level)
+
+      - has_session_ticket = True
+
+      - ticket_is_valid = True
+
+      - resumption_policy_ok = True
+
+      (Outcome = SESSION_RESUMPTION_SUCCESS, forward_secrecy hard-coded to False.)
+
+
+      B) Full handshake success using a non-FS group under non-high policy:
+
+      can_proceed=true ∧ forward_secrecy=false when
+
+      - replay_detected = False
+
+      - error_count < 3
+
+      - cipher compatible AND group compatible
+
+      - cipher meets min-strength policy: actual_strength >= min_strength
+
+      - cert_status = VALID
+
+      - provides_forward_secrecy(client_group) = False  (i.e., client_group = server_group
+      = SECP256R1)
+
+      - security_policy_level < 4  (because >=4 would reject non-FS full handshakes)
+
+      - and resumption did not occur, i.e. either:
+        - has_session_ticket = False, OR
+        - has_session_ticket = True AND (ticket_is_valid = False OR resumption_policy_ok
+      = False) (Outcome = FULL_HANDSHAKE_SUCCESS, forward_secrecy set to fs=False.)
+    reasoning: >-
+      - The only branches with can_proceed=True are SESSION_RESUMPTION_SUCCESS and
+      FULL_HANDSHAKE_SUCCESS.
+
+      - SESSION_RESUMPTION_SUCCESS sets forward_secrecy=False unconditionally.
+
+      - FULL_HANDSHAKE_SUCCESS sets forward_secrecy=provides_forward_secrecy(client_group);
+      this is False exactly when the negotiated group is SECP256R1.
+
+      - However, when security_policy_level>=4 and fs is False, the function returns
+      SECURITY_DOWNGRADE with can_proceed=False, so full-handshake success without
+      FS is only possible for security_policy_level<4.
+
+      - All success paths require passing the earlier guards: no replay, error_count<3,
+      compatibility, and meeting min-strength policy.
+  q3:
+    answer: >-
+      Yes, the safety property can be violated.
+
+
+      Property: “If security_policy_level >= 4 and the handshake is successful (can_proceed=True),
+      then forward_secrecy must be True.”
+
+
+      Violation occurs exactly when the function takes the session-resumption success
+      branch under a high policy:
+
+      - security_policy_level >= 4
+
+      - replay_detected = False
+
+      - error_count < 3
+
+      - cipher compatible and group compatible
+
+      - cipher meets policy min strength (for level>=4, min_strength=256, so client_cipher
+      must be AES_256_GCM)
+
+      - has_session_ticket = True
+
+      - ticket_is_valid = True
+
+      - resumption_policy_ok = True
+
+      Then determine_handshake_outcome returns SESSION_RESUMPTION_SUCCESS with can_proceed=True
+      and forward_secrecy=False.
+
+
+      Boundary/edge notes:
+
+      - The boundary level is inclusive: security_policy_level = 4 is already “high”
+      (>=4) and is enough to trigger the property and the violation.
+
+      - The intended override (resumption_allowed_by_policy() returns False for level>=4)
+      is not enforced inside determine_handshake_outcome; it trusts the boolean resumption_policy_ok,
+      so a caller bug/mismatch can enable the violating path.
+
+      - No full-handshake path violates the property: for security_policy_level>=4,
+      any full handshake with fs=False is rejected as SECURITY_DOWNGRADE (can_proceed=False).
+    reasoning: >-
+      - Under security_policy_level>=4, minimum_cipher_strength_for_policy requires
+      256-bit strength, so AES_128_GCM cannot reach any successful branch.
+
+      - The function enforces the high-policy FS requirement only in the full-handshake
+      branches (it checks security_policy_level>=4 and not fs), but it does not enforce
+      it (or resumption blocking) in the session-resumption success branch.
+
+      - Therefore, the only successful high-policy execution that returns forward_secrecy=False
+      is SESSION_RESUMPTION_SUCCESS when resumption_policy_ok is (incorrectly) True.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:53'
+  q1:
+    answer: >-
+      There are **7 distinct HandshakeOutcome scenarios** (enum values) that can be
+      returned by the function, driven by **5 specific numeric thresholds**.
+
+
+      **Numeric Thresholds:**
+
+      1. **Error Count**: 3 (Triggers `INVALID_STATE`)
+
+      2. **Security Policy Level**:
+         * Level 2 (Requires 192-bit cipher strength)
+         * Level 3 (Requires 256-bit cipher strength)
+         * Level 4 (Requires Forward Secrecy)
+      3. **Cipher Strength**: 128, 192, 256 bits (Defined for comparison)
+
+      4. **Session Age**: 86400, 86410 seconds (Found in the `resumption_allowed_by_policy`
+      helper, though not directly called in the main function).
+    reasoning: >-
+      *   **HandshakeOutcome.REPLAY_ATTACK**: Triggered immediately if `replay_detected`
+      is true.
+
+      *   **HandshakeOutcome.INVALID_STATE**: Triggered if `error_count >= 3`.
+
+      *   **HandshakeOutcome.COMPATIBILITY_FAILURE**: Triggered if cipher suites or
+      key exchange groups do not match.
+
+      *   **HandshakeOutcome.SECURITY_DOWNGRADE**: Triggered in two distinct numeric
+      scenarios:
+          1. Cipher strength mismatch: If logic derived from `security_policy_level`
+      (2, 3, or else) requires a bit strength (192, 256) higher than the actual cipher
+      (128, 256).
+          2. Forward Secrecy enforcement: If `security_policy_level >= 4` and the
+      group is not X25519 (no forward secrecy). *   **HandshakeOutcome.SESSION_RESUMPTION_SUCCESS**:
+      Triggered if a valid ticket exists and `resumption_policy_ok` is true.
+
+      *   **HandshakeOutcome.CERTIFICATE_FAILURE**: Triggered during a full handshake
+      (or failed resumption fallback) if `cert_status` is INVALID.
+
+      *   **HandshakeOutcome.FULL_HANDSHAKE_SUCCESS**: Triggered when certificate
+      is valid, and either policy level < 4 OR (policy level >= 4 and Forward Secrecy
+      is present).
+  q2:
+    answer: >-
+      There are two distinct logical paths where a handshake succeeds (`can_proceed=True`)
+      but fails to provide forward secrecy (`forward_secrecy=False`).
+
+
+      **Condition 1: Successful Session Resumption**
+
+      The handshake uses a Pre-Shared Key (PSK) from a previous session. This path
+      is taken when:
+
+      *   Initial security checks pass (no replay, error count < 3, compatible ciphers).
+
+      *   `has_session_ticket` is **True**.
+
+      *   `can_proceed` is **True** (ticket is valid).
+
+      *   `resumption_policy_ok` is **True**.
+
+      *   *Result:* The code explicitly hardcodes `forward_secrecy=False` for this
+      outcome.
+
+
+      **Condition 2: Low-Security Full Handshake**
+
+      The handshake performs a full key exchange using a non-FS algorithm (like SECP256R1)
+      under a permissive security policy. This path is taken when:
+
+      *   Standard resumption is not possible (no ticket, invalid ticket, or policy
+      forbids resumption).
+
+      *   `cert_status` is **VALID**.
+
+      *   `client_group` is **NOT X25519** (e.g., `SECP256R1`), resulting in `fs=False`.
+
+      *   `security_policy_level` is **strictly less than 4**.
+
+      *   *Result:* The security check `if security_policy_level >= 4 and not fs`
+      evaluates to False, allowing the handshake to succeed without Forward Secrecy.
+    reasoning: >-
+      *   **Initial Checks**: Both scenarios require `replay_detected=False`, `error_count
+      < 3`, and compatible cipher/group definitions.
+
+      *   **Cipher Strength**: Both scenarios require the chosen cipher's bit strength
+      to meet or exceed the `minimum_cipher_strength_for_policy` based on the current
+      policy level.
+
+      *   **The Divergence**:
+          *   **Resumption Path**: Relies entirely on the boolean inputs (`ticket_is_valid`,
+      `resumption_policy_ok`). If these are true, FS is sacrificed for performance
+      regardless of the group used.
+          *   **Full Handshake Path**: Relies on the intersection of the Key Exchange
+      Group (`SECP256R1` implies no FS) and the `security_policy_level`. The threshold
+      `< 4` acts as the gatekeeper allowing non-FS connections to proceed.
+  q3:
+    answer: >-
+      **Yes, the safety property can be violated.**
+
+
+      The property fails if the function is called with:
+
+      1.  `security_policy_level` >= 4
+
+      2.  `has_session_ticket` = True
+
+      3.  `ticket_is_valid` = True
+
+      4.  `resumption_policy_ok` = **True** (The critical edge case)
+
+
+      Under these exact conditions, the function returns `SESSION_RESUMPTION_SUCCESS`
+      with `forward_secrecy=False`, despite the Security Policy Level being 4 (High).
+
+
+      Although the model provides a helper function `resumption_allowed_by_policy`
+      which explicitly logic to return `False` if `security_policy_level >= 4`, **this
+      helper is never called** inside `determine_handshake_outcome`. Instead, the
+      determination function relies on the `resumption_policy_ok` boolean argument
+      provided by the caller. If the caller fails to invoke the helper correctly or
+      ignores its result and passes `True`, the high-security policy requirement for
+      forward secrecy is bypassed via the resumption path.
+    reasoning: >-
+      *   **Internal Logic Gap**: The code path for session resumption checks `if
+      ticket_is_valid and resumption_policy_ok`. It does *not* re-check `security_policy_level`
+      inside this `if` block.
+
+      *   **Hardcoded Outcome**: If that block is entered, the return value is `HandshakeDecision(...,
+      forward_secrecy=False, ...)`.
+
+      *   **Constraint Location**: The constraint "High security policy requires forward
+      secrecy" (`if security_policy_level >= 4 and not fs`) is located only in the
+      `else` blocks (fallback/full handshake), meaning it is completely skipped if
+      session resumption succeeds.
+
+      *   **Dependency on Caller**: Because the function signature accepts `resumption_policy_ok`
+      as a raw boolean rather than calculating it internally using `security_policy_level`,
+      the strict association between Level 4 and "No Resumption" is not enforced by
+      the `determine_handshake_outcome` function itself, leading to the potential
+      violation.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:46'
+  q1:
+    answer: >-
+      There are 7 distinct handshake outcome scenarios in determine_handshake_outcome:
+
+
+      1. REPLAY_ATTACK (replay_detected=True)
+
+      2. INVALID_STATE (error_count >= 3)
+
+      3. COMPATIBILITY_FAILURE (cipher or key exchange group mismatch)
+
+      4. SECURITY_DOWNGRADE (cipher strength below policy minimum, or high security
+      policy without forward secrecy)
+
+      5. SESSION_RESUMPTION_SUCCESS (valid ticket with policy approval)
+
+      6. CERTIFICATE_FAILURE (invalid certificate during full handshake)
+
+      7. FULL_HANDSHAKE_SUCCESS (valid certificate, compatible parameters, meets security
+      policy)
+
+
+      Numeric thresholds:
+
+      - error_count >= 3: triggers INVALID_STATE
+
+      - security_policy_level >= 3: requires 256-bit cipher strength minimum
+
+      - security_policy_level >= 2 (but < 3): requires 192-bit cipher strength minimum
+
+      - security_policy_level < 2: requires 128-bit cipher strength minimum
+
+      - security_policy_level >= 4: requires forward secrecy AND blocks session resumption
+    reasoning: >-
+      - Analyzing the function flow, I identified all return statements and their
+      conditions
+
+      - REPLAY_ATTACK: triggered when replay_detected=True
+
+      - INVALID_STATE: triggered when error_count >= 3
+
+      - COMPATIBILITY_FAILURE: triggered when cipher suites don't match OR key exchange
+      groups don't match
+
+      - SECURITY_DOWNGRADE: triggered in two scenarios: (1) actual_strength < min_strength
+      based on policy, OR (2) security_policy_level >= 4 and forward secrecy not provided
+
+      - SESSION_RESUMPTION_SUCCESS: triggered when has_session_ticket=True, ticket_is_valid=True,
+      and resumption_policy_ok=True
+
+      - CERTIFICATE_FAILURE: triggered when cert_status=INVALID during full handshake
+      path
+
+      - FULL_HANDSHAKE_SUCCESS: triggered when all compatibility/security checks pass
+      with valid certificate
+
+      - Numeric thresholds: error_count >= 3, security_policy_level >= 2 (192 bits),
+      >= 3 (256 bits), >= 4 (forward secrecy required)
+  q2:
+    answer: >-
+      A handshake succeeds (can_proceed=true) but fails to provide forward secrecy
+      (forward_secrecy=false) under exactly ONE condition:
+
+
+      SESSION_RESUMPTION_SUCCESS occurs when ALL of the following are true:
+
+      - replay_detected = False
+
+      - error_count < 3
+
+      - has_compatible_cipher(client_cipher, server_cipher) = True
+
+      - has_compatible_group(client_group, server_group) = True
+
+      - cipher_strength(client_cipher) >= minimum_cipher_strength_for_policy(security_policy_level)
+
+      - has_session_ticket = True
+
+      - ticket_is_valid = True
+
+      - resumption_policy_ok = True
+
+
+      Note: For FULL_HANDSHAKE_SUCCESS with can_proceed=True, forward_secrecy depends
+      on provides_forward_secrecy(client_group). When client_group=X25519, forward_secrecy=True.
+      When client_group=SECP256R1, forward_secrecy=False, BUT if security_policy_level
+      >= 4, this path is blocked (returns SECURITY_DOWNGRADE with can_proceed=False).
+      So FULL_HANDSHAKE_SUCCESS with security_policy_level < 4 and client_group=SECP256R1
+      would also give can_proceed=True and forward_secrecy=False.
+    reasoning: >-
+      - Analyzed all paths where can_proceed=True: SESSION_RESUMPTION_SUCCESS and
+      FULL_HANDSHAKE_SUCCESS
+
+      - SESSION_RESUMPTION_SUCCESS always has forward_secrecy=False (PSK-based resumption
+      doesn't provide forward secrecy)
+
+      - Conditions for SESSION_RESUMPTION_SUCCESS: pass replay check, pass error check,
+      pass compatibility checks, pass cipher strength check, has_session_ticket=True,
+      ticket_is_valid=True, resumption_policy_ok=True
+
+      - FULL_HANDSHAKE_SUCCESS sets forward_secrecy based on provides_forward_secrecy(client_group)
+
+      - provides_forward_secrecy returns True only for X25519, False for SECP256R1
+
+      - For security_policy_level >= 4 without forward secrecy, SECURITY_DOWNGRADE
+      is returned (can_proceed=False)
+
+      - Therefore, FULL_HANDSHAKE_SUCCESS with can_proceed=True and forward_secrecy=False
+      requires: security_policy_level < 4 AND client_group=SECP256R1
+  q3:
+    answer: >-
+      NO, the safety property 'High security policy (level >= 4) with successful handshake
+      always provides forward secrecy' CANNOT be violated in this implementation.
+
+
+      The property holds because:
+
+
+      1. When security_policy_level >= 4, the resumption_policy_ok parameter would
+      typically be False (based on resumption_allowed_by_policy), blocking session
+      resumption
+
+      2. Even if resumption_policy_ok is somehow True externally, SESSION_RESUMPTION_SUCCESS
+      returns forward_secrecy=False but this is the ONLY potential violation path
+
+      3. For FULL_HANDSHAKE_SUCCESS paths when security_policy_level >= 4: if provides_forward_secrecy(client_group)=False,
+      the code explicitly checks and returns SECURITY_DOWNGRADE with can_proceed=False
+
+
+      HOWEVER, there is ONE EDGE CASE that could violate this property:
+
+      If the caller passes resumption_policy_ok=True despite security_policy_level
+      >= 4 (overriding the expected policy check), AND has_session_ticket=True AND
+      ticket_is_valid=True, then SESSION_RESUMPTION_SUCCESS will occur with can_proceed=True
+      and forward_secrecy=False.
+
+
+      This is a design issue: resumption_policy_ok is passed as a parameter rather
+      than computed internally, creating a potential inconsistency if the caller doesn't
+      properly use resumption_allowed_by_policy().
+    reasoning: >-
+      - The safety property states: High security policy (level >= 4) with successful
+      handshake (can_proceed=True) should always have forward_secrecy=True
+
+      - Analyzed all paths where can_proceed=True with security_policy_level >= 4
+
+      - PATH 1 - SESSION_RESUMPTION_SUCCESS: This requires has_session_ticket=True,
+      ticket_is_valid=True, resumption_policy_ok=True. It returns forward_secrecy=False.
+      This would violate the property IF it can occur with security_policy_level >=
+      4
+
+      - The function resumption_allowed_by_policy returns False when security_policy_level
+      >= 4, which should set resumption_policy_ok=False
+
+      - CRITICAL: resumption_policy_ok is passed as a PARAMETER to determine_handshake_outcome,
+      not computed internally. The function doesn't enforce that resumption_policy_ok
+      aligns with security_policy_level
+
+      - If a caller incorrectly passes resumption_policy_ok=True when security_policy_level
+      >= 4, SESSION_RESUMPTION_SUCCESS occurs with forward_secrecy=False
+
+      - PATH 2 - FULL_HANDSHAKE_SUCCESS: When security_policy_level >= 4 and not forward_secrecy,
+      the code returns SECURITY_DOWNGRADE (can_proceed=False). This path is properly
+      protected.
+
+      - The violation is possible through the SESSION_RESUMPTION_SUCCESS path if resumption_policy_ok
+      is not correctly computed by the caller

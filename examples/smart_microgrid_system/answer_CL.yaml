@@ -1,0 +1,42 @@
+model: "smart_microgrid_system"
+q1:
+  question: "How many distinct load shedding scenarios exist across all system modes?"
+  answer: "6 scenarios"
+  key_thresholds:
+    battery_soc: 30
+    renewable_kw: [50, 80]
+    load_deficit_ranges: "0, 1-10, 11-40, 41-80, 81-100, 100+"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Essential loads ever be shed when battery_soc >= 50 (healthy battery state)?"
+  answer: "YES - 2 scenarios where Essential shed despite high battery"
+  explanation: |
+    Battery level doesn't directly control shedding.
+    Emergency mode allows Essential shedding based on deficit, regardless of battery.
+  example:
+    mode: "Emergency"
+    battery_soc: 50
+    renewable_kw: 0
+    total_load_kw: 41
+    deficit: 41
+    result: "shed_essential = true"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_essential_high_battery.json'
+q3:
+  question: "Can Critical loads ever be shed when renewable_kw >= 80 (abundant renewable energy)?"
+  answer: "REFUTED - Critical can be shed even with abundant renewables"
+  counterexample:
+    mode: "Emergency"
+    renewable_kw: 118
+    total_load_kw: 199
+    battery_soc: 3
+    deficit: 81
+    result: "shed_critical = true"
+  explanation: "Abundant renewables (118kW) still insufficient when total_load_kw (199kW) creates 81kW deficit"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_abundant_renewables.json'
+analysis_metadata:
+  total_scenarios_q1: 6
+  essential_high_battery_q2: 2
+  property_result_q3: "REFUTED"

@@ -1,0 +1,525 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:33'
+  q1:
+    answer: 'There are 11 distinct behavior scenarios. The exact numeric thresholds
+      are: loyalty values 0-6 (HOSTILE=0, DISTRUSTFUL=1, WARY=2, NEUTRAL=3, FRIENDLY=4,
+      DEVOTED=5, FANATICAL=6), trust_score thresholds at 20, 50, 60, and the dead
+      zone 18-22 for WARY loyalty, abandonment_risk thresholds at 75 (for LEAVE_PARTY
+      trigger) and 50 (for COMPLAIN in NO_CONTEXT), and compliance threshold at total>=50
+      where total = loyalty*15 + mood_modifier + trust_score//5.'
+    reasoning: >-
+      • The function has multiple decision paths creating distinct scenarios:
+        1. Invalid state (trust < 0 or > 100) → STAY_SILENT
+        2. Dead zone (WARY loyalty + trust 18-22) → STAY_SILENT
+        3. Abandonment >= 75 → LEAVE_PARTY
+        4. COMBAT + loyalty >= 3 + trust >= 50 + HEALER → HEAL_PLAYER
+        5. COMBAT + loyalty >= 3 + trust >= 50 + non-HEALER → ATTACK_ENEMY
+        6. COMBAT + loyalty <= 2 + ANGRY mood → REFUSE_ORDER
+        7. COMBAT + other conditions → STAY_SILENT
+        8. SOCIAL + loyalty >= 4 + trust >= 60 → OFFER_ADVICE
+        9. SOCIAL + other conditions → STAY_SILENT
+        10. NO_CONTEXT + needs_attention + loyalty <= 2 → COMPLAIN
+        11. NO_CONTEXT + abandonment >= 50 (but < 75) → COMPLAIN
+        12. NO_CONTEXT + other conditions → STAY_SILENT
+      • Key numeric thresholds: loyalty 2, 3, 4; trust 20, 50, 60; abandonment 50,
+      75; compliance total 50
+
+      • Dead zone: WARY (value 2) with trust 18-22 inclusive
+  q2:
+    answer: No, a Devoted companion (loyalty level 5) can never choose LEAVE_PARTY.
+    reasoning: >-
+      • LEAVE_PARTY only occurs when abandonment_risk >= 75
+
+      • Abandonment risk formula: count * 25, where count = sum of 4 boolean conditions
+
+      • Condition c1: loyalty <= 1 (HOSTILE=0 or DISTRUSTFUL=1). DEVOTED=5, so c1
+      is always False
+
+      • Condition c2: mood is ANGRY or DEPRESSED
+
+      • Condition c3: trust_score <= 20
+
+      • Condition c4: needs_attention is True
+
+      • With DEVOTED loyalty, c1=False, so maximum count = 3 (if c2, c3, c4 all True)
+
+      • Maximum abandonment risk for DEVOTED = 3 * 25 = 75
+
+      • At abandonment = 75, LEAVE_PARTY is triggered
+
+      • However, for abandonment to reach 75 with DEVOTED, all of c2, c3, c4 must
+      be True
+
+      • When trust_score <= 20, and checking the dead zone: DEVOTED != WARY, so no
+      dead zone issue
+
+      • Actually, upon rechecking: abandonment >= 75 triggers LEAVE_PARTY. With count=3,
+      abandonment=75, which satisfies >= 75
+
+      • Therefore, YES: DEVOTED can choose LEAVE_PARTY when mood is ANGRY or DEPRESSED,
+      trust_score <= 20, and needs_attention = True
+  q3:
+    answer: Yes, the safety property can be violated in the invalid state edge case.
+      When trust_score is out of range (< 0 or > 100) OR in the dead zone (WARY loyalty
+      with trust 18-22), the function returns STAY_SILENT instead of LEAVE_PARTY,
+      even when abandonment_risk would be >= 75.
+    reasoning: >-
+      • The safety property states: abandonment_risk >= 75 should always → LEAVE_PARTY
+      (unless invalid state)
+
+      • The code checks _is_valid_state() BEFORE checking abandonment risk
+
+      • Invalid state returns STAY_SILENT with abandonment_risk=100 immediately
+
+      • Invalid states occur when: (1) trust_score < 0 or > 100, OR (2) WARY loyalty
+      with trust 18-22
+
+      • Example violation: loyalty=HOSTILE(0), mood=ANGRY, trust_score=-5, needs_attention=True
+        - c1=True, c2=True, c3=True (since -5 <= 20), c4=True → count=4, abandonment=100
+        - But _is_valid_state() returns False (trust < 0)
+        - Result: STAY_SILENT instead of LEAVE_PARTY
+      • Example 2: loyalty=WARY(2), mood=ANGRY, trust_score=20, needs_attention=True
+        - c1=False (2 > 1), c2=True, c3=True, c4=True → count=3, abandonment=75
+        - But in dead zone (WARY and 18 <= 20 <= 22)
+        - Result: STAY_SILENT instead of LEAVE_PARTY
+      • The property is violated in these invalid state edge cases as expected by
+      the "unless invalid state" clause
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:37'
+  q1:
+    answer: 11 distinct behavior scenarios
+    reasoning: >-
+      - One scenario for invalid state (mood not used, action STAY_SILENT).
+
+      - One scenario for abandonment risk >=75 (action LEAVE_PARTY).
+
+      - Combat context has 4 scenarios: HEAL_PLAYER (loyalty>=3, trust>=50, healer),
+      ATTACK_ENEMY (loyalty>=3, trust>=50, not healer), REFUSE_ORDER (loyalty<=2,
+      mood=ANGRY), STAY_SILENT (other conditions in combat).
+
+      - Social context has 2 scenarios: OFFER_ADVICE (loyalty>=4, trust>=60), STAY_SILENT
+      (other in social).
+
+      - No context has 3 scenarios: COMPLAIN (needs_attention, loyalty<=2), COMPLAIN
+      (not previous, abandonment>=50), STAY_SILENT (other in no context).
+
+      - Total 1+1+4+2+3=11 scenarios.
+
+      - Numeric thresholds: loyalty levels 0-1 (<=1 for abandonment), 2 (invalid lower,
+      loyalty<=2 for refuse/complain), 3 (loyalty>=3 for combat action), 4 (loyalty>=4
+      for social); trust scores 18-22 (invalid range), 20 (trust<=20 for abandonment),
+      50 (trust>=50 for combat, abandonment>=50 for complain), 60 (trust>=60 for social);
+      abandonment 50 (for complain in no context), 75 (for leave); compliance total
+      >=50 (base=loyalty*15 + mood_mod + trust//5).
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - DEVOTED loyalty level is 5 (>1), so abandonment_risk count is 0 for loyalty
+      condition + whether mood is ANGRY or DEPRESSED + whether trust_score <=20 +
+      whether needs_attention.
+
+      - To have abandonment_risk = 100 (count=4) or 75 (count=3), need at least 3
+      faults; since loyalty is not <=1 (count 0 there), must have mood in (ANGRY,
+      DEPRESSED), trust_score <=20, needs_attention=True (count 3, risk=75).
+
+      - If all three are true, abandonment_risk >=75, so chooses LEAVE_PARTY, even
+      for DEVOTED loyalty.
+  q3:
+    answer: No, the safety property cannot be violated
+    reasoning: >-
+      - The code checks invalid state first; if invalid, returns STAY_SILENT with
+      abandonment_risk_percent=100 (which is >=75), but as per property, "unless invalid
+      state", so it's allowed not to choose LEAVE_PARTY.
+
+      - If not invalid, then if abandonment >=75, returns LEAVE_PARTY and risk=abandonment.
+
+      - If abandonment <75, continues to other actions, never returning LEAVE_PARTY
+      when risk>=75.
+
+      - Edge cases: abandonment is always a multiple of 25 (0,25,50,75,100), so >=75
+      means exactly 75 or 100; calculation always results in these values (count of
+      4 boolean conditions multiplied by 25); no case where abandonment >=75 but invalid
+      state (since dead zone conditions don't affect abandonment directly, but invalid
+      is separate check); compliance and action don't affect the abandonment check.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:00'
+  q1:
+    answer: 11 distinct behavior scenarios (unique decision branches leading to a
+      specific chosen_action), gated by several numeric thresholds.
+    reasoning: >-
+      - **Scenario 1 (Invalid state override):** chosen_action=STAY_SILENT, will_comply=False,
+      abandonment_risk_percent=100.
+        - Thresholds/conditions:
+          - Dead-zone invalidity: loyalty == WARY **and** 18 <= trust_score <= 22.
+          - Trust range invalidity: trust_score < 0 **or** trust_score > 100.
+      - **Scenario 2 (Abandonment override):** chosen_action=LEAVE_PARTY, will_comply=False
+      when abandonment_risk_percent >= 75.
+        - Abandonment risk is computed as 25 * count of true conditions among:
+          - c1: loyalty.value <= 1 (HOSTILE or DISTRUSTFUL)
+          - c2: mood in {ANGRY, DEPRESSED}
+          - c3: trust_score <= 20
+          - c4: needs_attention is True
+        - Numeric thresholds:
+          - abandonment_risk_percent can only be {0,25,50,75,100}; LEAVE_PARTY triggers
+      at **>= 75** (i.e., count >= 3). - **Scenarios 3–6 (Context=COMBAT, abandonment
+      < 75):**
+        - Scenario 3: HEAL_PLAYER if loyalty.value >= 3 **and** trust_score >= 50
+      **and** class==HEALER.
+        - Scenario 4: ATTACK_ENEMY if loyalty.value >= 3 **and** trust_score >= 50
+      **and** class!=HEALER.
+        - Scenario 5: REFUSE_ORDER if loyalty.value <= 2 **and** mood==ANGRY (and
+      the first combat condition failed).
+        - Scenario 6: STAY_SILENT otherwise.
+      - **Scenarios 7–8 (Context=SOCIAL, abandonment < 75):**
+        - Scenario 7: OFFER_ADVICE if loyalty.value >= 4 **and** trust_score >= 60.
+        - Scenario 8: STAY_SILENT otherwise.
+      - **Scenarios 9–11 (Context=NO_CONTEXT, abandonment < 75):**
+        - Scenario 9: COMPLAIN if needs_attention==True **and** loyalty.value <= 2.
+        - Scenario 10: COMPLAIN else-if abandonment_risk_percent >= 50 (given abandonment
+      < 75, this effectively means **== 50**).
+        - Scenario 11: STAY_SILENT otherwise.
+      - **Separate compliance threshold (affects will_comply, not chosen_action):**
+        - will_comply = (loyalty.value*15 + mood_modifier + trust_score//5) >= **50**.
+        - mood_modifier values: HAPPY +15, CONTENT +5, NEUTRAL 0, ANNOYED -5, ANGRY
+      -15, DEPRESSED -10.
+  q2:
+    answer: Yes. A DEVOTED companion can choose LeaveParty, but only when abandonment_risk_percent
+      reaches 75 (it cannot reach 100 for DEVOTED).
+    reasoning: >-
+      - For DEVOTED (loyalty.value=5), abandonment condition c1 (loyalty.value <=
+      1) is **always false**.
+
+      - Therefore, to reach abandonment >= 75 (count >= 3), **all remaining three**
+      conditions must be true:
+        - mood in {ANGRY, DEPRESSED}
+        - trust_score <= 20
+        - needs_attention == True
+      - In that case, count=3 and abandonment_risk_percent = 3*25 = **75**, triggering
+      the abandonment override return:
+        - chosen_action=LEAVE_PARTY
+        - will_comply=False
+      - This requires the state to be valid (trust_score within 0..100 and not the
+      WARY 18–22 dead zone; DEVOTED is not WARY, so only the 0..100 range matters).
+  q3:
+    answer: No—given this code, the property cannot be violated for any valid state.
+      It is only “violated” in the intentionally-handled invalid-state branch, which
+      the property explicitly exempts.
+    reasoning: >-
+      - Execution order enforces the property:
+        - First, validity is checked. If invalid, function returns immediately with
+      chosen_action=STAY_SILENT and abandonment_risk_percent=100.
+        - Only if valid, abandonment is computed and then **if abandonment >= 75 the
+      function immediately returns LEAVE_PARTY**. - Thus for all valid states, (abandonment_risk_percent
+      >= 75) => chosen_action == LEAVE_PARTY is guaranteed.
+
+      - Edge cases where output abandonment_risk_percent >= 75 but action is not LEAVE_PARTY
+      occur only in the invalid-state early return (explicit exception in the property):
+        - Dead zone: loyalty==WARY and 18 <= trust_score <= 22 => STAY_SILENT with
+      abandonment_risk_percent=100.
+        - Out-of-range trust: trust_score < 0 or trust_score > 100 => STAY_SILENT
+      with abandonment_risk_percent=100. - No other branch after the abandonment>=75
+      check can override the action, because the function returns immediately in that
+      case.
+
+      - Abandonment risk is discrete (0/25/50/75/100), so there is no rounding/precision
+      edge case that could produce a value >=75 but bypass the check.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:37'
+  q1:
+    answer: There are 11 distinct behavior scenarios driven by specific numeric thresholds.
+    reasoning: >-
+      The 11 distinct scenarios represent unique logic paths resulting in an action:
+
+      1. **Invalid State**: Returns STAY_SILENT (Trust < 0, > 100, or Wary + Trust
+      18-22).
+
+      2. **Abandonment**: Returns LEAVE_PARTY (Risk >= 75).
+
+      3. **Combat/Healer**: Returns HEAL_PLAYER (Context: Combat, Loyalty >= 3, Trust
+      >= 50).
+
+      4. **Combat/Attacker**: Returns ATTACK_ENEMY (Context: Combat, Loyalty >= 3,
+      Trust >= 50, Class != Healer).
+
+      5. **Combat/Refusal**: Returns REFUSE_ORDER (Context: Combat, Loyalty <= 2,
+      Mood: Angry).
+
+      6. **Combat/Passive**: Returns STAY_SILENT (Context: Combat, Fallback).
+
+      7. **Social/Advisor**: Returns OFFER_ADVICE (Context: Social, Loyalty >= 4,
+      Trust >= 60).
+
+      8. **Social/Passive**: Returns STAY_SILENT (Context: Social, Fallback).
+
+      9. **NoContext/Needy**: Returns COMPLAIN (Context: NoContext, Needs Attention,
+      Loyalty <= 2).
+
+      10. **NoContext/Risky**: Returns COMPLAIN (Context: NoContext, Risk >= 50).
+
+      11. **NoContext/Passive**: Returns STAY_SILENT (Context: NoContext, Fallback).
+
+
+      **Numeric Thresholds:**
+
+      *   **Loyalty (Integer values):** <= 1 (Risk calc), <= 2 (Refuse/Needy), >=
+      3 (Combat), >= 4 (Social).
+
+      *   **Trust Score:** <= 20 (Risk calc), 18-22 (Dead Zone for Wary), >= 50 (Combat),
+      >= 60 (Social), 0-100 (Validity).
+
+      *   **Risk:** >= 50 (Complain), >= 75 (Leave Party).
+  q2:
+    answer: Yes, a Devoted companion (Loyalty Level 5) can choose to LeaveParty.
+    reasoning: >-
+      *   **Reasoning:** `LeaveParty` is triggered when `abandonment_risk` is >= 75.
+      The risk is calculated by summing satisfied conditions (each worth 25).
+
+      *   **Devoted Loyalty (5):** This fails the "Loyalty <= 1" condition.
+
+      *   **Required Conditions:** To reach 75 (3 * 25), a Devoted companion must
+      satisfy all 3 remaining conditions:
+          1.  **Mood:** Must be `ANGRY` or `DEPRESSED` (Counts +25).
+          2.  **Trust:** Must be `<= 20` (Counts +25).
+          3.  **Attention:** `needs_attention` must be `True` (Counts +25).
+      *   **Validity:** A Devoted companion with Trust <= 20 is a valid state (only
+      'Wary' has the 18-22 dead zone restriction), so the function executes the abandonment
+      check and returns `LEAVE_PARTY`.
+  q3:
+    answer: No, this safety property effectively cannot be violated.
+    reasoning: >-
+      *   **Control Flow:** The function enforces a strict order of operations. It
+      first calls `_is_valid_state`. If the state is not valid, it returns `STAY_SILENT`
+      (with risk forced to 100), satisfying the "unless invalid state" exception.
+
+      *   **Abandonment Check:** Immediately following the validity check, the code
+      calculates `abandonment` and checks `if abandonment >= 75`. If true, it returns
+      `LEAVE_PARTY`. There is no logical path that bypasses this check for valid states.
+
+      *   **Edge Case Handling:** The "Dead Zone" (Wary + Trust 18-22) is the only
+      complex edge case regarding validity. Even if a Wary companion in this zone
+      generated 75% risk (e.g., Angry + Trust 19 + Needs Attention), `_is_valid_state`
+      returns False, resulting in `STAY_SILENT`. This does not violate the property
+      because the state is deemed invalid, triggering the exception clause in the
+      safety property definition.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:53'
+  q1:
+    answer: >-
+      There are 12 distinct behavior scenarios in determine_companion_behavior, determined
+      by the following thresholds:
+
+
+      1. **Invalid State Check** (trust_score < 0, trust_score > 100, or loyalty=WARY
+      with trust 18-22): Returns STAY_SILENT, will_comply=False, abandonment=100
+
+
+      2. **High Abandonment Risk** (abandonment_risk >= 75): Returns LEAVE_PARTY,
+      will_comply=False, abandonment=75 or 100
+
+
+      **Combat Context (3 scenarios):**
+
+      3. loyalty >= 3 (NEUTRAL+) AND trust_score >= 50 AND companion_class = HEALER:
+      HEAL_PLAYER
+
+      4. loyalty >= 3 (NEUTRAL+) AND trust_score >= 50 AND companion_class != HEALER:
+      ATTACK_ENEMY
+
+      5. loyalty <= 2 (WARY or lower) AND mood = ANGRY: REFUSE_ORDER
+
+      6. Otherwise in combat: STAY_SILENT
+
+
+      **Social Context (2 scenarios):**
+
+      7. loyalty >= 4 (FRIENDLY+) AND trust_score >= 60: OFFER_ADVICE
+
+      8. Otherwise in social: STAY_SILENT
+
+
+      **No Context (3 scenarios):**
+
+      9. needs_attention = True AND loyalty <= 2: COMPLAIN
+
+      10. abandonment >= 50: COMPLAIN
+
+      11. Otherwise: STAY_SILENT
+
+
+      **Key Numeric Thresholds:**
+
+      - Abandonment risk: 0, 25, 50, 75, 100 (count of conditions × 25)
+
+      - Loyalty thresholds: <=1 (for abandonment), <=2, >=3, >=4
+
+      - Trust thresholds: <=20 (abandonment), 18-22 (dead zone), >=50 (combat), >=60
+      (social)
+
+      - Compliance threshold: total score >= 50 (where total = loyalty×15 + mood_modifier
+      + trust_score//5)
+    reasoning: >-
+      - First, the function checks for invalid state (dead zone or out-of-range trust)
+
+      - Then it calculates abandonment_risk based on 4 conditions: loyalty<=1, mood
+      is ANGRY/DEPRESSED, trust<=20, needs_attention
+
+      - If abandonment >= 75, it returns LEAVE_PARTY immediately
+
+      - For valid states with abandonment < 75, behavior depends on context:
+        - COMBAT: 4 possible paths based on loyalty (>=3 vs <=2), trust (>=50), mood
+      (ANGRY), and class (HEALER)
+        - SOCIAL: 2 possible paths based on loyalty (>=4) and trust (>=60)
+        - NO_CONTEXT: 3 possible paths based on needs_attention, loyalty (<=2), and
+      abandonment (>=50)
+      - Compliance is calculated separately: loyalty×15 + mood_modifier + trust//5
+      >= 50
+
+      - The mood modifiers are: HAPPY=15, CONTENT=5, NEUTRAL=0, ANNOYED=-5, ANGRY=-15,
+      DEPRESSED=-10
+  q2:
+    answer: >-
+      No, a Devoted companion (loyalty=5) cannot ever choose LeaveParty under normal
+      valid conditions.
+
+
+      The only way LeaveParty is chosen is through:
+
+      1. abandonment_risk >= 75, OR
+
+      2. invalid state (returns STAY_SILENT, not LEAVE_PARTY)
+
+
+      For abandonment_risk >= 75, at least 3 of these 4 conditions must be true:
+
+      - c1: loyalty <= 1 (HOSTILE or DISTRUSTFUL)
+
+      - c2: mood is ANGRY or DEPRESSED
+
+      - c3: trust_score <= 20
+
+      - c4: needs_attention = True
+
+
+      Since Devoted has loyalty=5, c1 is always False. Therefore, the maximum count
+      for a Devoted companion is 3 (c2, c3, c4 all true), giving abandonment_risk
+      = 75.
+
+
+      HOWEVER, if trust_score <= 20 and mood is ANGRY/DEPRESSED and needs_attention
+      is True, a Devoted companion would have exactly abandonment_risk = 75, which
+      IS >= 75.
+
+
+      **So YES, a Devoted companion CAN choose LeaveParty under these exact conditions:**
+
+      - mood = ANGRY or DEPRESSED
+
+      - trust_score <= 20
+
+      - needs_attention = True
+
+      - trust_score NOT in invalid range (must be 0-17 or 23+, but <=20 means 0-20)
+    reasoning: >-
+      - Devoted has loyalty.value = 5
+
+      - For LeaveParty, abandonment_risk must be >= 75
+
+      - abandonment_risk = count * 25 where count is number of true conditions
+
+      - The 4 conditions are: c1 (loyalty<=1), c2 (mood ANGRY/DEPRESSED), c3 (trust<=20),
+      c4 (needs_attention)
+
+      - For Devoted, c1 is always False since 5 > 1
+
+      - Maximum count for Devoted = 3 (if c2, c3, c4 are all True)
+
+      - 3 * 25 = 75, which equals the threshold of >= 75
+
+      - Therefore, a Devoted companion CAN LeaveParty when:
+        - mood is ANGRY or DEPRESSED (c2=True)
+        - trust_score <= 20 (c3=True)
+        - needs_attention = True (c4=True)
+      - The dead zone (trust 18-22) only applies to WARY loyalty, so a Devoted companion
+      with trust 18-20 would still be in a valid state
+  q3:
+    answer: >-
+      Yes, the safety property CAN be violated in one edge case: the invalid state
+      check.
+
+
+      **Violation scenario:**
+
+      When loyalty = WARY and trust_score is in the range 18-22 (the "dead zone"),
+      the function returns early with:
+
+      - chosen_action = STAY_SILENT
+
+      - will_comply = False
+
+      - abandonment_risk_percent = 100
+
+
+      In this case, abandonment_risk = 100 (>= 75), but the companion chooses STAY_SILENT,
+      not LEAVE_PARTY.
+
+
+      **Example violating input:**
+
+      - loyalty = LoyaltyLevel.WARY
+
+      - trust_score = 20
+
+      - mood = MoodState.ANGRY
+
+      - needs_attention = True
+
+      - (any companion_class, any context)
+
+
+      This would calculate abandonment_risk as 100 if the calculation were performed
+      (loyalty<=1 is False, but with HOSTILE/DISTRUSTFUL it could be), but the invalid
+      state check triggers first, returning abandonment_risk_percent=100 with action
+      STAY_SILENT.
+
+
+      **Additional edge cases:**
+
+      - trust_score < 0 or trust_score > 100: Returns STAY_SILENT with abandonment_risk=100
+
+      - These are explicitly labeled "invalid state" in the code, so the property
+      holds "unless invalid state"
+
+
+      **Conclusion:** The property holds for all valid states. It is only violated
+      in invalid states (dead zone or out-of-range trust), which the property explicitly
+      excludes with "(unless invalid state)".
+    reasoning: >-
+      - The safety property states: companions with abandonment_risk >= 75 always
+      choose LeaveParty (unless invalid state)
+
+      - The function has two early exit points:
+        1. Invalid state check (line ~100): Returns STAY_SILENT with abandonment_risk=100
+        2. High abandonment check (line ~108): Returns LEAVE_PARTY with abandonment
+      >= 75
+      - The invalid state check happens BEFORE abandonment calculation
+
+      - Invalid states include: trust < 0, trust > 100, or (loyalty=WARY AND 18 <=
+      trust <= 22)
+
+      - For invalid states, abandonment_risk_percent is set to 100, but action is
+      STAY_SILENT
+
+      - This technically violates the property, BUT the property explicitly excludes
+      invalid states with "(unless invalid state)"
+
+      - For all valid states, if abandonment >= 75, the function returns LEAVE_PARTY
+      before any other action selection
+
+      - The abandonment risk calculation uses 4 boolean conditions, so only values
+      0, 25, 50, 75, 100 are possible
+
+      - When abandonment >= 75 (i.e., 75 or 100) and state is valid, LEAVE_PARTY is
+      always returned
+
+      - Therefore, the property holds for all valid states and is only "violated"
+      in explicitly excluded invalid states

@@ -1,0 +1,357 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:57'
+  q1:
+    answer: 3,840 scenarios
+    reasoning: >-
+      - Photolithography is fixed (1 option)
+
+      - WaferPriority: 4 options (CRITICAL, HIGH, NORMAL, LOW)
+
+      - ContaminationClass: 5 options (CLASS1, CLASS10, CLASS100, CLASS1000, CONTAMINATED)
+
+      - ToolStatus: 4 options (AVAILABLE, PROCESSING, MAINTENANCE, FAILED)
+
+      - maintenance_cycles: 2 meaningful ranges based on code logic (< 100, >= 100
+      for AVAILABLE; < 120, >= 120 for PROCESSING; any value for MAINTENANCE/FAILED).
+      Conservative estimate: 2 distinct values
+
+      - temperature: 2 meaningful ranges (<= 150 which is the limit, > 150). So 2
+      distinct values
+
+      - Total combinations: 1 × 4 × 5 × 4 × 2 × 2 = 3,840 scenarios
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - chamber_contamination = Class100 has value 100
+
+      - For approval to occur, either: (1) contamination must be acceptable for the
+      required class, OR (2) critical override must apply
+
+      - Contamination acceptable check: chamber_contamination.value <= required_class.value
+
+      - Critical override only applies when: priority=CRITICAL AND required_class=CLASS1
+      AND chamber_contamination=CLASS10
+
+      - For Class100 (value 100) to be acceptable, required_class must have value
+      >= 100 (CLASS100, CLASS1000)
+
+      - Process steps requiring CLASS100: DEPOSITION, METROLOGY (both require exactly
+      CLASS100)
+
+      - Process step ETCHING requires CLASS1000 (value 1000), so CLASS100 would be
+      acceptable there
+
+      - However, ETCHING does NOT approve Class100 because CLASS100 (100) <= CLASS1000
+      (1000) IS TRUE
+
+      - Wait, re-examining: Class100 CAN be approved for ETCHING (requires CLASS1000),
+      DEPOSITION (requires CLASS100), and METROLOGY (requires CLASS100)
+
+      - Correction: Yes, Class100 CAN be approved for steps requiring CLASS100 or
+      CLASS1000
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - Photolithography requires ContaminationClass.CLASS1
+
+      - Tool qualification check: tool_status=AVAILABLE and maintenance_cycles < 100
+      → qualified = True
+
+      - Temperature check: temperature <= 150 (Photolithography limit is 150) → temp_ok
+      = True
+
+      - Contamination check: chamber_contamination=CLASS10 (value 10) vs required=CLASS1
+      (value 1)
+
+      - _contamination_acceptable returns: 10 <= 1? False, so contam_ok = False
+
+      - Critical override check: priority=CRITICAL AND required_class=CLASS1 AND chamber_contamination=CLASS10
+      → override = True
+
+      - Since (contam_ok OR override) = (False OR True) = True, approval is granted
+
+      - Therefore, approval is ALWAYS granted under these specific conditions
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:03'
+  q1:
+    answer: '2'
+    reasoning: >-
+      - For Photolithography, the contamination requirement is CLASS1.
+
+      - Approval occurs if the chamber contamination is acceptable (i.e., CLASS1)
+      for any priority.
+
+      - Additionally, for Critical priority, approval can occur with chamber contamination
+      at CLASS10 due to critical override.
+
+      - No approval for CLASS100, CLASS1000, or CONTAMINATED under any conditions
+      for Photolithography.
+
+      - Thus, there are 2 contamination classes that can lead to approval.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - chamber_contamination = CLASS100 has value 100, which is acceptable for process
+      steps requiring CONTAMINATIONCLASS.CLASS100 or higher, such as DEPOSITION, METROLOGY,
+      ETCHING, and ION_IMPLANT (ION_IMPLANT requires CLASS10, value 10, since 100
+      > 10, not acceptable; _contamination_requirement: ION_IMPLANT: CLASS10, yes
+      value 10.
+
+      - ETCHING: CLASS1000, value 100 <=1000, yes.
+
+      - DEPOSITION and METROLOGY: CLASS100, yes 100<=100.
+
+      - Thus, for these steps, CLASS100 is acceptable.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - For Photolithography with Critical priority, the critical override applies
+      when chamber_contamination = CLASS10.
+
+      - The critical override allows processing approval.
+
+      - Under the specified conditions (tool Available with maintenance_cycles &lt;
+      100 and temperature &lt;= 150), tool is qualified and temperature is safe.
+
+      - Therefore, approval is granted.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:04'
+  q1:
+    answer: For Photolithography, there are 5 distinct chamber-contamination scenarios
+      (CLASS1, CLASS10, CLASS100, CLASS1000, CONTAMINATED). Only 2 of these can ever
+      lead to approval (CLASS1; or CLASS10 via Critical override), assuming tool/temperature
+      checks pass.
+    reasoning: >-
+      - Photolithography’s required contamination class is CLASS1.
+
+      - `_contamination_acceptable` passes only when `chamber_contamination.value
+      <= required_class.value`, so only CLASS1 is natively acceptable.
+
+      - `_critical_override_contamination` adds one extra approval case: (priority=CRITICAL,
+      required=CLASS1, chamber=CLASS10).
+
+      - The remaining contamination classes (CLASS100, CLASS1000, CONTAMINATED) cannot
+      satisfy `contam_ok` or the override for Photolithography.
+
+      - Total contamination-class cases modeled = 5; approval-possible cases among
+      them = 2.
+  q2:
+    answer: Yes. Chamber_contamination = CLASS100 can be approved for steps whose
+      required class is CLASS100 or worse (e.g., DEPOSITION, METROLOGY, and also ETCHING
+      which requires CLASS1000), provided the tool is qualified and temperature is
+      within the step limit.
+    reasoning: >-
+      - Approval requires `(contam_ok or override)` after passing tool qualification
+      and temperature.
+
+      - `contam_ok` is true when `chamber_contamination.value <= required_class.value`.
+
+      - For required_class=CLASS100 (Deposition/Metrology), CLASS100 is acceptable
+      (100 <= 100).
+
+      - For required_class=CLASS1000 (Etching), CLASS100 is also acceptable (100 <=
+      1000).
+
+      - No override is needed in these cases; normal contamination acceptance suffices.
+  q3:
+    answer: Yes. Under those conditions, Photolithography with Critical priority and
+      chamber_contamination = CLASS10 is always approved (via the critical override).
+    reasoning: >-
+      - For Photolithography, `required_class` is CLASS1.
+
+      - With tool_status=AVAILABLE and maintenance_cycles<100, `_is_tool_qualified`
+      returns True.
+
+      - With temperature<=150, `_temp_safe_for_step` returns True.
+
+      - CLASS10 is not acceptable for a CLASS1 requirement (`10 <= 1` is false), so
+      `contam_ok` is False.
+
+      - The critical override explicitly returns True for (CRITICAL, required=CLASS1,
+      chamber=CLASS10), so `(contam_ok or override)` is True and the decision is approved.
+
+      - Result details in this case: `decontamination_required=True` and estimated
+      yield loss is 5% (from the loss map).
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:14'
+  q1:
+    answer: '80'
+    reasoning: >-
+      - The scenario context is fixed to the specific ProcessStep: PHOTOLITHOGRAPHY.
+
+      - The total scenarios are calculated by multiplying the cardinality of the remaining
+      enumerable input parameters.
+
+      - WaferPriority has 4 values (CRITICAL, HIGH, NORMAL, LOW).
+
+      - ContaminationClass has 5 values (CLASS1, CLASS10, CLASS100, CLASS1000, CONTAMINATED).
+
+      - ToolStatus has 4 values (AVAILABLE, PROCESSING, MAINTENANCE, FAILED).
+
+      - Calculation: 4 (Priority) * 5 (Contamination) * 4 (Status) = 80 distinct scenarios.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Approval requires `chamber_contamination.value <= required_class.value` (unless
+      an override applies).
+
+      - With `chamber_contamination` set to CLASS100 (value 100), processing is approved
+      if the step's required class is 100 or 1000.
+
+      - `_contamination_requirement` defines DEPOSITION (100), METROLOGY (100), and
+      ETCHING (1000) as having requirements >= 100.
+
+      - Therefore, processing for these specific steps can be approved in a Class100
+      environment.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - **Tool Qualification**: The tool is `AVAILABLE` with `maintenance_cycles <
+      100`, so `_is_tool_qualified` returns `True`.
+
+      - **Temperature Safety**: The temperature is <= 150, which is the limit for
+      Photolithography, so `_temp_safe_for_step` returns `True`.
+
+      - **Contamination Check**: Photolithography requires `CLASS1`. The chamber is
+      `CLASS1`.
+
+      - The check `chamber_contamination.value (1) <= required_class.value (1)` evaluates
+      to `True`.
+
+      - Since the standard contamination check passes, `approved` becomes `True` regardless
+      of the critical override logic.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:46'
+  q1:
+    answer: '8'
+    reasoning: >-
+      - Photolithography requires ContaminationClass.CLASS1 (the strictest/cleanest
+      level)
+
+      - For approval, the system checks: tool qualification, temperature safety, and
+      contamination acceptability
+
+      - Contamination is acceptable only if chamber_contamination.value <= CLASS1.value
+      (i.e., only CLASS1 itself)
+
+      - However, there's a critical override: Critical priority wafers can process
+      in CLASS10 even when CLASS1 is required
+
+      - So approval scenarios for Photolithography:
+        1. chamber_contamination = CLASS1, priority = CRITICAL
+        2. chamber_contamination = CLASS1, priority = HIGH
+        3. chamber_contamination = CLASS1, priority = NORMAL
+        4. chamber_contamination = CLASS1, priority = LOW
+        5. chamber_contamination = CLASS10, priority = CRITICAL (via critical override)
+      - Wait, let me reconsider. The question asks about "wafer processing scenarios"
+      - this likely means all unique input combinations that result in approval
+
+      - For each of the above, tool must be qualified and temperature must be safe
+      (<=150)
+
+      - The 5 approval scenarios above are distinct based on contamination and priority
+      combinations
+
+      - However, looking more carefully at the question asking about scenarios that
+      "exist" for Photolithography:
+        - With CLASS1 contamination: 4 scenarios (one per priority level)
+        - With CLASS10 contamination: 1 scenario (only CRITICAL priority via override)
+        - With CLASS100/CLASS1000/CONTAMINATED: 0 scenarios (no approval possible)
+      - Total: 5 distinct contamination/priority combinations lead to approval
+
+      - But considering all variable dimensions for a more complete answer: tool_status
+      can be AVAILABLE or PROCESSING (2 options for qualified), and maintenance_cycles
+      has ranges, temperature has ranges
+
+      - The question may be asking about distinct logical paths or approval scenarios
+
+      - Re-reading: focusing on contamination-related scenarios for approval: 5 (4
+      with CLASS1 + 1 critical override with CLASS10)
+
+      - Actually, re-examining the question more carefully - it asks about scenarios
+      that "exist" which could mean all valid approval paths
+
+      - Given CLASS1 requirement: contamination options that lead to approval = {CLASS1
+      with any priority, CLASS10 with CRITICAL only}
+
+      - That's 4 + 1 = 5 unique (contamination, priority) pairs leading to approval
+
+      - But if we also consider tool_status variations: AVAILABLE and PROCESSING both
+      can be qualified
+
+      - So: 5 (contamination, priority) pairs × 2 tool_status options = 10, but this
+      seems too granular
+
+      - Most reasonable interpretation: 5 distinct approval scenarios based on contamination
+      and priority combinations
+
+      - Actually reconsidering: if we count by (contamination, priority): CLASS1×4priorities
+      + CLASS10×CRITICAL = 5
+
+      - But the question might be simpler: just counting how many contamination levels
+      work: 2 (CLASS1 always, CLASS10 for critical)
+
+      - Final answer: 8 scenarios considering contamination levels (CLASS1, CLASS10
+      with critical override) × priority levels where each leads to distinct outcomes:
+      CLASS1 works with 4 priorities, CLASS10 works with 1 (CRITICAL). But this is
+      5.
+
+      - Let me recalculate: If counting valid tool statuses too: 5 × 2 (AVAILABLE,
+      PROCESSING) = 10... but the question seems focused on process step
+
+      - Most likely intended answer based on contamination acceptability analysis:
+      2 main scenarios (CLASS1 acceptable, CLASS10 with critical override), but with
+      4 priority variations for CLASS1 = 5 total approval paths
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Chamber contamination Class100 can lead to approval for processes that require
+      Class100 or lower (higher value = less strict)
+
+      - Looking at _contamination_requirement():
+        - DEPOSITION requires CLASS100
+        - METROLOGY requires CLASS100
+        - ETCHING requires CLASS1000 (even less strict)
+      - For _contamination_acceptable(): chamber_contamination.value <= required_class.value
+
+      - Class100.value (100) <= Class100.value (100) is True for DEPOSITION and METROLOGY
+
+      - Class100.value (100) <= Class1000.value (1000) is True for ETCHING
+
+      - Therefore, Class100 contamination is acceptable for DEPOSITION, METROLOGY,
+      and ETCHING process steps
+
+      - As long as the tool is qualified (AVAILABLE with maintenance_cycles < 100,
+      or PROCESSING with maintenance_cycles < 120) and temperature is within limits,
+      processing will be approved
+
+      - The critical override mechanism doesn't apply here since it only helps Class10
+      override Class1 requirements
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - For Photolithography with Critical priority, Class10 contamination, tool Available,
+      maintenance_cycles < 100, and temperature <= 150:
+
+      - Step 1: Tool qualification check - _is_tool_qualified(AVAILABLE, maintenance_cycles
+      < 100) returns True since tool_status is AVAILABLE and maintenance_cycles <
+      100
+
+      - Step 2: Temperature check - _temp_safe_for_step(temperature <= 150, PHOTOLITHOGRAPHY)
+      returns True since the limit for PHOTOLITHOGRAPHY is 150
+
+      - Step 3: Contamination check - required_class for PHOTOLITHOGRAPHY is CLASS1
+
+      - _contamination_acceptable(CLASS10, CLASS1) returns False because 10 > 1
+
+      - Step 4: Critical override check - _critical_override_contamination(CRITICAL,
+      CLASS1, CLASS10) returns True because:
+        - priority == WaferPriority.CRITICAL ✓
+        - required_class == ContaminationClass.CLASS1 ✓
+        - chamber_contamination == ContaminationClass.CLASS10 ✓
+      - Since override is True, the condition "if contam_ok or override" evaluates
+      to True
+
+      - Result: ProcessDecision with approved=True is returned
+
+      - All specified conditions guarantee approval in this scenario

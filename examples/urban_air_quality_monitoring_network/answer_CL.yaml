@@ -1,0 +1,36 @@
+model: "urban_air_quality_monitoring_network"
+q1:
+  question: "How many distinct monitoring response scenarios exist in determine_monitoring_response, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "2989 scenarios"
+  key_thresholds:
+    drift_factor: [79, 80, 89, 90, 97, 98, 102, 103, 110, 111, 120, 121]
+    time_since_last_alert: [24]
+    raw_reading: [147, 148, 152, 153]
+    pollutant_base: "PM25:[15,35,75,150] NO2:[25,50,100,200] Ozone:[100,160,240,300] CO:[10,20,40,60] SO2:[20,50,100,200]"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_response_scenarios.json'
+q2:
+  question: "Can a sensor with status=Calibrating ever trigger an emergency protocol? If so, under what conditions?"
+  answer: "YES - 247 scenarios where Calibrating sensors trigger emergency"
+  example:
+    scenario: "Calibrating + drift_factor=119 + time_since_last_alert=23"
+    satisfied_conditions: ["drift < 90 OR > 110 (TRUE)", "time < 24 (TRUE)"]
+    result: "2 conditions met → emergency=true"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_str.sensor_status == \"Calibrating\" and .invariant_str == \"true\")] | length" decomp_q2_triggers_emergency.json'
+    why_counterintuitive: "Calibrating → final_alert_level=Normal, but emergency uses quorum (2/4 conditions), so can trigger via other conditions"
+q3:
+  question: "Can the safety property 'Hazardous readings with recent alerts always trigger emergency protocol' ever be violated?"
+  answer: "PROVEN - Property always holds, no counterexamples"
+  property: "(reading_valid && final_alert_level=Hazardous && time_since_last_alert<24) ==> trigger_emergency"
+  why_holds: "Hazardous (Condition 1) + Recent alert (Condition 4) = 2/4 conditions → always triggers"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_safety_property.json'
+analysis_metadata:
+  total_regions: 2989
+  imandra_runtime: "All analyses completed successfully, no timeouts"
+  pattern_complexity:
+    override: "Faulty escalates alerts, BUT favorable conditions override (except Hazardous)"
+    multiplexer: "Weather changes threshold semantics (PM25+Foggy: -20%, PM25+Rainy: +30%)"
+    quorum: "Emergency requires 2 of 4: [Hazardous/VeryUnhealthy, Foggy, BadDrift, RecentAlert]"
+    dead_zone: "raw_reading∈[148,152] AND drift_factor∈[98,102] → invalid"

@@ -1,0 +1,40 @@
+model: "gdpr_compliance_engine"
+q1:
+  question: "How many distinct GDPR compliance scenarios exist in determine_gdpr_compliance, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "929 scenarios"
+  key_thresholds:
+    consent_age: [24, 23, 25]
+    transfer_safeguard_score: [58, 59, 60, 62, 63, 80, 90]
+    risk_factors: [2, 3, 4]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_compliance_scenarios.json'
+q2:
+  question: "Can processing with lawful_basis=LegalObligation ever be rejected? If so, under what exact conditions?"
+  answer: "YES - 33 scenarios where LegalObligation is rejected"
+  example:
+    scenario: "Health data + LegalObligation + automated_decision=true"
+    constraints: ["data_cat = Health", "lawful_basis = LegalObligation", "automated_decision = true"]
+    result: "processing_allowed = false"
+  why_counterintuitive: "LegalObligation normally allows processing (it's a strong legal basis), BUT the override pattern creates an exception: sensitive data (Health/Sensitive) + automated decision making → rejected"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_legal_obligation_rejected.json'
+q3:
+  question: "Can the safety property 'Critical risk always requires DPO review' ever be violated? If so, under what exact conditions?"
+  answer: "PROVEN - Property always holds, cannot be violated"
+  property: "(risk_assessment = Critical) ==> requires_dpo_review"
+  why_holds: "Critical risk (4 risk factors) always triggers requires_dpo_review=true by design in the code"
+  metadata:
+    extraction: 'jq ".[0].proved" vg_q3_critical_dpo.json'
+    note: "Uses formal verification (verify) rather than decomposition"
+analysis_metadata:
+  total_regions: 929
+  imandra_runtime: "All analyses completed successfully within timeouts"
+  pattern_complexity:
+    override: "LegalObligation allows processing, BUT (sensitive data AND automated_decision) → rejected"
+    multiplexer: "Transfer safeguard thresholds vary by data category: Personal=60, Sensitive=80, Health=90"
+    quorum: "Risk requires M of 4: [sensitive_data, automated_decision, profiling, cross_border]"
+    dead_zone: "safeguard_score∈[58,62] AND consent_age∈[23,25] → invalid"
+  interesting_findings:
+    - "33 scenarios where strong LegalObligation basis is rejected (override pattern)"
+    - "Dead zone boundaries create ambiguous cases that are marked invalid"
+    - "Critical risk (all 4 factors) always requires DPO review (0 violations)"

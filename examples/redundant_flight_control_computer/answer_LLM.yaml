@@ -1,0 +1,254 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:25'
+  q1:
+    answer: 432 distinct control scenarios
+    reasoning: >-
+      • Input parameters: comp_a (3 values), comp_b (3 values), comp_c (3 values),
+      flight_phase (3 values), agreement (3 values), altitude (continuous but discretized
+      by dead zone)
+
+      • Total combinations: 3 × 3 × 3 × 3 × 3 = 243 computer/phase/agreement combinations
+
+      • Altitude creates 2 regions: dead zone (9800-10200 with specific conditions)
+      and normal operation
+
+      • Not all combinations produce unique outputs, but distinct control scenarios
+      are determined by unique combinations of (use_computer_a, use_computer_b, use_computer_c,
+      require_pilot_intervention, system_confidence)
+
+      • Confidence values: base (95, 85, 98) × agreement factors (100%, 85%, 60%)
+      = 9 possible values
+
+      • Computer selection: 8 patterns (2^3 for which computers are OPERATIONAL/DEGRADED
+      vs FAILED)
+
+      • With quorum requirements and pilot override logic: 3^3 computer status × 3
+      flight phases × 3 sensor agreements × 2 altitude regions = 486 theoretical combinations
+
+      • After removing invalid states and duplicate outcomes: approximately 432 distinct
+      control scenarios
+  q2:
+    answer: Yes, but only under specific conditions
+    reasoning: >-
+      • Landing is a critical phase that normally requires pilot intervention
+
+      • The _requires_pilot_override function shows: critical_phase = True for LANDING
+
+      • However, there is an exception: pilot NOT required if FULL_AGREEMENT AND quorum
+      exists
+
+      • Quorum requires at least 2 OPERATIONAL computers (not just degraded)
+
+      • Therefore, Landing can operate without pilot intervention when:
+        - SensorAgreement = FULL_AGREEMENT
+        - At least 2 computers have status OPERATIONAL
+        - System is in valid state (not in dead zone, valid altitude range)
+      • Example: comp_a=OPERATIONAL, comp_b=OPERATIONAL, comp_c=any, agreement=FULL_AGREEMENT
+      → no pilot needed
+  q3:
+    answer: Yes, the system can use computers with 1 Failed computer
+    reasoning: >-
+      • The _select_computers function uses computers that are OPERATIONAL or DEGRADED
+
+      • FAILED computers are not used (use_x = False when comp_x == FAILED)
+
+      • Quorum requires 2+ OPERATIONAL computers (not counting DEGRADED as operational)
+
+      • With 1 FAILED computer, the other 2 can provide quorum if both are OPERATIONAL
+
+      • Example valid configuration: comp_a=OPERATIONAL, comp_b=OPERATIONAL, comp_c=FAILED
+        - Quorum exists (2 operational)
+        - use_computer_a=True, use_computer_b=True, use_computer_c=False
+        - System can operate (with or without pilot depending on phase/agreement)
+      • The failed computer is simply excluded from the control decision
+
+      • Therefore, yes, the system can operate with 1 failed computer as long as the
+      other 2 are operational
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:31'
+  q1:
+    answer: 5 distinct control scenarios.
+    reasoning: >-
+      - The logic partitions into five outcome modes based on validity, quorum, phase
+      criticality, and sensor agreement.
+
+      - (1) Invalid/ambiguous state (bad altitude/confidence or dead zone) => all
+      computers off, pilot required.
+
+      - (2) Valid but no quorum (fewer than 2 OPERATIONAL computers) => computers
+      effectively not used (ANDed with quorum), pilot required.
+
+      - (3) Valid + quorum + CRUISE => computers used, no pilot intervention.
+
+      - (4) Valid + quorum + critical phase (TAKEOFF/LANDING) + FULL_AGREEMENT =>
+      computers used, no pilot intervention.
+
+      - (5) Valid + quorum + critical phase + not FULL_AGREEMENT (PARTIAL/DISAGREEMENT)
+      => computers used, pilot intervention required.
+  q2:
+    answer: Yes—Landing can operate without pilot intervention, but only with FULL
+      sensor agreement and quorum (≥2 OPERATIONAL computers), and the state must be
+      valid.
+    reasoning: >-
+      - LANDING is treated as a critical phase, so pilot is required by default.
+
+      - The only exception is when `agreement == FULL_AGREEMENT` AND `_has_quorum(...)`
+      is true; then `_requires_pilot_override` returns False.
+
+      - Quorum counts only OPERATIONAL computers (DEGRADED does not count).
+
+      - Validity must also pass `_is_valid_state` (altitude 0–50000 and not in the
+      defined dead zone).
+  q3:
+    answer: Yes, but only if the other two computers are OPERATIONAL (so quorum still
+      holds).
+    reasoning: >-
+      - With 1 FAILED computer, quorum requires the remaining two to both be OPERATIONAL
+      (since quorum counts only OPERATIONAL).
+
+      - If either remaining computer is DEGRADED (or FAILED), op_count drops below
+      2 ⇒ no quorum ⇒ all `use_computer_*` become False (ANDed with quorum) and pilot
+      intervention is required.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:19:42'
+  q1:
+    answer: '2'
+    reasoning: >-
+      Analysis of the `determine_flight_control` function reveals two distinct execution
+      paths (control scenarios) based on the validity of the inputs:
+
+      - **Invalid State Scenario**: An early return occurs if `_is_valid_state` returns
+      False (due to "dead zone" logic or boundary checks). This returns a hardcoded
+      decision with no computers used, pilot required, and 0 confidence.
+
+      - **Valid State Scenario**: If the state is valid, the function proceeds to
+      calculate confidence, check quorum, and determine override logic, resulting
+      in a dynamically calculated `ControlDecision`.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      The `_requires_pilot_override` function defines logic for "Critical Phases"
+      (which includes LANDING).
+
+      - By default, `critical_phase` sets `needs_pilot` to True.
+
+      - However, an exception is defined: `override = agreement == SensorAgreement.FULL_AGREEMENT
+      and _has_quorum(...)`.
+
+      - If there is Full Agreement and Quorum, `override` becomes True, and the function
+      returns `False` for pilot requirement. Therefore, Landing can operate without
+      the pilot under these specific high-reliability conditions.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      The system functions based on a "Quorum" check (`_has_quorum`), which requires
+      `_count_operational(...) >= 2`.
+
+      - `_count_operational` only increments the count for computers with `ComputerStatus.OPERATIONAL`.
+
+      - If 1 computer is FAILED, 2 computers remain.
+
+      - If the remaining 2 computers are strictly `OPERATIONAL`, the count is 2, and
+      Quorum is satisfied.
+
+      - Consequently, the system will use the two operational computers (returning
+      True for `use_computer_a` and `use_computer_b`, for example).
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:06'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - The control scenarios refer to the possible combinations of computers used
+      for flight control.
+
+      - No computers used: 1 scenario.
+
+      - Two computers used: 3 scenarios (A and B, A and C, B and C).
+
+      - All three computers used: 1 scenario.
+
+      - Total: 5 distinct scenarios.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - In the LANDING phase, which is a critical phase, pilot intervention is required
+      by default.
+
+      - However, if there is full sensor agreement and a quorum (at least 2 operational
+      computers), no pilot intervention is required.
+
+      - This allows the system to operate autonomously during landing under these
+      specific conditions.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The system requires a quorum of at least 2 operational computers to use any
+      computers.
+
+      - If there is 1 failed computer, as long as there are 2 operational computers,
+      quorum exists, and the system can use the operational ones (along with any degraded
+      ones if present).
+
+      - For example, if one computer is failed and the other two are operational,
+      the two operational computers will be used.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:38'
+  q1:
+    answer: '243 distinct control scenarios exist (3^3 × 3 × 3 × altitude range considerations,
+      but for discrete inputs: 243 base combinations)'
+    reasoning: >-
+      - ComputerStatus has 3 values (OPERATIONAL, DEGRADED, FAILED) for each of 3
+      computers = 3^3 = 27 combinations
+
+      - FlightPhase has 3 values (TAKEOFF, CRUISE, LANDING)
+
+      - SensorAgreement has 3 values (FULL_AGREEMENT, PARTIAL_AGREEMENT, DISAGREEMENT)
+
+      - For discrete enumeration: 27 × 3 × 3 = 243 distinct input combinations (excluding
+      altitude as a continuous variable)
+
+      - Altitude is continuous but affects validity checks (dead zone 9800-10200 with
+      specific conditions, and valid range 0-50000)
+
+      - The 243 combinations represent the distinct discrete control scenarios based
+      on enum inputs
+  q2:
+    answer: Yes, Landing phase can operate without pilot intervention under specific
+      conditions
+    reasoning: >-
+      - Landing is a critical phase (critical_phase = True in _requires_pilot_override)
+
+      - For critical phases, pilot is needed by default (needs_pilot = True)
+
+      - However, there's an override condition: agreement == SensorAgreement.FULL_AGREEMENT
+      AND _has_quorum() returns True
+
+      - If override is True, the function returns "not override" which is False, meaning
+      no pilot intervention required
+
+      - So Landing can operate without pilot intervention when: FULL_AGREEMENT sensor
+      status AND at least 2 OPERATIONAL computers (quorum)
+
+      - Additionally, quorum must exist (2+ operational computers) otherwise pilot_needed
+      becomes True due to "not quorum" condition
+  q3:
+    answer: Yes, the system can use computers with 1 Failed computer
+    reasoning: >-
+      - The system uses quorum-based operation requiring at least 2 OPERATIONAL computers
+
+      - With 1 Failed computer and 2 OPERATIONAL computers, _has_quorum() returns
+      True (count >= 2)
+
+      - _select_computers() selects computers that are OPERATIONAL or DEGRADED (not
+      FAILED)
+
+      - The final decision uses "use_a and quorum" logic, so operational/degraded
+      computers will be used if quorum exists
+
+      - Example: comp_a=FAILED, comp_b=OPERATIONAL, comp_c=OPERATIONAL results in
+      use_computer_b=True, use_computer_c=True, use_computer_a=False
+
+      - The system gracefully handles 1 failed computer as long as 2 operational computers
+      remain
+
+      - If 2 computers are Failed, quorum is lost and pilot intervention is required

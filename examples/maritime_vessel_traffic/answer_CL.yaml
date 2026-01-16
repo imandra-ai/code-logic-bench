@@ -1,0 +1,90 @@
+model: "maritime_vessel_traffic"
+q1:
+  question: "How many distinct lane entry scenarios exist?"
+  answer: "340 total scenarios: 162 Approved, 109 Delayed, 69 Denied"
+  state_space_breakdown: |
+    Total: 340 scenarios
+    Approved: 162 (48%) - All conditions satisfied
+    Delayed: 109 (32%) - Borderline or dead zone
+    Denied: 69 (20%) - Insufficient conditions
+  key_thresholds:
+    visibility: [200, 450, 500, 550]
+    fuel_level: [30]
+    vessel_priority_scores: [1, 2, 3, 4]
+    weather_capacity_reduction: [0, 1, 2]
+    entry_score: [2, 3]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), approved_count: ([.[0].regions_str[] | select(.invariant_str == \"Approved\")] | length), delayed_count: ([.[0].regions_str[] | select(.invariant_str == \"Delayed\")] | length), denied_count: ([.[0].regions_str[] | select(.invariant_str == \"Denied\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Cargo vessels enter when at reduced capacity limit in Storm?"
+  answer: "YES - 5 scenarios where Cargo + Storm + at_capacity → Approved"
+  quorum_compensation_demonstrated:
+    situation: "Storm reduces capacity by 2, current_count = max_capacity - 2 (at limit)"
+    capacity_ok: "FALSE (at reduced capacity limit)"
+    example:
+      vessel_type: "Cargo"
+      weather: "Storm"
+      current_vessel_count: 0
+      max_capacity: 2
+      effective_capacity: "max_capacity - 2 = 0"
+      capacity_ok: "FALSE (0 < 0 is false)"
+      vessel_speed: 0
+      speed_limit: 0
+      speed_ok: "TRUE (0 <= 0)"
+      vessel_priority: 1
+      priority_ok: "TRUE (1 >= 1)"
+      fuel_level: 30
+      fuel_ok: "TRUE"
+      visibility: 500
+      spacing_ok: "TRUE"
+      score: "4/5 (all except capacity)"
+      result: "Approved (score >= 3)"
+  explanation: |
+    Even though capacity_ok = false (at reduced limit), the quorum pattern
+    allows approval if 3+ other conditions are satisfied.
+    In this case: speed_ok, priority_ok, fuel_ok, spacing_ok = 4 conditions
+    Score = 4/5 >= 3 → Approved
+  key_insight: "Quorum pattern treats capacity as soft constraint - can be compensated"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_cargo_storm_capacity.json'
+q3:
+  question: "Can entries be approved in visibility dead zone?"
+  answer: "PROVEN - Dead zone entries NEVER directly approved"
+  property: "in_visibility_dead_zone ==> result != Approved"
+  why_proven: |
+    The visibility dead zone check has highest precedence (line 68-70):
+
+    if in_dead_zone then
+      Delayed
+    else
+      ... (* emergency override and quorum *)
+
+    Dead zone applies when: weather=Fog AND visibility ∈ [450, 550]
+    This ensures marginally safe visibility conditions force a Delayed decision
+    for waiting until visibility improves, regardless of other factors.
+  dead_zone_definition:
+    condition: "Fog weather AND visibility 450-550m"
+    rationale: "Below 450m clearly unsafe, above 550m clearly safe, 450-550m uncertain"
+    safety_response: "Delay entry until visibility improves"
+  key_insight: "Dead zone check prevents approval even for emergency vessels in marginal fog"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_visibility_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 340
+  cargo_storm_capacity_approved: 5
+  property_result: "PROVEN"
+  patterns_demonstrated:
+    pattern_1_override: "Emergency + visibility>200 bypasses quorum, but not dead zone"
+    pattern_2_multiplexer: "Weather changes both capacity (0/1/2 reduction) and speed limits (100%/60%/40%)"
+    pattern_3_dead_zone: "Visibility 450-550m during Fog → Delayed"
+    pattern_6_quorum: "3/5 conditions allow entry even at capacity"
+  model_insights:
+    - "340 scenarios with balanced distribution"
+    - "48% approval rate shows permissive but safe policy"
+    - "Cargo can enter at capacity limit if compensated (5 scenarios)"
+    - "Dead zone safety correctly enforced (proven)"
+    - "Multiplexer pattern creates weather-adaptive thresholds"
+  design_lessons:
+    soft_capacity_constraint: "Capacity checked via quorum, not hard limit"
+    weather_adaptivity: "Single weather parameter affects multiple dimensions"
+    safety_precedence: "Visibility dead zone > Emergency override > Quorum"

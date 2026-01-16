@@ -1,0 +1,517 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:12'
+  q1:
+    answer: >-
+      There are 5 distinct alert scenarios in determine_alert. The numeric thresholds
+      are coastal-type-specific:
+
+
+      SANDY: Advisory ≥30, Warning ≥50, Critical ≥80, Emergency ≥150
+
+      ROCKY: Advisory ≥50, Warning ≥80, Critical ≥120, Emergency ≥150
+
+      ESTUARY: Advisory ≥25, Warning ≥40, Critical ≥65, Emergency ≥150
+
+
+      Additional thresholds: Dead zone (48≤erosion_rate≤52 AND 28≤wave_height≤32),
+      Danger quorum wave_height >25
+    reasoning: >-
+      • The 5 distinct alert levels are: NORMAL, ADVISORY, WARNING, CRITICAL, EMERGENCY
+
+      • Each coastal type has different thresholds for ADVISORY, WARNING, and CRITICAL
+      levels
+
+      • EMERGENCY threshold is uniform across all coastal types at 150
+
+      • NORMAL is the default when erosion_rate is below the ADVISORY threshold (implicitly
+      < threshold_advisory)
+
+      • Sandy beaches have the most sensitive thresholds (lowest values), followed
+      by Estuary, then Rocky (highest values)
+
+      • The dead zone represents an ambiguous measurement region that always triggers
+      ADVISORY
+
+      • The danger quorum uses wave_height > 25 as one of three conditions to potentially
+      downgrade CRITICAL to WARNING or maintain CRITICAL with evacuation
+  q2:
+    answer: >-
+      Evacuation (evacuate=true) is triggered under exactly 2 conditions:
+
+
+      1. erosion_rate ≥ 150 (EMERGENCY alert regardless of coastal type)
+
+      2. erosion_rate ≥ threshold_critical AND danger_quorum_met=true AND infrastructure_critical=true
+      (CRITICAL alert with evacuation)
+
+
+      Where danger_quorum requires at least 2 of 3: erosion_rate≥threshold_critical,
+      wave_height>25, infrastructure_critical=true
+    reasoning: >-
+      • EMERGENCY alert (erosion_rate ≥ 150) always sets evacuate=True unconditionally
+
+      • CRITICAL alert can set evacuate=True, but only when: (a) danger quorum is
+      met (≥2 of 3 conditions), AND (b) infrastructure_critical=True
+
+      • If infrastructure_critical=False, even with CRITICAL alert and quorum met,
+      evacuate remains False
+
+      • WARNING, ADVISORY, and NORMAL alerts always set evacuate=False
+
+      • Dead zone condition always returns ADVISORY with evacuate=False
+
+      • Failed sensors always return ADVISORY with evacuate=False, preventing any
+      evacuation
+
+      • The quorum check ensures that CRITICAL-level erosion alone isn't enough; it
+      needs supporting evidence from wave height or critical infrastructure presence
+  q3:
+    answer: No, the safety property cannot be violated. Failed sensors can NEVER produce
+      an Emergency alert under any conditions.
+    reasoning: >-
+      • The code has an early return statement: if sensor_status == SensorStatus.FAILED,
+      it immediately returns AlertDecision(level=AlertLevel.ADVISORY, evacuate=False)
+
+      • This check occurs BEFORE any erosion rate classification logic
+
+      • This check also occurs BEFORE the emergency threshold check (erosion_rate
+      >= threshold_emergency)
+
+      • Therefore, regardless of erosion_rate, wave_height, coastal_type, or infrastructure_critical
+      values, a FAILED sensor will ALWAYS return ADVISORY
+
+      • The control flow guarantees that failed sensors cannot reach the code path
+      that would return EMERGENCY
+
+      • This is a robust safety feature: even if erosion_rate is 200+ (well above
+      emergency threshold), a failed sensor will still only report ADVISORY
+
+      • The safety property is preserved by design through early exit pattern
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:19'
+  q1:
+    answer: 'There are 6 distinct alert scenarios in determine_alert: (AlertLevel.NORMAL,
+      evacuate=False), (AlertLevel.ADVISORY, evacuate=False), (AlertLevel.WARNING,
+      evacuate=False), (AlertLevel.CRITICAL, evacuate=False), (AlertLevel.CRITICAL,
+      evacuate=True), and (AlertLevel.EMERGENCY, evacuate=True). The exact numeric
+      thresholds that determine these scenarios depend on the coastal type, as follows.
+      For CoastalType.SANDY: erosion rate thresholds are 30 (Advisory), 50 (Warning),
+      80 (Critical), and 150 (Emergency). For CoastalType.ROCKY: 50 (Advisory), 80
+      (Warning), 120 (Critical), and 150 (Emergency). For CoastalType.ESTUARY: 25
+      (Advisory), 40 (Warning), 65 (Critical), and 150 (Emergency). Additionally,
+      the dead zone triggers Advisory if erosion rate is between 48 and 52 (inclusive)
+      and wave height is between 28 and 32 (inclusive). The quorum check for Critical
+      uses wave height > 25 in combination with erosion rate >= Critical threshold
+      and infrastructure_critical, where at least 2 out of the 3 conditions (erosion
+      >= thresh, wave > 25, and infra critical) are true. If quorum is true and the
+      alert would be Critical, evacuate depends on infrastructure_critical; otherwise,
+      it becomes Warning. Normal applies for erosion rate below the Advisory threshold.'
+    reasoning: >-
+      - The function determine_alert returns AlertDecision with one of the 5 AlertLevel
+      values combined with evacuate as True or False.
+
+      - Distinct scenarios are the unique combinations: NORMAL/F, ADVISORY/F, WARNING/F,
+      CRITICAL/F, CRITICAL/T, EMERGENCY/T (6 total).
+
+      - Thresholds for erosion_rate levels vary by coastal_type and are defined in
+      _base_erosion_threshold: Advisory (25/30/50), Warning (40/50/80), Critical (65/80/120),
+      Emergency (150 for all).
+
+      - Additional thresholds include: erosion 48-52 and wave 28-32 for dead zone
+      (forces ADVISORY/F, overriding other logic); wave > 25 for danger quorum (for
+      Critical downgrade or evacuation).
+
+      - Normal level has no lower bound (just < Advisory threshold), but default to
+      0 in the function.
+
+      - These thresholds determine the branching logic for assigning levels, with
+      quorum conditionally affecting Critical and evac.
+  q2:
+    answer: 'The system triggers evacuation (evacuate=True) under exactly these conditions:
+      either (1) erosion_rate >= 150, sensor_status != SensorStatus.FAILED, and the
+      measurements are not in the dead zone (i.e., not 48 <= erosion_rate <= 52 and
+      28 <= wave_height <= 32); or (2) erosion_rate >= threshold_critical (65/80/120
+      depending on coastal_type), infrastructure_critical == True, _danger_quorum_met
+      is True (which requires at least 2 of: erosion_rate >= threshold_critical, wave_height
+      > 25, infrastructure_critical being True), sensor_status != SensorStatus.FAILED,
+      and not in dead zone. No other combinations trigger evacuation.'
+    reasoning: >-
+      - emergency (AlertLevel.EMERGENCY) is returned only when erosion_rate >= 150,
+      sensor != FAILED, not dead zone, and evacuate=True is always True for it.
+
+      - critical (AlertLevel.CRITICAL) is returned when erosion_rate >= threshold_critical,
+      sensor != FAILED, not dead zone, quorum met, and evacuate = infrastructure_critical
+      (so evacuate=True only if infrastructure_critical == True and quorum met).
+
+      - All other paths (including dead zone, failed sensor, advisory threshold, warning,
+      critical without quorum) set evacuate=False or return CRITICAL with evac=False.
+  q3:
+    answer: No, the safety property 'failed sensors should never produce Emergency
+      alert' can never be violated, as failed sensors always result in AlertLevel.ADVISORY
+      with evacuate=False, regardless of other inputs.
+    reasoning: >-
+      - The check for sensor_status == SensorStatus.FAILED is before any erosion rate
+      classification, immediately returning ADVISORY/F if true.
+
+      - Dead zone check occurs first, overriding sensor status by forcing ADVISORY/F
+      if in dead zone, but even if sensors failed and not in dead zone, it still returns
+      ADVISORY/F.
+
+      - Emergency is only possible after failed sensor check, so failed sensors cannot
+      reach the Emergency path.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:24'
+  q1:
+    answer: >-
+      There are 8 distinct decision scenarios (code paths) in `determine_alert`.
+
+
+      Numeric thresholds used:
+
+      - Dead zone override: `48 <= erosion_rate <= 52` AND `28 <= wave_height <= 32`.
+
+      - Emergency erosion threshold (all coastal types): `erosion_rate >= 150`.
+
+      - Coastal-type base erosion thresholds:
+        - SANDY: Advisory `>=30`, Warning `>=50`, Critical `>=80`.
+        - ROCKY: Advisory `>=50`, Warning `>=80`, Critical `>=120`.
+        - ESTUARY: Advisory `>=25`, Warning `>=40`, Critical `>=65`.
+      - Quorum (used only inside the Critical band): counts indicators among
+        1) `erosion_rate >= threshold_critical`,
+        2) `wave_height > 25`,
+        3) `infrastructure_critical is True`,
+        and requires `count >= 2`.
+    reasoning: >-
+      - The function has two early-return overrides (dead zone; sensor FAILED).
+
+      - Otherwise it partitions by erosion bands using `>=` comparisons in this order:
+      Emergency (150), then Critical (coastal-specific), then Warning (coastal-specific),
+      then Advisory (coastal-specific), else Normal.
+
+      - Inside the Critical band there is an additional split: quorum met vs not met.
+
+      - Counting the explicit return branches yields 8 scenarios: dead zone; failed
+      sensor; emergency; critical+quorum; critical+no quorum; warning band; advisory
+      band; normal band.
+
+      - Thresholds are exactly those constants in `_in_measurement_dead_zone`, `_base_erosion_threshold`,
+      and `_danger_quorum_met`.
+  q2:
+    answer: >-
+      `evacuate=True` happens in exactly these cases:
+
+
+      1) Emergency evacuation:
+
+      - `sensor_status` is not `FAILED` (i.e., `ACTIVE` or `DEGRADED`), AND
+
+      - NOT in dead zone (`NOT(48<=erosion_rate<=52 AND 28<=wave_height<=32)`), AND
+
+      - `erosion_rate >= 150`.
+
+      (Coastal type and infrastructure flag do not matter here.)
+
+
+      2) Critical-level evacuation driven by critical infrastructure:
+
+      - `sensor_status` is not `FAILED`, AND
+
+      - NOT in dead zone, AND
+
+      - `infrastructure_critical == True`, AND
+
+      - `erosion_rate >= threshold_critical` for the given coastal type, AND
+
+      - `erosion_rate < 150` (otherwise case (1) triggers first).
+
+      Where `threshold_critical` is:
+
+      - SANDY: 80
+
+      - ROCKY: 120
+
+      - ESTUARY: 65
+
+
+      Note: when `infrastructure_critical` is True and you are in the Critical band,
+      quorum is automatically satisfied because both indicators (erosion >= critical
+      threshold, infrastructure_critical) are true; wave height is irrelevant for
+      evacuation in this branch.
+    reasoning: >-
+      - The only `evacuate=True` returns in the code are:
+        - `AlertLevel.EMERGENCY, evacuate=True` when `erosion_rate >= threshold_emergency
+      (150)`.
+        - `AlertLevel.CRITICAL, evacuate=infrastructure_critical` when in the Critical
+      band and `quorum` is true. - For Critical-band evacuation to be true, `infrastructure_critical`
+      must be true (since it is assigned directly to `evacuate`).
+
+      - In the Critical band, `c1` (erosion >= critical threshold) is always true
+      by construction, so with `infrastructure_critical=True` (`c3` true) the quorum
+      count is at least 2 regardless of wave height.
+
+      - Dead zone and sensor FAILED are early returns with `evacuate=False`, so they
+      must be excluded from any evacuation condition.
+  q3:
+    answer: >-
+      No. The property “failed sensors should never produce Emergency alert” cannot
+      be violated in this implementation.
+
+
+      If `sensor_status == SensorStatus.FAILED`, the function returns `AlertLevel.ADVISORY`
+      with `evacuate=False` before any erosion-threshold logic (including the Emergency
+      check) is evaluated.
+    reasoning: >-
+      - The `sensor_status == FAILED` check is an unconditional early return that
+      occurs before computing thresholds and before `erosion_rate >= 150` is tested.
+
+      - Therefore, with `sensor_status` exactly equal to `FAILED`, there is no control-flow
+      path to the Emergency return.
+
+      - The dead-zone early return also prevents Emergency, but the FAILED-sensor
+      early return alone is sufficient to guarantee the safety property.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:45'
+  q1:
+    answer: >-
+      There are 8 distinct alert scenarios defined by the logic flow.
+
+
+      The thresholds are:
+
+      1. **Emergency:** Erosion ≥ 150 (regardless of coastal type).
+
+      2. **Critical:** Sandy ≥ 80, Rocky ≥ 120, Estuary ≥ 65.
+
+      3. **Warning:** Sandy ≥ 50, Rocky ≥ 80, Estuary ≥ 40.
+
+      4. **Advisory:** Sandy ≥ 30, Rocky ≥ 50, Estuary ≥ 25.
+
+      5. **Dead Zone:** Erosion between [48, 52] AND Wave Height between [28, 32].
+
+      6. **Wave Height Trigger:** > 25 (used for quorum calculations).
+    reasoning: >-
+      The 8 scenarios determine the alert priority flow:
+
+      1. **Measurement Dead Zone:** (Returns Advisory) Triggers if erosion is 48-52
+      and wave height is 28-32.
+
+      2. **Sensor Failure:** (Returns Advisory) Triggers if sensor_status is FAILED.
+
+      3. **Emergency:** (Returns Emergency) Triggers if erosion ≥ 150.
+
+      4. **Critical (Verified):** (Returns Critical) Triggers if erosion ≥ Critical
+      Threshold AND Danger Quorum is met (≥2 danger indicators).
+
+      5. **Critical (Downgraded):** (Returns Warning) Triggers if erosion ≥ Critical
+      Threshold BUT Danger Quorum is NOT met.
+
+      6. **Warning:** (Returns Warning) Triggers if erosion ≥ Warning Threshold (and
+      < Critical).
+
+      7. **Advisory:** (Returns Advisory) Triggers if erosion ≥ Advisory Threshold
+      (and < Warning).
+
+      8. **Normal:** (Returns Normal) Triggers if erosion < Advisory Threshold.
+  q2:
+    answer: >-
+      The system triggers evacuation (evacuate=true) in exactly two sets of conditions,
+      assuming the sensors have not FAILED:
+
+
+      1. **Emergency Condition:** None of the specific infrastructure or wave conditions
+      matter if the **erosion_rate ≥ 150**.
+
+      2. **Critical Infrastructure Condition:** If the **erosion_rate is between the
+      Critical and Emergency thresholds** (e.g., 80 to 149 for Sandy) AND **infrastructure_critical
+      is True**.
+    reasoning: >-
+      *   **Condition 1 (Emergency):** The code explicitly returns `evacuate=True`
+      if `erosion_rate >= threshold_emergency` (150). This logic is reachable only
+      if the Dead Zone and Sensor Failure checks pass.
+
+      *   **Condition 2 (Critical):** If erosion is in the Critical range (but < 150),
+      the system checks for a "Danger Quorum".
+          *   The quorum requires 2 of 3 flags: High Erosion (True by definition in
+      this block), High Waves (>25), and Critical Infrastructure.
+          *   The return statement is `evacuate=infrastructure_critical`.
+          *   If `infrastructure_critical` is True, the quorum count is automatically
+      at least 2 (Erosion + Infra), satisfying the quorum check, and setting `evacuate=True`.
+          *   (Note: High waves alone cannot trigger evacuation in the Critical band;
+      critical infrastructure is strictly required). *   **Exclusion:** Evacuation
+      is False in all other scenarios (Dead Zone, Failed Sensors, Downgraded Critical,
+      Warning, Advisory, Normal).
+  q3:
+    answer: No, the safety property cannot be violated.
+    reasoning: >-
+      *   **Order of Operations:** The function evaluates conditions sequentially.
+
+      *   **Early Termination:** The check `if sensor_status == SensorStatus.FAILED:`
+      (lines 82-83) occurs *before* the erosion threshold logic (lines 86+).
+
+      *   **Strict Return:** If the sensor is FAILED, the function immediately returns
+      an `ADVISORY` alert decision.
+
+      *   **Unreachable Code:** The code that produces `AlertLevel.EMERGENCY` (lines
+      90-91) can only be reached if the sensor check evaluates to false (i.e., status
+      is ACTIVE or DEGRADED). Therefore, a FAILED sensor cannot trigger an Emergency
+      alert.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:43'
+  q1:
+    answer: >-
+      There are 8 distinct alert scenarios in determine_alert, with the following
+      exact numeric thresholds:
+
+
+      1. **Dead Zone → ADVISORY**: erosion_rate in [48, 52] AND wave_height in [28,
+      32]
+
+      2. **Failed Sensor → ADVISORY**: sensor_status == FAILED (after dead zone check)
+
+      3. **EMERGENCY**: erosion_rate >= 150 (universal threshold for all coastal types)
+
+      4. **CRITICAL with quorum**: erosion_rate >= coastal-type threshold AND quorum
+      met (2+ of 3 conditions)
+         - Sandy: erosion_rate >= 80
+         - Rocky: erosion_rate >= 120
+         - Estuary: erosion_rate >= 65
+      5. **WARNING (downgraded from critical)**: erosion_rate >= critical threshold
+      BUT quorum NOT met
+
+      6. **WARNING (direct)**: erosion_rate >= warning threshold but < critical threshold
+         - Sandy: erosion_rate >= 50 and < 80
+         - Rocky: erosion_rate >= 80 and < 120
+         - Estuary: erosion_rate >= 40 and < 65
+      7. **ADVISORY (direct)**: erosion_rate >= advisory threshold but < warning threshold
+         - Sandy: erosion_rate >= 30 and < 50
+         - Rocky: erosion_rate >= 50 and < 80
+         - Estuary: erosion_rate >= 25 and < 40
+      8. **NORMAL**: erosion_rate < advisory threshold
+         - Sandy: erosion_rate < 30
+         - Rocky: erosion_rate < 50
+         - Estuary: erosion_rate < 25
+    reasoning: >-
+      - The code has multiple decision branches that produce distinct alert scenarios
+
+      - Dead zone check: returns ADVISORY when 48 <= erosion_rate <= 52 AND 28 <=
+      wave_height <= 32
+
+      - Failed sensor check: returns ADVISORY when sensor_status == FAILED (checked
+      after dead zone)
+
+      - Emergency threshold: 150 for all coastal types (hardcoded in _base_erosion_threshold)
+
+      - Critical thresholds vary by coastal type: Sandy=80, Rocky=120, Estuary=65
+
+      - Warning thresholds: Sandy=50, Rocky=80, Estuary=40
+
+      - Advisory thresholds: Sandy=30, Rocky=50, Estuary=25
+
+      - When erosion_rate >= critical threshold, quorum check determines if it stays
+      CRITICAL or downgrades to WARNING
+
+      - Quorum requires 2+ of: (erosion_rate >= threshold, wave_height > 25, infrastructure_critical)
+  q2:
+    answer: >-
+      Evacuation (evacuate=true) is triggered under exactly 2 conditions:
+
+
+      **Condition 1 - EMERGENCY level:**
+
+      - erosion_rate >= 150 (universal threshold)
+
+      - AND NOT in dead zone (erosion_rate NOT in [48,52] OR wave_height NOT in [28,32])
+
+      - AND sensor_status != FAILED
+
+
+      **Condition 2 - CRITICAL level with infrastructure at risk:**
+
+      - erosion_rate >= critical threshold (Sandy: 80, Rocky: 120, Estuary: 65) but
+      < 150
+
+      - AND danger quorum met (at least 2 of 3 conditions: erosion >= threshold, wave_height
+      > 25, infrastructure_critical)
+
+      - AND infrastructure_critical == True
+
+      - AND NOT in dead zone
+
+      - AND sensor_status != FAILED
+
+
+      Note: In the CRITICAL case, even if quorum is met, evacuation only occurs when
+      infrastructure_critical is True (evacuate=infrastructure_critical).
+    reasoning: >-
+      - Examining the code for all return statements with evacuate=True
+
+      - Line: `return AlertDecision(level=AlertLevel.EMERGENCY, evacuate=True)` -
+      triggered when erosion_rate >= 150
+
+      - Line: `return AlertDecision(level=AlertLevel.CRITICAL, evacuate=infrastructure_critical)`
+      - triggered when erosion_rate >= critical threshold AND quorum is met; evacuate
+      equals infrastructure_critical value
+
+      - For EMERGENCY: must pass dead zone check (not in dead zone) and failed sensor
+      check (not failed)
+
+      - For CRITICAL with evacuation: must pass dead zone check, failed sensor check,
+      erosion_rate must be >= critical threshold but < 150, quorum must be met, AND
+      infrastructure_critical must be True
+
+      - The quorum check itself requires 2+ of 3 conditions to be true
+
+      - When quorum is met but infrastructure_critical is False, evacuate=False despite
+      CRITICAL alert
+  q3:
+    answer: >-
+      No, the safety property 'failed sensors should never produce Emergency alert'
+      can NEVER be violated in this system.
+
+
+      The code structure makes this violation impossible because:
+
+      1. The failed sensor check occurs BEFORE any alert level classification
+
+      2. When sensor_status == FAILED, the function immediately returns ADVISORY with
+      evacuate=False
+
+      3. The EMERGENCY alert logic is only reachable if sensor_status != FAILED
+
+
+      The execution order is:
+
+      1. Dead zone check → returns ADVISORY if matched
+
+      2. Failed sensor check → returns ADVISORY if sensor_status == FAILED
+
+      3. Only then: threshold-based classification including EMERGENCY
+
+
+      Since step 2 always intercepts failed sensors before reaching step 3, there
+      is no code path where a failed sensor can produce an Emergency alert.
+    reasoning: >-
+      - The code checks sensor status early in the function flow
+
+      - Line 78-79: `if sensor_status == SensorStatus.FAILED: return AlertDecision(level=AlertLevel.ADVISORY,
+      evacuate=False)`
+
+      - This check happens BEFORE any threshold-based alert level determination
+
+      - The EMERGENCY alert is only issued in line 90 when erosion_rate >= 150
+
+      - But to reach line 90, the code must first pass through the failed sensor check
+      at lines 78-79
+
+      - If sensor_status is FAILED, the function returns at line 79 and never reaches
+      the EMERGENCY classification
+
+      - The only check that comes before the failed sensor check is the dead zone
+      check (lines 74-75)
+
+      - Even if in dead zone with failed sensor, dead zone returns ADVISORY first
+
+      - Therefore, there is NO possible combination of inputs that can produce EMERGENCY
+      with a FAILED sensor
+
+      - The safety property is structurally enforced by the code's control flow

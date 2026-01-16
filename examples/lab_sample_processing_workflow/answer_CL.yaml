@@ -1,0 +1,79 @@
+model: "lab_sample_processing_workflow"
+q1:
+  question: "How many distinct processing decision scenarios exist?"
+  answer: "918 total scenarios: 244 Approved, 434 Quarantine, 240 Rejected"
+  state_space_breakdown: |
+    Total: 918 scenarios
+    Approved: 244 (27%) - All safety conditions met
+    Quarantine: 434 (47%) - Dead zone or borderline cases
+    Rejected: 240 (26%) - Insufficient conditions
+  key_thresholds:
+    user_clearance: [2, 3, 4, 5]
+    current_temp: [0, 2, 8, 10, 18, 25]
+    time_since_received: [720]
+    approval_score: [2, 3]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), approved_count: ([.[0].regions_str[] | select(.invariant_str == \"Approved\")] | length), quarantine_count: ([.[0].regions_str[] | select(.invariant_str == \"Quarantine\")] | length), rejected_count: ([.[0].regions_str[] | select(.invariant_str == \"Rejected\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Chemical samples with High contamination be approved?"
+  answer: "YES - 4 scenarios where Chemical + High contamination → Approved"
+  override_pattern_demonstrated:
+    mechanism: "priority_override (high_priority=true + user_clearance≥4) bypasses quorum"
+    example:
+      sample_type: "Chemical"
+      location_contamination: "Low"
+      equipment_contamination: "Low"
+      combined_contamination: "High (from Chemical base)"
+      high_priority: true
+      user_clearance: 4
+      result: "Approved (via priority override path)"
+  explanation: |
+    Chemical samples have base contamination level = High.
+    Combined contamination = max(Chemical→High, Low, Low) = High
+    Normally: High contamination → contamination_ok = false → quorum fails
+    BUT: priority_override checked BEFORE quorum:
+      - high_priority = true
+      - user_clearance = 4 (≥ 4)
+      → Approved immediately, bypassing contamination check
+  key_insight: "Override pattern allows emergency processing of contaminated samples when authorized"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_chemical_high_contam.json'
+q3:
+  question: "Can samples in temperature dead zone be directly approved?"
+  answer: "PROVEN - Dead zone samples NEVER directly approved"
+  property: "in_temperature_dead_zone ==> result != Approved"
+  why_proven: |
+    The dead zone check happens at the TOP of determine_processing_decision:
+
+    if in_dead_zone then
+      Quarantine  (* Dead zone → forced to quarantine *)
+    else
+      ... (* all other logic *)
+
+    This means dead zone samples can ONLY result in Quarantine, never Approved.
+    Even the priority override (which comes after) cannot bypass this safety check.
+  dead_zone_definition:
+    refrigerated_samples: "temp ∈ [0,2) or (8,10]"
+    why_dangerous: "Near refrigeration boundaries (2-8°C) - unclear if storage violated"
+    safety_response: "Force manual review via Quarantine"
+  key_insight: "Dead zone check has highest precedence - even overrides don't bypass it"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_temp_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 918
+  chemical_high_contam_approved: 4
+  property_result: "PROVEN"
+  patterns_demonstrated:
+    pattern_1_override: "Priority override (high_priority + clearance≥4) bypasses quorum, BUT not dead zone"
+    pattern_2_multiplexer: "Required clearance: Biological→3, Chemical→4, Environmental→2, Unknown→5"
+    pattern_3_dead_zone: "Refrigerated samples at temp boundaries [0,2) or (8,10] → Quarantine"
+    pattern_6_quorum: "3/5 conditions needed: user, equipment, temp, expiry, contamination"
+  model_insights:
+    - "918 scenarios with near-even 3-way split"
+    - "Quarantine is the largest category (47%) - reflects cautious safety policy"
+    - "Only 4 scenarios allow Chemical + High contamination approval (via override)"
+    - "Dead zone safety proven - highest precedence check"
+    - "Override pattern powerful but still subordinate to dead zone safety"
+  safety_architecture:
+    precedence_order: "1. Dead zone check → 2. Priority override → 3. Quorum logic"
+    design_lesson: "Safety constraints organized by criticality - temperature boundaries most critical"

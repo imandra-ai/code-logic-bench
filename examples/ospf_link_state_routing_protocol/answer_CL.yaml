@@ -1,0 +1,26 @@
+model: "ospf_link_state_routing_protocol"
+q1:
+  question: "How many distinct neighbor status scenarios exist across all router states and conditions?"
+  answer: "29 scenarios"
+  key_thresholds:
+    lsa_age: [300, 3600]
+    dead_interval: "last_hello >= dead_interval triggers dead"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_neighbors.json'
+q2:
+  question: "Can become_full=true ever occur when lsa_age_seconds >= 3600 (MaxAge LSA)?"
+  answer: "NO - MaxAge LSAs prevent Full state (0 scenarios)"
+  explanation: "LSA freshness check (line 89) blocks become_full when lsa_age >= 3600"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_maxage.json'
+q3:
+  question: "When last_hello_seconds equals dead_interval exactly, is dead_timer_expired always true?"
+  answer: "PROVEN - Exact equality triggers dead timer"
+  property: "last_hello_seconds = dead_interval ==> dead_timer_expired"
+  why_proven: "Dead check uses >= comparison, so equality satisfies condition"
+  metadata:
+    extraction: 'cat vg_q3_dead_timer.json | jq ".[0] | keys"'
+analysis_metadata:
+  total_scenarios_q1: 29
+  maxage_full_q2: 0
+  property_result_q3: "PROVEN"

@@ -1,0 +1,34 @@
+model: "distributed_virtual_power_controller"
+q1:
+  question: "How many distinct dispatch scenarios exist in determine_dispatch?"
+  answer: 136
+  explanation: >
+    The decomposition identified 136 distinct regions representing all possible dispatch scenarios. This covers combinations of: - 4 resource types (Solar, Battery, EV_Charger, Load) - 3 grid conditions (Normal, Congestion, Emergency) - battery_soc range (0-100%) - electricity_price range (5-50 $/kWh) - solar_generation range (0-100 kW) - grid_frequency range (58-62 Hz) With patterns: Dead Zone, Multiplexer (grid condition->price), Override (Emergency), Quorum (2-of-3)
+
+q2:
+  question: "When does Battery receive Discharge command? Must price always be high?"
+  answer: "NO - discharge can occur without high price if dispatch quorum is met"
+  explanation: >
+    Battery Discharge command occurs in two main scenarios: 1. Emergency grid condition (lines 53-54): Always discharges regardless of price/SOC 2. Normal dispatch with quorum (lines 78-82): Requires 2 of 3 conditions:
+
+
+       - price_favorable: high_price AND soc > 20
+       - soc_adequate: soc >= 30 AND soc <= 90
+       - grid_needs: frequency < 59 OR frequency > 61
+
+    So discharge can happen at moderate price (e.g., 20 $/kWh) if: - SOC is in 30-90% range (soc_adequate=true) - Grid frequency is abnormal (grid_needs=true) Even though price_favorable=false, the quorum (2 of 3) is still met!
+
+q3:
+  question: "Can Emergency + Battery violate the Discharge property?"
+  answer: "PROVEN - cannot be violated"
+  explanation: >
+    The safety property holds. When grid_condition = Emergency AND resource_type = Battery, lines 53-54 immediately return Discharge command with power_level=50 and participate=true. This override happens BEFORE any price, SOC, or quorum checks, ensuring Emergency always results in Battery discharge.
+
+key_thresholds:
+  - "Dead zone: soc 48-52%, price 18-22 $/kWh"
+  - "base_price_threshold: 25 $/kWh"
+  - "low_price: < 15 $/kWh"
+  - "Battery SOC ranges: < 20 (too low), 30-90 (adequate), > 80 (near full)"
+  - "Grid frequency normal: 59-61 Hz"
+  - "Price multipliers: Normal=1.0x, Congestion=1.3x (->32.5), Emergency=2.0x (->50)"
+  - "Quorum: 2 of 3 (price_favorable, soc_adequate, grid_needs)"

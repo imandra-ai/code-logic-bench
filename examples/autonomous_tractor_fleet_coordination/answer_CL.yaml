@@ -1,0 +1,28 @@
+model: "autonomous_tractor_fleet_coordination"
+q1:
+  question: "How many distinct task assignment scenarios exist in determine_task_assignment?"
+  answer: 173
+  explanation: >
+    The decomposition identified 173 distinct regions representing all possible task assignment scenarios. This covers combinations of: - 4 task types (Planting, Harvesting, Spraying, Tillage) - 3 weather conditions (Sunny, Rainy, Stormy) - fuel_level range (10-100%) - maintenance_hours range (0-250 hours) - 2 has_equipment states - 2 task_deadline_ok states - distance_to_nearest_tractor range (0-100 meters) - 2 collision_active states With patterns: Dead Zone, Override (collision + weather), Quorum (3-of-4)
+
+q2:
+  question: "Can a Spraying task be assigned when weather is Rainy with full fuel and all equipment?"
+  answer: "NO"
+  explanation: >
+    Spraying cannot be assigned in Rainy weather regardless of other conditions. The weather compatibility check at line 38-44 (task_weather_compatible) shows that Spraying + Rainy -> false. This check happens at line 59-61 BEFORE the quorum check, so even with perfect fuel, equipment, and deadline conditions, the assignment will result in Abort_Weather (line 61). Weather compatibility is a hard constraint.
+
+q3:
+  question: "Can the collision safety property ever be violated?"
+  answer: "PROVEN - cannot be violated"
+  explanation: >
+    The safety property holds. When collision_active=true AND distance_to_nearest_tractor < 50, the collision override at lines 55-57 ensures Abort_Collision is commanded BEFORE any other checks. This is the highest priority decision in the function, even higher than dead zone or weather checks (though those are checked first, they don't prevent the collision check).
+
+key_thresholds:
+  - "fuel_level dead zone: 18-22%"
+  - "maintenance_hours dead zone: 195-205 hours"
+  - "fuel_level critical: < 15%"
+  - "fuel_level readiness: >= 30%"
+  - "maintenance_hours critical: > 200 hours"
+  - "maintenance_hours readiness: < 180 hours"
+  - "collision distance: < 50 meters"
+  - "readiness quorum: 3 of 4 conditions"

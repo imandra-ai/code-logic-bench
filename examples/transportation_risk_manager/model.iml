@@ -1,0 +1,196 @@
+(* Transportation Risk Manager *)
+
+(* Core types *)
+type transport_mode = Truck | Rail | Air | Sea
+
+type weather = Clear | Rain | Snow | Storm | Hurricane
+
+type geopolitical_risk = Stable | Tensions | Sanctions | WarZone
+
+type cargo_type = Standard | Fragile | Hazardous | Perishable
+
+type route_decision = {
+  approved: bool;
+  adjusted_cost: int;
+  adjusted_time: int;
+  emergency_routing: bool;
+}
+
+(* Base route parameters *)
+let base_cost_by_mode mode =
+  match mode with
+  | Truck -> 100
+  | Rail -> 150
+  | Air -> 500
+  | Sea -> 200
+
+let base_time_by_mode mode =
+  match mode with
+  | Truck -> 48   (* hours *)
+  | Rail -> 72
+  | Air -> 8
+  | Sea -> 336   (* 14 days *)
+
+(* Weather affects cost differently per mode *)
+let weather_cost_multiplier mode weather =
+  match mode, weather with
+  (* Air is sensitive to storms *)
+  | Air, Storm -> 3
+  | Air, Hurricane -> 5
+  | Air, Snow -> 2
+  | Air, Rain -> 1
+  | Air, Clear -> 1
+  (* Sea is sensitive to hurricanes *)
+  | Sea, Hurricane -> 4
+  | Sea, Storm -> 2
+  | Sea, Rain -> 1
+  | Sea, Snow -> 1
+  | Sea, Clear -> 1
+  (* Truck sensitive to snow *)
+  | Truck, Snow -> 3
+  | Truck, Storm -> 2
+  | Truck, Rain -> 1
+  | Truck, Hurricane -> 2
+  | Truck, Clear -> 1
+  (* Rail relatively stable *)
+  | Rail, Hurricane -> 2
+  | Rail, Storm -> 1
+  | Rail, Snow -> 1
+  | Rail, Rain -> 1
+  | Rail, Clear -> 1
+
+(* Geopolitical risk affects cost differently by mode *)
+let geopolitical_cost_multiplier mode risk =
+  match mode, risk with
+  (* Air can bypass many risks *)
+  | Air, WarZone -> 4
+  | Air, Sanctions -> 2
+  | Air, Tensions -> 1
+  | Air, Stable -> 1
+  (* Sea heavily affected by tensions/war *)
+  | Sea, WarZone -> 5
+  | Sea, Sanctions -> 3
+  | Sea, Tensions -> 2
+  | Sea, Stable -> 1
+  (* Land routes moderately affected *)
+  | Truck, WarZone -> 3
+  | Truck, Sanctions -> 2
+  | Truck, Tensions -> 1
+  | Truck, Stable -> 1
+  | Rail, WarZone -> 3
+  | Rail, Sanctions -> 2
+  | Rail, Tensions -> 1
+  | Rail, Stable -> 1
+
+(* Check if cargo is allowed on this transport mode *)
+let cargo_restrictions mode cargo =
+  match mode, cargo with
+  (* Hazardous cannot fly *)
+  | Air, Hazardous -> false
+  (* Perishable cannot use slow sea routes *)
+  | Sea, Perishable -> false
+  | _ -> true
+
+(* Check if route is viable under current conditions *)
+let is_route_viable mode weather geopolitical =
+  let extreme_risk = (weather = Hurricane && geopolitical = WarZone) in
+  let air_grounded = (mode = Air && weather = Hurricane && geopolitical = Sanctions) in
+  not (extreme_risk || air_grounded)
+
+(* Calculate adjusted cost *)
+let calculate_cost mode weather geopolitical =
+  let base = base_cost_by_mode mode in
+  let weather_mult = weather_cost_multiplier mode weather in
+  let geo_mult = geopolitical_cost_multiplier mode geopolitical in
+  base * weather_mult * geo_mult
+
+(* Calculate adjusted time *)
+let calculate_time mode weather =
+  let base = base_time_by_mode mode in
+  let time_mult = match weather with
+    | Clear -> 1
+    | Rain -> 1
+    | Snow -> 2
+    | Storm -> 2
+    | Hurricane -> 3
+  in
+  base * time_mult
+
+(* Check if emergency routing should activate *)
+let check_emergency_conditions cargo_value time_critical route_cost route_time =
+  let c1 = cargo_value > 100000 in
+  let c2 = time_critical < 24 in
+  let c3 = route_cost < 1000 in
+  let c4 = route_time < 72 in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count >= 3
+
+(* Core decision function *)
+let determine_route_decision
+    mode
+    cargo
+    weather
+    geopolitical
+    cargo_value
+    time_critical =
+
+  let cargo_approved = cargo_restrictions mode cargo in
+
+  if not cargo_approved then
+    { approved = false;
+      adjusted_cost = 0;
+      adjusted_time = 0;
+      emergency_routing = false }
+  else
+    let viable = is_route_viable mode weather geopolitical in
+
+    if not viable then
+      { approved = false;
+        adjusted_cost = 0;
+        adjusted_time = 0;
+        emergency_routing = false }
+    else
+      let cost = calculate_cost mode weather geopolitical in
+      let time = calculate_time mode weather in
+      let emergency = check_emergency_conditions cargo_value time_critical cost time in
+
+      { approved = true;
+        adjusted_cost = cost;
+        adjusted_time = time;
+        emergency_routing = emergency }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for Sea under tensions *)
+let assume_sea_under_tensions
+    (mode : transport_mode)
+    (cargo : cargo_type)
+    (weather : weather)
+    (geopolitical : geopolitical_risk)
+    (cargo_value : int)
+    (time_critical : int) : bool =
+  mode = Sea && (geopolitical = Tensions || geopolitical = Sanctions || geopolitical = WarZone)
+
+let sea_under_tensions mode cargo weather geopolitical cargo_value time_critical =
+  determine_route_decision mode cargo weather geopolitical cargo_value time_critical
+[@@decomp top ~prune:true ~assuming:[%id assume_sea_under_tensions] ()]
+
+(* Q2: Can Air be rejected for non-Hazardous Standard cargo? *)
+let air_rejected_non_hazardous mode cargo weather geopolitical cargo_value time_critical =
+  let decision = determine_route_decision mode cargo weather geopolitical cargo_value time_critical in
+  mode = Air && cargo = Standard && not decision.approved
+[@@decomp top ()]
+
+(* Q3: Does high value + time critical always trigger emergency for Air? *)
+verify (fun cargo weather geopolitical cargo_value time_critical ->
+  let decision = determine_route_decision Air cargo weather geopolitical cargo_value time_critical in
+  (decision.approved && cargo_value > 100000 && time_critical < 24) ==> decision.emergency_routing
+)

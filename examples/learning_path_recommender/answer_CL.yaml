@@ -1,0 +1,81 @@
+model: "learning_path_recommender"
+q1:
+  question: "How many distinct module recommendation scenarios exist?"
+  answer: "76 total scenarios: 36 Recommended, 28 Deferred, 12 Excluded"
+  state_space_breakdown: |
+    Total: 76 scenarios
+    Recommended: 36 (47%) - All conditions satisfied
+    Deferred: 28 (37%) - Borderline or dead zone
+    Excluded: 12 (16%) - Prerequisites not met
+  key_thresholds:
+    competency_level: [40, 60, 70, 80]
+    dead_zones: [35-45, 55-65, 65-75, 75-85]
+    goal_priority_scores: [1, 2, 3]
+    quorum_score: [2, 3]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), recommended_count: ([.[0].regions_str[] | select(.invariant_str == \"Recommended\")] | length), deferred_count: ([.[0].regions_str[] | select(.invariant_str == \"Deferred\")] | length), excluded_count: ([.[0].regions_str[] | select(.invariant_str == \"Excluded\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Expert modules be recommended with competency < 80%?"
+  answer: "NO - 0 scenarios (prerequisites are hard constraints)"
+  why_no:
+    prerequisite_check: "competency_level >= 80 (Expert threshold)"
+    check_location: "Line 77-82 - checked immediately after dead zone"
+    early_exclusion: "if not prereq_met then Excluded"
+    override_subordinate: "high_priority_override checked AFTER prerequisite check passes"
+  explanation: |
+    The control flow ensures prerequisites are hard constraints:
+    1. Dead zone check (competency ±5% of threshold)
+    2. Prerequisite check (competency >= difficulty threshold)
+    3. IF prerequisite fails → Excluded (no further checks)
+    4. IF prerequisite passes → check override, then quorum
+
+    For Expert modules (threshold=80%), any competency < 80% fails step 2
+    and gets Excluded before the override pattern is even considered.
+  key_insight: "Override pattern only bypasses soft constraints (style mismatch), not hard constraints (prerequisites)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_expert_low_competency.json'
+q3:
+  question: "Can modules be recommended when in competency dead zone?"
+  answer: "PROVEN - Dead zone modules NEVER directly recommended"
+  property: "in_competency_dead_zone ==> result != Recommended"
+  why_proven: |
+    The dead zone check has highest precedence (line 73-74):
+
+    if in_dead_zone then
+      Deferred
+    else
+      ... (* all other logic *)
+
+    This ensures students with borderline competency (within ±5% of threshold)
+    always get Deferred for manual assessment, never automatic recommendation.
+  dead_zone_ranges:
+    Beginner: "35-45% (threshold 40%)"
+    Intermediate: "55-65% (threshold 60%)"
+    Advanced: "65-75% (threshold 70%)"
+    Expert: "75-85% (threshold 80%)"
+  key_insight: "Dead zone correctly prioritized as first safety check, above all other logic"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_competency_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 76
+  expert_low_competency_count: 0
+  property_result: "PROVEN"
+  model_simplifications:
+    final_parameter_count: 6
+    removed_parameters: "failed_before, separate style enums → combined to style_matches boolean"
+    quorum_simplification: "4 factors instead of 5 (removed not_failed)"
+  patterns_demonstrated:
+    pattern_1_override: "High priority + competency≥30 + no style_match bypasses quorum"
+    pattern_2_multiplexer: "Prerequisite thresholds: Beginner(40), Intermediate(60), Advanced(70), Expert(80)"
+    pattern_3_dead_zone: "Competency within ±5% of each threshold → Deferred"
+    pattern_6_quorum: "3/4 factors needed: prereq, style, goal_relevant, engagement"
+  model_insights:
+    - "76 scenarios with clean 3-way distribution"
+    - "Expert modules rigidly enforce 80% prerequisite (0 bypass scenarios)"
+    - "Dead zone safety correctly implemented (proven)"
+    - "Override pattern properly subordinate to hard constraints"
+    - "47% recommendation rate shows balanced decision-making"
+  design_lessons:
+    hard_vs_soft_constraints: "Prerequisites are checked early and fail-fast (Excluded)"
+    override_scope: "Override only applies after hard constraints pass"
+    safety_precedence: "Dead zone > Prerequisites > Override > Quorum"

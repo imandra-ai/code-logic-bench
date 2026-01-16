@@ -1,0 +1,136 @@
+(* Multi-Tenant Resource Management - Simplified for Decomposition *)
+
+(* Core types *)
+type subscription_tier =
+  | Basic
+  | Professional
+  | Enterprise
+
+type billing_status =
+  | Current
+  | GracePeriod
+  | Overdue
+  | Suspended
+
+type tenant_status =
+  | Active
+  | Suspended
+  | QuotaExceeded
+
+type allocation_decision =
+  | FullyApproved
+  | PartiallyApproved
+  | Denied
+  | RequiresReview
+
+(* Dead zone: usage percentage in 75-85% triggers throttling *)
+let in_throttle_zone usage_pct =
+  usage_pct >= 75 && usage_pct <= 85
+
+(* Tier affects approval threshold *)
+let tier_approval_threshold tier =
+  match tier with
+  | Basic -> 60        (* Strict - must stay under 60% to get approval *)
+  | Professional -> 75
+  | Enterprise -> 90   (* Lenient - can go up to 90% *)
+
+(* Billing status override *)
+let apply_billing_override billing_status tier usage_pct =
+  match billing_status with
+  | Current -> FullyApproved
+
+  | GracePeriod ->
+      (* Grace period allows allocation... *)
+      (* ...BUT if usage is already high, deny *)
+      if usage_pct >= 70 then
+        Denied
+      (* ...EXCEPT Enterprise gets extended grace *)
+      else if tier = Enterprise then
+        FullyApproved
+      else
+        PartiallyApproved
+
+  | Overdue ->
+      (* Overdue normally denies... *)
+      (* ...BUT Enterprise gets one more chance if usage is low *)
+      if tier = Enterprise && usage_pct < 50 then
+        RequiresReview
+      else
+        Denied
+
+  | Suspended -> Denied
+
+(* Calculate usage percentage *)
+let calculate_usage_percentage current_usage quota_limit =
+  if quota_limit = 0 then 100
+  else (current_usage * 100) / quota_limit
+
+(* Core decision function *)
+let determine_allocation_decision
+    tier
+    billing_status
+    tenant_status
+    current_usage
+    quota_limit
+    requested_amount =
+
+  let usage_pct = calculate_usage_percentage current_usage quota_limit in
+  let new_usage = current_usage + requested_amount in
+  let new_usage_pct = calculate_usage_percentage new_usage quota_limit in
+
+  (* Check throttle zone first *)
+  if in_throttle_zone usage_pct then
+    Denied
+  else if tenant_status <> Active then
+    Denied
+  else
+    (* Get tier-specific threshold *)
+    let threshold = tier_approval_threshold tier in
+
+    (* Apply billing override *)
+    let billing_result = apply_billing_override billing_status tier usage_pct in
+
+    match billing_result with
+    | Denied -> Denied
+    | RequiresReview -> RequiresReview
+    | FullyApproved ->
+        (* Even with billing approved, check if new usage exceeds threshold *)
+        if new_usage_pct > threshold then
+          PartiallyApproved
+        else
+          FullyApproved
+    | PartiallyApproved ->
+        (* Check if can at least partially approve *)
+        if new_usage_pct > threshold then
+          Denied
+        else
+          PartiallyApproved
+
+(* Analysis
+====================
+ *)
+
+(* Q1: How many scenarios for GracePeriod billing? *)
+let grace_period_scenarios
+    tier tenant_status current_usage quota_limit requested_amount =
+  determine_allocation_decision
+    tier GracePeriod tenant_status current_usage quota_limit requested_amount
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Basic tier EVER get FullyApproved with GracePeriod? *)
+let basic_grace_fully_approved
+    tenant_status current_usage quota_limit requested_amount =
+  let result = determine_allocation_decision
+    Basic GracePeriod tenant_status current_usage quota_limit requested_amount
+  in
+  result = FullyApproved
+[@@decomp top ()]
+
+(* Q3: Does Enterprise with Current billing always get approved? *)
+verify (fun tenant_status current_usage quota_limit requested_amount ->
+  let result = determine_allocation_decision
+    Enterprise Current tenant_status current_usage quota_limit requested_amount
+  in
+  (* Should always be approved if active and not in throttle zone... or is there an edge case? *)
+  (tenant_status = Active) ==> (result = FullyApproved || result = PartiallyApproved)
+)

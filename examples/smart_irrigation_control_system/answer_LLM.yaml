@@ -1,0 +1,256 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:57'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - The function `determine_irrigation_decision` can return three distinct `IrrigationDecision`
+      values based on input conditions: (approved=True, emergency_priority=True),
+      (approved=True, emergency_priority=False), or (approved=False, emergency_priority=False).
+
+      - These correspond to emergency override, normal approval, and no approval,
+      respectively.
+  q2:
+    answer: Yes, when the crop is at a critical growth stage and the soil is critically
+      dry.
+    reasoning: >-
+      - Critical growth stages are Flowering for all crops and Mature for Tomatoes.
+
+      - In these stages, if moisture_pct < (target_min - 20), the function returns
+      approved=True, emergency_priority=True, bypassing the sensor status check.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - For crops in the Flowering stage, is_critical_stage returns True.
+
+      - If critically_dry, the critical stage override always approves irrigation
+      with emergency priority, regardless of other conditions.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:00'
+  q1:
+    answer: 3 distinct decision scenarios (rule sets) based on crop+stage criticality.
+    reasoning: >-
+      - The logic changes only based on whether `is_critical_stage(crop, stage)` is
+      true.
+
+      - Critical stages are: (a) `FLOWERING` for any crop, and (b) `MATURE` only for
+      `TOMATOES`.
+
+      - Therefore crop/stage pairs fall into three distinct behavioral groups:
+        - Flowering (any crop): critical-stage override possible.
+        - Tomatoes + Mature: critical-stage override possible.
+        - All other crop+stage combinations: normal checks only.
+  q2:
+    answer: Yes. Irrigation can be approved with `sensor_status = FAULTY` only via
+      the critical-stage emergency override.
+    reasoning: >-
+      - The normal (non-override) path explicitly denies irrigation when `sensor_status
+      != WORKING`.
+
+      - The override happens before any sensor check: `if is_critical and critically_dry:
+      return approved=True`.
+
+      - Conditions for approval despite a faulty sensor:
+        - `stage == FLOWERING` (any crop) OR (`crop == TOMATOES` and `stage == MATURE`),
+      AND
+        - `moisture_pct < target_min - 20`.
+      - Water availability is not checked in this override path.
+  q3:
+    answer: Yes. For any Flowering-stage crop, `critically_dry` always triggers irrigation
+      approval (with emergency priority).
+    reasoning: >-
+      - For `stage == FLOWERING`, `is_critical_stage` returns `True` for all crops.
+
+      - When `critically_dry` is true, the function immediately returns `IrrigationDecision(approved=True,
+      emergency_priority=True)`.
+
+      - This bypasses later safety/resource checks (sensor status and water availability).
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:02'
+  q1:
+    answer: 15 distinct irrigation decision scenarios
+    reasoning: >-
+      • There are 3 crop types (WHEAT, CORN, TOMATOES) × 3 growth stages (SEEDLING,
+      FLOWERING, MATURE) = 9 combinations
+
+      • Critical stage combinations: 5 total
+        - All crops at FLOWERING (3 combinations)
+        - TOMATOES at MATURE (1 combination)
+        - Non-critical: 4 combinations (WHEAT-SEEDLING, WHEAT-MATURE, CORN-SEEDLING,
+      CORN-MATURE, TOMATOES-SEEDLING) • For critical stages (5 combinations):
+        - If critically_dry (moisture < target_min - 20): Approved=True, Emergency=True
+        - If not critically_dry but needs_water: Standard checks apply (sensor + water
+      availability)
+        - If doesn't need water: Approved=False
+      • For non-critical stages (4 combinations):
+        - If doesn't need water: Approved=False
+        - If needs_water: Standard checks apply (sensor + water availability)
+      • Each crop-stage combination can produce different decision outcomes based
+      on moisture, sensor, and water conditions
+
+      • Total distinct scenarios = 9 crop-stage combinations with varying conditions
+      = 15 unique decision paths when considering all conditional branches
+  q2:
+    answer: Yes, irrigation can be approved when sensor_status = Faulty, but only
+      under specific conditions
+    reasoning: >-
+      • The critical stage override (lines checking is_critical and critically_dry)
+      executes BEFORE the sensor check
+
+      • If both conditions are met:
+        1. Crop is at a critical stage (FLOWERING for any crop, OR MATURE for TOMATOES)
+        2. Soil moisture is critically dry (moisture_pct < target_min - 20)
+      • Then the function returns IrrigationDecision(approved=True, emergency_priority=True)
+      immediately
+
+      • This return happens before reaching the sensor_ok check at line "sensor_ok
+      = sensor_status == SensorStatus.WORKING"
+
+      • Therefore, sensor_status can be Faulty and irrigation is still approved in
+      emergency situations
+
+      • Specific conditions: (WHEAT/CORN/TOMATOES at FLOWERING OR TOMATOES at MATURE)
+      AND (moisture_pct < target_min - 20)
+
+      • In all other cases, faulty sensors will block irrigation approval
+  q3:
+    answer: No, critically_dry does NOT always trigger irrigation approval for Flowering
+      stage crops
+    reasoning: >-
+      • While Flowering stage is a critical stage for all crops (returns True from
+      is_critical_stage)
+
+      • The critical stage override requires BOTH conditions:
+        1. is_critical = True (satisfied for Flowering)
+        2. critically_dry = True (moisture_pct < target_min - 20)
+      • However, "critically_dry" is defined as: moisture_pct < (target_min - 20)
+
+      • This can be satisfied OR not satisfied depending on the actual moisture_pct
+      value
+
+      • If moisture_pct is NOT less than (target_min - 20), then critically_dry =
+      False
+
+      • For example: if target_min = 30 and moisture_pct = 15, then critically_dry
+      = True (15 < 10)
+
+      • But if target_min = 30 and moisture_pct = 25, then critically_dry = False
+      (25 is not < 10)
+
+      • So a Flowering crop with moisture_pct = 25 and target_min = 30 would NOT get
+      the emergency override
+
+      • It would proceed through normal checks (needs_water check, sensor check, water
+      availability check)
+
+      • Therefore, critically_dry condition must actually be met; Flowering stage
+      alone is insufficient
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:45'
+  q1:
+    answer: '5'
+    reasoning: >-
+      There are 5 distinct logical decision scenarios (execution paths) in the code:
+
+      1. **Critical Emergency Override:** The crop is in a critical stage AND moisture
+      is critically low. (Returns Approved=True, Priority=True).
+
+      2. **Moisture Sufficient:** Moisture is not below the target minimum (and not
+      in critical emergency). (Returns Approved=False).
+
+      3. **Sensor Fault:** Moisture is low, but the sensor status is Faulty (and not
+      in critical emergency). (Returns Approved=False).
+
+      4. **Insufficient Water Resources:** Moisture is low, sensor is working, but
+      available water is less than 100. (Returns Approved=False).
+
+      5. **Standard Approval:** Moisture is low, sensor is working, and available
+      water is sufficient. (Returns Approved=True).
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      Irrigation can be approved with a faulty sensor under the **Critical Stage Override**
+      condition.
+
+      - The system checks for critical conditions (`is_critical` AND `critically_dry`)
+      at the very beginning of the function.
+
+      - If these conditions are met, the function returns `approved=True` immediately,
+      bypassing the subsequent `sensor_status` check (lines 57-58).
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - For **Flowering** stage crops, the helper function `is_critical_stage` always
+      returns `True`.
+
+      - Consequently, the condition `if is_critical and critically_dry` simplifies
+      to `if True and critically_dry`.
+
+      - Therefore, whenever `critically_dry` is True (moisture < target_min - 20),
+      the system immediately triggers irrigation approval, regardless of other factors.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:31'
+  q1:
+    answer: There are 5 distinct irrigation decision scenarios across all crop types
+      and stages.
+    reasoning: >-
+      - Scenario 1: Critical stage (Flowering for any crop, or Mature for Tomatoes)
+      AND critically_dry (moisture < target_min - 20) → approved=True, emergency_priority=True
+
+      - Scenario 2: Not critically dry or not critical stage, AND moisture >= target_min
+      (no water needed) → approved=False, emergency_priority=False
+
+      - Scenario 3: Needs water (moisture < target_min), but sensor is Faulty → approved=False,
+      emergency_priority=False
+
+      - Scenario 4: Needs water, sensor is Working, but insufficient water (water_available
+      < 100) → approved=False, emergency_priority=False
+
+      - Scenario 5: Needs water, sensor is Working, AND sufficient water (water_available
+      >= 100) → approved=True, emergency_priority=False
+
+      - Note: The number of crop types (3) and stages (3) create different paths to
+      these scenarios, but the distinct decision outcomes are limited to these 5 scenarios
+      based on the logic branches in the code.
+  q2:
+    answer: Yes, irrigation can be approved when sensor_status = Faulty, but only
+      under the critical stage emergency override condition.
+    reasoning: >-
+      - The critical stage override check happens BEFORE the sensor status check in
+      the code flow
+
+      - If is_critical_stage() returns True (Flowering stage for any crop, OR Mature
+      stage for Tomatoes) AND critically_dry is True (moisture_pct < target_min -
+      20), the function returns immediately with approved=True, emergency_priority=True
+
+      - This return happens before the sensor_ok check is evaluated
+
+      - Therefore, a Faulty sensor does NOT block irrigation when both conditions
+      are met: (1) crop is in a critical stage, and (2) soil moisture is critically
+      low
+
+      - For non-critical stages or when moisture is not critically low, a Faulty sensor
+      will result in approved=False
+  q3:
+    answer: Yes, for Flowering stage crops, critically_dry (moisture < target_min
+      - 20) always triggers irrigation approval with emergency priority, regardless
+      of sensor status or water availability.
+    reasoning: >-
+      - The is_critical_stage() function returns True for ALL crop types when stage
+      == CropStage.FLOWERING
+
+      - The first conditional check in determine_irrigation_decision() is: if is_critical
+      and critically_dry
+
+      - For Flowering stage: is_critical is always True
+
+      - If critically_dry is also True (moisture_pct < target_min - 20), the function
+      immediately returns IrrigationDecision(approved=True, emergency_priority=True)
+
+      - This early return bypasses ALL subsequent checks including: sensor_status
+      check, water_available check, and even the basic needs_water check
+
+      - This is by design - the system description states "critical stage overrides
+      for Flowering crops that bypass normal safety checks"
+
+      - Therefore, for any Flowering crop with critically_dry conditions, irrigation
+      is ALWAYS approved with emergency priority

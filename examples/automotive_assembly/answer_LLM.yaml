@@ -1,0 +1,417 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:57'
+  q1:
+    answer: 'There are 5 distinct station processing scenarios in determine_station_processing.
+      The exact numeric thresholds are: (1) maintenance_due: 48-52 AND worker_count:
+      1-2 for INVALID_CONFIG; (2) defect_rate > 15 OR safety_violations > 2 for EMERGENCY_STOP;
+      (3) worker_count == 0 for INSUFFICIENT_WORKERS; (4) maintenance_due <= 10 (20%
+      time increase), maintenance_due <= 30 (10% time increase), or maintenance_due
+      > 30 (no increase) for PROCESS_APPROVED time adjustments.'
+    reasoning: >-
+      - The function returns 5 distinct DecisionClassification types: INVALID_CONFIG,
+      EMERGENCY_STOP, EQUIPMENT_DOWN, INSUFFICIENT_WORKERS, and PROCESS_APPROVED
+
+      - INVALID_CONFIG threshold: maintenance_due in range [48, 52] (inclusive) AND
+      worker_count in range [1, 2] (inclusive), OR maintenance_due < 0 OR worker_count
+      < 0
+
+      - EMERGENCY_STOP thresholds: equipment_status == FAULTY OR defect_rate > 15
+      OR safety_violations > 2 (hardcoded to 0 in current implementation)
+
+      - EQUIPMENT_DOWN: equipment_status != OPERATIONAL (i.e., MAINTENANCE or FAULTY,
+      but FAULTY triggers emergency first)
+
+      - INSUFFICIENT_WORKERS: worker_count == 0
+
+      - PROCESS_APPROVED time adjustments: maintenance_due <= 10 adds 20% to base
+      time; 10 < maintenance_due <= 30 adds 10%; maintenance_due > 30 adds 0%
+
+      - The decision flow is hierarchical: validity check → emergency check → equipment
+      check → worker check → process approved
+  q2:
+    answer: 'No, a station with Operational equipment status cannot trigger EmergencyStop
+      through the equipment_status condition. However, it CAN trigger EmergencyStop
+      through the other two conditions: defect_rate > 15 OR safety_violations > 2.'
+    reasoning: >-
+      - The check_emergency_trigger function has three OR conditions: (1) equipment_status
+      == FAULTY, (2) defect_rate > 15, (3) safety_violations > 2
+
+      - If equipment_status is OPERATIONAL, the first condition (equipment_status
+      == FAULTY) evaluates to False
+
+      - However, the function uses OR logic, so if either defect_rate > 15 OR safety_violations
+      > 2, emergency is still triggered
+
+      - Example: equipment_status=OPERATIONAL, defect_rate=16, safety_violations=0
+      → triggers EmergencyStop
+
+      - Example: equipment_status=OPERATIONAL, defect_rate=10, safety_violations=3
+      → triggers EmergencyStop
+
+      - Note: In the current implementation, safety_violations is hardcoded to 0,
+      so only defect_rate > 15 can trigger emergency with OPERATIONAL equipment
+
+      - Exact conditions for OPERATIONAL equipment to trigger EmergencyStop: defect_rate
+      must be >= 16 (since > 15) OR safety_violations must be >= 3 (since > 2)
+  q3:
+    answer: No, the safety property 'emergency halt always prevents processing' cannot
+      be violated. The emergency check occurs early in the decision flow and always
+      returns can_process=False with processing_time=0 when triggered, preventing
+      any processing from occurring.
+    reasoning: >-
+      - The decision flow is strictly hierarchical: (1) validity check, (2) emergency
+      check, (3) equipment check, (4) worker check, (5) process approved
+
+      - The emergency check occurs immediately after validity check and before any
+      other operational checks
+
+      - When emergency conditions are met (equipment_status == FAULTY OR defect_rate
+      > 15 OR safety_violations > 2), the function immediately returns with can_process=False,
+      processing_time=0, and decision_type=EMERGENCY_STOP
+
+      - This is a hard return statement - no subsequent code executes, so processing
+      cannot be approved
+
+      - Edge cases examined: (a) INVALID_CONFIG is checked first, so invalid configs
+      return before emergency check; (b) Even if equipment is OPERATIONAL and workers
+      are available, emergency conditions still prevent processing; (c) Boundary conditions
+      like defect_rate=16 (just over threshold) correctly trigger emergency
+
+      - The only scenario where processing could theoretically occur despite emergency
+      conditions would require code execution to bypass the return statement, which
+      is not possible in this control flow
+
+      - Safety property holds universally: if emergency=True, then can_process=False
+      in all cases
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:01'
+  q1:
+    answer: >-
+      There are 7 distinct decision scenarios in determine_station_processing (5 decision
+      types, with PROCESS_APPROVED split into 3 time-adjustment sub-scenarios). Thresholds/conditions:
+
+      1) INVALID_CONFIG: (48 <= maintenance_due <= 52 AND 1 <= worker_count <= 2)
+      OR (maintenance_due < 0 OR worker_count < 0).
+
+      2) EMERGENCY_STOP: equipment_status == FAULTY OR defect_rate > 15 OR safety_violations
+      > 2 (but safety_violations is hardcoded to 0, so only FAULTY or defect_rate
+      > 15 can actually trigger it).
+
+      3) EQUIPMENT_DOWN: equipment_status != OPERATIONAL, after the emergency check
+      (in practice this only occurs for MAINTENANCE, because FAULTY would already
+      have returned EMERGENCY_STOP).
+
+      4) INSUFFICIENT_WORKERS: worker_count == 0 (with valid config, no emergency,
+      and equipment OPERATIONAL).
+
+      5) PROCESS_APPROVED with 20% time increase: maintenance_due <= 10.
+
+      6) PROCESS_APPROVED with 10% time increase: 10 < maintenance_due <= 30.
+
+      7) PROCESS_APPROVED with no increase: maintenance_due > 30.
+    reasoning: >-
+      - The function is a sequence of early returns: config validity -> emergency
+      -> equipment -> workers -> approved.
+
+      - Each early return corresponds to a distinct scenario.
+
+      - The approved path has a 3-way split on maintenance_due (<=10, <=30, else),
+      creating distinct processing-time outcomes.
+
+      - Numeric thresholds are taken directly from the predicates: dead-zone 48–52,
+      worker 1–2; invalid if <0; emergency defect_rate >15; safety_violations >2;
+      worker_count ==0; maintenance bands at 10 and 30 hours.
+  q2:
+    answer: Yes. Even with equipment_status == OPERATIONAL, EMERGENCY_STOP occurs
+      if defect_rate > 15 (i.e., defect_rate >= 16). In this implementation, safety_violations
+      cannot cause it because safety_violations is hardcoded to 0.
+    reasoning: >-
+      - check_emergency_trigger returns True if (equipment_status == FAULTY) OR (defect_rate
+      > 15) OR (safety_violations > 2).
+
+      - With OPERATIONAL equipment, only the defect-rate or safety-violations clauses
+      could trigger.
+
+      - safety_violations is set to 0 inside determine_station_processing, so the
+      only reachable trigger under OPERATIONAL is defect_rate > 15.
+  q3:
+    answer: >-
+      No—within determine_station_processing, once the variable emergency is True,
+      the function always returns can_process=False (EMERGENCY_STOP), so processing
+      cannot be approved in an emergency.
+
+      Edge/boundary notes:
+
+      - If the configuration is invalid (e.g., maintenance_due in 48–52 with worker_count
+      1–2, or negative inputs), the function returns INVALID_CONFIG before checking
+      emergency; this can mask the EMERGENCY_STOP classification, but it still prevents
+      processing (can_process=False).
+
+      - Boundary conditions: defect_rate == 15 does NOT trigger emergency (strict
+      > 15). equipment_status == FAULTY ALWAYS triggers emergency regardless of defect_rate.
+
+      - safety_violations is hardcoded to 0, so some real-world “emergency” situations
+      might not be represented/tripped, but that is a missing-trigger issue, not a
+      case where an emergency halt allows processing.
+    reasoning: >-
+      - The emergency check is evaluated before any path that can return can_process=True.
+
+      - The emergency branch returns immediately with can_process=False.
+
+      - The only earlier return is INVALID_CONFIG, which also returns can_process=False
+      (so the safety property still holds, though decision_type may not be EMERGENCY_STOP).
+
+      - Strict inequalities/inclusive ranges define boundary behavior: defect_rate
+      > 15, safety_violations > 2, dead-zone maintenance_due 48–52 inclusive, and
+      maintenance adjustments at <=10 and <=30.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:01'
+  q1:
+    answer: >-
+      5 distinct scenarios: InvalidConfig, EmergencyStop, EquipmentDown, InsufficientWorkers,
+      ProcessApproved.
+
+
+      Exact numeric thresholds:
+
+      - InvalidConfig: maintenance_due in [48,52] and worker_count in [1,2], or maintenance_due
+      &lt; 0 or worker_count &lt; 0.
+
+      - EmergencyStop: defect_rate &gt; 15 or safety_violations &gt; 2.
+
+      - InsufficientWorkers: worker_count == 0.
+
+      - ProcessApproved time adjustments: if maintenance_due &lt;= 10, increase 20%;
+      elif maintenance_due &lt;= 30, increase 10%; else, no increase.
+    reasoning: >-
+      - The function determine_station_processing has 5 distinct return paths corresponding
+      to the DecisionClassification enum values.
+
+      - Each has specific conditions involving numeric thresholds as listed.
+
+      - There are no additional sub-scenarios beyond the decision types, though ProcessApproved
+      includes time adjustments based on maintenance_due thresholds.
+  q2:
+    answer: Yes, under the exact conditions where equipment_status is Operational
+      and defect_rate &gt; 15.
+    reasoning: >-
+      - EmergencyStop is triggered by check_emergency_trigger if defect_rate &gt;
+      15, independent of equipment status.
+
+      - Safety_violations is hardcoded to 0, so only defect_rate threshold applies
+      for Operational equipment.
+  q3:
+    answer: No, the safety property cannot be violated in this model definition.
+    reasoning: >-
+      - If emergency is true, the function immediately returns can_process=False,
+      preventing processing regardless of other conditions.
+
+      - Edge cases like defect_rate = 15 (no emergency) vs. 16 (emergency) hold the
+      property, as thresholds are strictly >15.
+
+      - The dead zone (invalid config) also prevents processing but is checked before
+      emergency and does not interfere with the emergency halt logic.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:18'
+  q1:
+    answer: There are 7 distinct station processing scenarios.
+    reasoning: >-
+      The scenarios are determined by the decision classification and processing time
+      calculations:
+
+      1. **Invalid Config:** Returns `INVALID_CONFIG` (Condition: `maintenance_due`
+      < 0, `worker_count` < 0, or Dead Zone [`48` <= `maintenance_due` <= `52` and
+      `1` <= `worker_count` <= `2`]).
+
+      2. **Emergency Stop:** Returns `EMERGENCY_STOP` (Condition: `EquipmentStatus.FAULTY`
+      or `defect_rate` > `15`).
+
+      3. **Equipment Down:** Returns `EQUIPMENT_DOWN` (Condition: `EquipmentStatus.MAINTENANCE`).
+
+      4. **Insufficient Workers:** Returns `INSUFFICIENT_WORKERS` (Condition: `worker_count`
+      == `0`).
+
+      5. **Process Approved (High Priority Maintenance):** Returns `PROCESS_APPROVED`
+      with +20% time (Condition: `maintenance_due` <= `10`).
+
+      6. **Process Approved (Medium Priority Maintenance):** Returns `PROCESS_APPROVED`
+      with +10% time (Condition: `10` < `maintenance_due` <= `30`).
+
+      7. **Process Approved (Standard):** Returns `PROCESS_APPROVED` with base time
+      (Condition: `maintenance_due` > `30`).
+  q2:
+    answer: Yes, an Operational station can trigger an EmergencyStop.
+    reasoning: >-
+      1. The `check_emergency_trigger` function evaluates multiple inputs using logic
+      `OR`.
+
+      2. Even if `equipment_status` is `EquipmentStatus.OPERATIONAL` (making the first
+      check False), the logic checks `defect_rate`.
+
+      3. If `defect_rate > 15`, the expression evaluates to True.
+
+      4. Note: While `safety_violations` is part of the emergency logic, it is hardcoded
+      to `0` inside the main function, so it cannot currently trigger the stop on
+      its own.
+  q3:
+    answer: Yes, the safety property can be violated due to variable hardcoding and
+      order of operations.
+    reasoning: >-
+      1. **Hardcoded Safety Violations (Critical):** The function `determine_station_processing`
+      initializes `safety_violations = 0` locally. The safety rule "safety violations
+      > 2" (defined in `check_emergency_trigger`) is therefore effectively unreachable.
+      If the actual system state has high safety violations, the function ignores
+      them and will return `PROCESS_APPROVED` (can_process=True), directly violating
+      the safety halt requirement.
+
+      2. **Precedence Masking:** The `is_valid_config` check runs *before* the emergency
+      check. If the inputs fall into the "Dead Zone" (e.g., `maintenance_due=50`,
+      `worker_count=1`) while the equipment is `FAULTY`, the system returns `INVALID_CONFIG`.
+      Although this sets `can_process=False`, it fails to classify the state as an
+      `EMERGENCY_STOP`, masking the critical safety alert status.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:44'
+  q1:
+    answer: >-
+      There are 5 distinct station processing scenarios with the following numeric
+      thresholds:
+
+
+      1. **INVALID_CONFIG**: maintenance_due in [48, 52] AND worker_count in [1, 2],
+      OR maintenance_due < 0, OR worker_count < 0
+
+      2. **EMERGENCY_STOP**: defect_rate > 15 OR safety_violations > 2 (safety_violations
+      hardcoded to 0) OR equipment_status == FAULTY
+
+      3. **EQUIPMENT_DOWN**: equipment_status == MAINTENANCE (after passing validity
+      and emergency checks)
+
+      4. **INSUFFICIENT_WORKERS**: worker_count == 0 (after passing validity, emergency,
+      and equipment checks)
+
+      5. **PROCESS_APPROVED**: All checks pass, with processing time adjustments:
+         - maintenance_due <= 10: base_time + 20%
+         - maintenance_due in (10, 30]: base_time + 10%
+         - maintenance_due > 30: base_time (no adjustment)
+    reasoning: >-
+      - The function `determine_station_processing` has a clear decision tree with
+      5 possible outcomes corresponding to 5 DecisionClassification values
+
+      - INVALID_CONFIG is triggered by `is_valid_config` returning False, which occurs
+      when: (48 <= maintenance_due <= 52 AND 1 <= worker_count <= 2) OR maintenance_due
+      < 0 OR worker_count < 0
+
+      - EMERGENCY_STOP is triggered by `check_emergency_trigger` returning True: equipment_status
+      == FAULTY OR defect_rate > 15 OR safety_violations > 2 (but safety_violations
+      is hardcoded to 0)
+
+      - EQUIPMENT_DOWN occurs when equipment_status is MAINTENANCE (FAULTY would trigger
+      emergency first)
+
+      - INSUFFICIENT_WORKERS occurs when worker_count == 0
+
+      - PROCESS_APPROVED occurs when all checks pass, with time adjustments based
+      on maintenance_due thresholds: <=10 (20% increase), <=30 (10% increase), >30
+      (no increase)
+  q2:
+    answer: >-
+      Yes, a station with Operational equipment status CAN trigger EmergencyStop under
+      the following exact conditions:
+
+
+      1. **defect_rate > 15**: When defect_rate exceeds 15 (e.g., 16 or higher), the
+      emergency stop is triggered regardless of equipment being Operational.
+
+
+      2. **safety_violations > 2**: If safety_violations exceeds 2, emergency stop
+      triggers. However, in the current implementation, safety_violations is hardcoded
+      to 0, making this condition impossible to achieve.
+
+
+      Therefore, in practice, only **defect_rate > 15** can trigger EmergencyStop
+      with Operational equipment.
+    reasoning: >-
+      - The `check_emergency_trigger` function uses OR logic: equipment_status ==
+      FAULTY OR defect_rate > 15 OR safety_violations > 2
+
+      - This means any ONE of these conditions being true triggers an emergency
+
+      - With equipment_status == OPERATIONAL, the first condition is False
+
+      - But if defect_rate > 15 (e.g., 16, 17, etc.), the second condition is True,
+      triggering EmergencyStop
+
+      - The safety_violations parameter is hardcoded to 0 in `determine_station_processing`,
+      so this path is currently unreachable
+
+      - The emergency check happens BEFORE the equipment status check in the decision
+      flow, so EmergencyStop takes precedence
+  q3:
+    answer: >-
+      No, the safety property 'emergency halt always prevents processing' CANNOT be
+      violated in this implementation.
+
+
+      The property holds because:
+
+      1. The emergency check occurs early in the decision flow (after only the validity
+      check)
+
+      2. When emergency conditions are met, the function immediately returns with
+      can_process=False
+
+      3. There is no code path that can bypass this check
+
+
+      **Edge cases and boundary conditions analyzed:**
+
+
+      1. **Invalid config precedence**: When both invalid config AND emergency conditions
+      exist, INVALID_CONFIG is returned first (not EmergencyStop), but processing
+      is still prevented (can_process=False).
+
+
+      2. **Boundary at defect_rate = 15**: At exactly 15, no emergency (condition
+      is > 15). At 16, emergency triggers. This is a boundary but not a violation.
+
+
+      3. **maintenance_due = 48, worker_count = 1, defect_rate = 20**: Invalid config
+      check triggers first, so EmergencyStop isn't explicitly returned, but processing
+      is still prevented.
+
+
+      4. **Negative values**: maintenance_due < 0 or worker_count < 0 triggers INVALID_CONFIG
+      before emergency check, but still prevents processing.
+
+
+      The property is preserved in ALL cases - whenever emergency conditions exist,
+      processing is always prevented (can_process=False), even if a different decision_type
+      is returned due to earlier validity checks.
+    reasoning: >-
+      - The decision flow in `determine_station_processing` is: validity check → emergency
+      check → equipment check → worker check → approve
+
+      - Emergency conditions are checked via `check_emergency_trigger`: equipment_status
+      == FAULTY OR defect_rate > 15 OR safety_violations > 2
+
+      - When emergency is True, the function returns immediately with can_process=False
+      and decision_type=EMERGENCY_STOP
+
+      - Edge case 1: Invalid config is checked BEFORE emergency, so if both conditions
+      exist, INVALID_CONFIG is returned. However, processing is still prevented (can_process=False),
+      so the safety property holds.
+
+      - Edge case 2: defect_rate boundary at 15 - exactly 15 does NOT trigger emergency
+      (condition is >15), but this is expected behavior, not a violation
+
+      - Edge case 3: safety_violations is hardcoded to 0, so that condition can never
+      trigger
+
+      - Edge case 4: Negative maintenance_due or worker_count triggers INVALID_CONFIG
+      first, masking potential emergency, but processing still prevented
+
+      - There is no code path where emergency conditions are true but can_process
+      returns True
+
+      - The only potential "semantic" issue is when INVALID_CONFIG masks EMERGENCY_STOP,
+      but the safety property (preventing processing) is still maintained

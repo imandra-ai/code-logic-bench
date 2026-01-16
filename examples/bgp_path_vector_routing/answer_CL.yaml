@@ -1,0 +1,66 @@
+model: "bgp_path_vector_routing"
+q1:
+  question: "How many distinct BGP route selection scenarios exist, and how many involve MED comparison?"
+  answer: "811 total scenarios, 405 with MED comparison"
+  state_space_breakdown: |
+    Total: 811 scenarios across all combinations
+    MED compared: 405 scenarios (50%) where MED affects decision
+    MED not compared: 406 scenarios where MED is ignored
+  key_thresholds:
+    local_pref: [50]
+    as_path: [250, 254, 255]
+    med_values: [95, 100, 105]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), with_med_compare: ([.[0].regions_str[] | select(.model_str.med_mode == \"AlwaysCompare\" or (.model_str.med_mode == \"OnlySameAS\" and .model_str.same_as == \"true\"))] | length)}" decomp_q1_med_scenarios.json'
+q2:
+  question: "Can an emergency route beat a route with higher local_pref? If yes, under what conditions?"
+  answer: "YES - 29 scenarios where emergency override or dead zone causes reversal"
+  override_conditions:
+    pattern_1_emergency: "r1_emergency=true AND r1_med<100 AND r2_local_pref > r1_local_pref"
+    pattern_3_dead_zone: "r2 in dead zone (AS path 250-254 + MED 95-105) makes r2 invalid"
+  example:
+    r1_local_pref: 50
+    r1_as_path: 249
+    r1_emergency: false
+    r1_med: 0
+    r2_local_pref: 51
+    r2_as_path: 250
+    r2_med: 95
+    result: "Route1 wins because Route2 is in dead zone despite higher local_pref"
+  explanation: |
+    Override happens in two ways:
+    1. Emergency community flag (r1_emergency=true + r1_med<100) beats higher local_pref
+    2. Dead zone (AS 250-254 + MED 95-105) disqualifies route, allowing lower local_pref to win
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_emergency_override.json'
+q3:
+  question: "Can routes in the dead zone (AS path 250-254 with MED 95-105) ever be selected?"
+  answer: "PROVEN - Dead zone routes are NEVER selected"
+  property: "(r1_in_dead_zone ==> result != Route1) AND (r2_in_dead_zone ==> result != Route2)"
+  why_proven: |
+    The dead zone check happens early in is_viable():
+      r1_valid = r1_local_pref >= 50 && r1_as_path <= 255 && not r1_dead
+
+    This means dead zone routes are marked invalid before any comparison logic runs,
+    guaranteeing they can never win the selection.
+  safety_guarantee: "Dead zone provides deterministic filtering of ambiguous routes"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 811
+  scenarios_with_med: 405
+  emergency_override_count: 29
+  property_result: "PROVEN"
+  patterns_demonstrated:
+    pattern_1_override: "Emergency flag checked before local_pref comparison"
+    pattern_2_multiplexer: "MED comparison mode (AlwaysCompare/OnlySameAS/NeverCompare) changes semantics"
+    pattern_3_dead_zone: "AS path 250-254 + MED 95-105 creates invalid region"
+  model_simplifications:
+    parameter_count: 12
+    key_reduction: "Combined two learned_from_as into single same_as boolean"
+    removed_complexity: "Eliminated route categories, simplified to core BGP decision"
+  complexity_insights:
+    - "811 scenarios show combinatorial explosion even with 12 parameters"
+    - "MED comparison mode acts as multiplexer - changes interpretation in 50% of cases"
+    - "Dead zone (6 AS values × 11 MED values = 66 combinations) filtered at entry"
+    - "Emergency override creates 29 counterintuitive scenarios"

@@ -1,0 +1,153 @@
+(* Maritime Vessel Traffic *)
+
+(* Core types *)
+type vessel_type = Cargo | Passenger | Emergency | Military
+
+type weather_condition = Clear | Fog | Storm
+
+type entry_decision = Approved | Delayed | Denied
+
+(* Emergency vessels can bypass capacity limits *)
+(* BUT only if visibility is above critical threshold (200m) *)
+let emergency_override vessel_type visibility =
+  vessel_type = Emergency && visibility > 200
+
+(* Capacity reduction depends on weather severity *)
+let weather_capacity_reduction weather =
+  match weather with
+  | Clear -> 0
+  | Fog -> 1
+  | Storm -> 2
+
+(* Speed limit adjustment depends on weather *)
+let weather_speed_limit weather base_limit =
+  match weather with
+  | Clear -> base_limit
+  | Fog -> (base_limit * 60) / 100  (* 60% of base *)
+  | Storm -> (base_limit * 40) / 100  (* 40% of base *)
+
+(* Visibility 450-550m is ambiguous for lane entry *)
+(* This represents borderline fog conditions where safety unclear *)
+let in_visibility_dead_zone visibility weather =
+  weather = Fog && visibility >= 450 && visibility <= 550
+
+(* Calculate priority score by vessel type *)
+let vessel_priority_score vessel_type =
+  match vessel_type with
+  | Emergency -> 4
+  | Military -> 3
+  | Passenger -> 2
+  | Cargo -> 1
+
+(* Entry approval needs 3 out of 5 conditions *)
+let calculate_entry_score
+    capacity_ok
+    speed_compliant
+    priority_sufficient
+    fuel_adequate
+    spacing_ok =
+  let count =
+    (if capacity_ok then 1 else 0) +
+    (if speed_compliant then 1 else 0) +
+    (if priority_sufficient then 1 else 0) +
+    (if fuel_adequate then 1 else 0) +
+    (if spacing_ok then 1 else 0)
+  in
+  count
+
+(* Core lane entry decision *)
+let determine_lane_entry
+    (* Vessel characteristics *)
+    vessel_type
+    vessel_speed
+    vessel_priority
+    fuel_level
+    (* Lane state *)
+    current_vessel_count
+    max_capacity
+    speed_limit
+    (* Environment *)
+    weather
+    visibility =
+
+  (* Check visibility dead zone first *)
+  let in_dead_zone = in_visibility_dead_zone visibility weather in
+
+  if in_dead_zone then
+    Delayed  (* Dead zone → delay for visibility improvement *)
+  else
+    (* Check emergency override *)
+    let is_emergency_override = emergency_override vessel_type visibility in
+
+    if is_emergency_override then
+      Approved  (* Emergency bypasses normal checks *)
+    else
+      (* Normal entry logic with quorum *)
+
+      (* Check individual conditions *)
+      let weather_reduction = weather_capacity_reduction weather in
+      let effective_capacity = max_capacity - weather_reduction in
+      let capacity_ok = current_vessel_count < effective_capacity in
+
+      let adjusted_limit = weather_speed_limit weather speed_limit in
+      let speed_ok = vessel_speed <= adjusted_limit in
+
+      let priority_score = vessel_priority_score vessel_type in
+      let priority_ok = vessel_priority >= priority_score in
+
+      let fuel_ok = fuel_level >= 30 in
+
+      (* Spacing check - simplified as good visibility *)
+      let spacing_ok = visibility >= 500 in
+
+      (* Calculate entry score (quorum) *)
+      let score = calculate_entry_score
+        capacity_ok speed_ok priority_ok fuel_ok spacing_ok
+      in
+
+      (* Need 3 out of 5 for approval *)
+      if score >= 3 then
+        Approved
+      else if score >= 2 then
+        Delayed  (* Borderline cases *)
+      else
+        Denied
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all lane entry scenarios *)
+let all_entry_scenarios = determine_lane_entry
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Cargo vessels enter when lane is at reduced capacity in Storm? *)
+let cargo_storm_reduced_capacity
+    vessel_type vessel_speed vessel_priority fuel_level
+    current_vessel_count max_capacity speed_limit
+    weather visibility =
+  let result = determine_lane_entry
+    vessel_type vessel_speed vessel_priority fuel_level
+    current_vessel_count max_capacity speed_limit
+    weather visibility
+  in
+  vessel_type = Cargo && weather = Storm &&
+  current_vessel_count = max_capacity - 2 &&  (* At reduced capacity limit *)
+  result = Approved
+[@@decomp top ()]
+
+(* Q3: Safety property - entries in visibility dead zone never directly approved *)
+verify (fun
+    vessel_type vessel_speed vessel_priority fuel_level
+    current_vessel_count max_capacity speed_limit
+    weather visibility ->
+  let result = determine_lane_entry
+    vessel_type vessel_speed vessel_priority fuel_level
+    current_vessel_count max_capacity speed_limit
+    weather visibility
+  in
+  let in_dead_zone = in_visibility_dead_zone visibility weather in
+
+  (* Dead zone should never lead to direct approval *)
+  in_dead_zone ==> result <> Approved
+)

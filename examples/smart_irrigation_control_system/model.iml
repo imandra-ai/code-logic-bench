@@ -1,0 +1,67 @@
+(* Smart Irrigation Control System *)
+
+(* Core types *)
+type crop_type = Wheat | Corn | Tomatoes
+
+type crop_stage = Seedling | Flowering | Mature
+
+type weather = Sunny | Rainy
+
+type sensor_status = Working | Faulty
+
+type irrigation_decision = {
+  approved: bool;
+  emergency_priority: bool;
+}
+
+(* Critical stages need guaranteed irrigation *)
+let is_critical_stage crop stage =
+  stage = Flowering || (crop = Tomatoes && stage = Mature)
+
+(* Core irrigation decision *)
+let determine_irrigation_decision
+    crop
+    stage
+    moisture_pct
+    target_min
+    sensor_status
+    water_available =
+
+  (* Critical stage override *)
+  let is_critical = is_critical_stage crop stage in
+  let critically_dry = moisture_pct < (target_min - 20) in
+
+  if is_critical && critically_dry then
+    { approved = true; emergency_priority = true }
+  else
+    let needs_water = moisture_pct < target_min in
+    if not needs_water then
+      { approved = false; emergency_priority = false }
+    else
+      let sensor_ok = sensor_status = Working in
+      if not sensor_ok then
+        { approved = false; emergency_priority = false }
+      else
+        let sufficient_water = water_available >= 100 in
+        { approved = sufficient_water; emergency_priority = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All irrigation scenarios *)
+let all_irrigation_scenarios = determine_irrigation_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Faulty sensors get approved? *)
+let approved_faulty crop stage moisture_pct target_min sensor_status water_available =
+  let decision = determine_irrigation_decision crop stage moisture_pct target_min sensor_status water_available in
+  sensor_status = Faulty && decision.approved
+[@@decomp top ()]
+
+(* Q3: Critical stage protection *)
+verify (fun crop moisture_pct target_min sensor_status water_available ->
+  let decision = determine_irrigation_decision crop Flowering moisture_pct target_min sensor_status water_available in
+  let critically_dry = moisture_pct < (target_min - 20) in
+  critically_dry ==> decision.approved
+)

@@ -1,0 +1,180 @@
+(* Real-time Payment Fraud Detector *)
+
+(* Core types *)
+type merchant_category = Grocery | OnlineRetail | Casino | Crypto
+
+type device_trust = Trusted | Unverified | Suspicious
+
+type transaction_time = Business | Evening | LateNight
+
+type fraud_decision = {
+  allow_transaction: bool;
+  require_2fa: bool;
+  flag_for_review: bool;
+  risk_score: int;  (* 0-100 *)
+}
+
+(* Risk score base by merchant category (multiplexer pattern) *)
+let base_risk_score category amount =
+  match category with
+  | Grocery -> 5
+  | OnlineRetail -> if amount > 500 then 20 else 10
+  | Casino -> 40
+  | Crypto -> 50
+
+(* Device trust affects risk *)
+let device_risk_multiplier device_trust =
+  match device_trust with
+  | Trusted -> 100  (* 100% = no change *)
+  | Unverified -> 150  (* 50% increase *)
+  | Suspicious -> 250  (* 150% increase *)
+
+(* Time of day affects risk (multiplexer) *)
+let time_risk_factor transaction_time category =
+  match transaction_time, category with
+  | LateNight, Casino -> 180  (* 80% increase for late night casino *)
+  | LateNight, Crypto -> 170  (* 70% increase for late night crypto *)
+  | LateNight, _ -> 130  (* 30% increase otherwise *)
+  | Evening, _ -> 110  (* 10% increase *)
+  | Business, _ -> 100  (* No change *)
+
+(* Override pattern: high amount triggers review BUT small trusted transactions override *)
+let check_amount_threshold amount device_trust account_age =
+  if amount > 1000 then
+    (* Override: large amounts need review... *)
+    let needs_review = true in
+    (* ...EXCEPT trusted device + old account *)
+    let trusted_account = device_trust = Trusted && account_age > 365 in
+    if trusted_account then false else needs_review
+  else
+    false
+
+(* Velocity check with quorum pattern *)
+let check_velocity_risk tx_count_24h amount_24h location_changes consecutive_failures =
+  let c1 = tx_count_24h > 10 in
+  let c2 = amount_24h > 2000 in
+  let c3 = location_changes > 3 in
+  let c4 = consecutive_failures > 2 in
+
+  let risk_factors =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+
+  risk_factors >= 2
+
+(* Dead zone: certain amount/score combinations are ambiguous *)
+let is_valid_transaction amount risk_score account_age =
+  (* Amounts 985-1015 with risk 48-52 and account age 363-367 are ambiguous *)
+  let in_dead_zone =
+    amount >= 985 && amount <= 1015 &&
+    risk_score >= 48 && risk_score <= 52 &&
+    account_age >= 363 && account_age <= 367
+  in
+  (* Also invalid if values out of bounds *)
+  let invalid =
+    amount < 0 || amount > 10000 ||
+    risk_score < 0 || risk_score > 100 ||
+    account_age < 0
+  in
+
+  not (in_dead_zone || invalid)
+
+(* Calculate final risk score *)
+let calculate_risk_score category amount device_trust transaction_time =
+  let base = base_risk_score category amount in
+  let device_mult = device_risk_multiplier device_trust in
+  let time_mult = time_risk_factor transaction_time category in
+  (base * device_mult * time_mult) / 10000
+
+(* Core decision function *)
+let determine_fraud_decision
+    category
+    amount
+    device_trust
+    transaction_time
+    account_age
+    tx_count_24h
+    amount_24h
+    location_changes
+    consecutive_failures =
+
+  (* Calculate initial risk score *)
+  let risk = calculate_risk_score category amount device_trust transaction_time in
+
+  (* Check validity *)
+  let valid = is_valid_transaction amount risk account_age in
+
+  if not valid then
+    { allow_transaction = false;
+      require_2fa = false;
+      flag_for_review = false;
+      risk_score = 0 }
+  else
+    (* Check amount threshold (override) *)
+    let amount_review = check_amount_threshold amount device_trust account_age in
+
+    (* Check velocity risk (quorum) *)
+    let velocity_risk = check_velocity_risk tx_count_24h amount_24h location_changes consecutive_failures in
+
+    (* Determine if transaction allowed *)
+    let allow =
+      risk < 60 && not velocity_risk
+    in
+
+    (* 2FA requirement *)
+    let needs_2fa =
+      (risk >= 40 && risk < 60) ||
+      (amount > 500 && device_trust <> Trusted)
+    in
+
+    (* Flag for review *)
+    let flag =
+      amount_review || velocity_risk || risk >= 70
+    in
+
+    { allow_transaction = allow;
+      require_2fa = needs_2fa;
+      flag_for_review = flag;
+      risk_score = risk }
+
+(* Analysis
+====================
+ *)
+
+(* Restrict input space *)
+let assume_valid_inputs
+    (category : merchant_category)
+    (amount : int)
+    (device_trust : device_trust)
+    (transaction_time : transaction_time)
+    (account_age : int)
+    (tx_count_24h : int)
+    (amount_24h : int)
+    (location_changes : int)
+    (consecutive_failures : int) : bool =
+  amount >= 0 && amount <= 5000 &&
+  account_age >= 0 && account_age <= 500 &&
+  tx_count_24h >= 0 && tx_count_24h <= 20 &&
+  amount_24h >= 0 && amount_24h <= 5000 &&
+  location_changes >= 0 && location_changes <= 5 &&
+  consecutive_failures >= 0 && consecutive_failures <= 5
+
+(* Q1: Enumerate fraud decision scenarios *)
+let fraud_scenarios category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures =
+  determine_fraud_decision category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures
+[@@decomp top ~prune:true ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q2: Can Casino transactions ever be allowed? *)
+let casino_allowed category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures =
+  let decision = determine_fraud_decision category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures in
+  category = Casino && decision.allow_transaction
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q3: Can large amount (>1000) avoid review flag? *)
+let large_amount_no_review category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures =
+  let decision = determine_fraud_decision category amount device_trust transaction_time account_age tx_count_24h amount_24h location_changes consecutive_failures in
+  amount > 1000 && not decision.flag_for_review
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]

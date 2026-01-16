@@ -1,0 +1,112 @@
+(* Smart Factory Production *)
+
+(* Core types *)
+type product_type = ProductA | ProductB | ProductC
+
+type production_mode = Normal | HighSpeed | EcoMode
+
+type safety_level = Safe | Warning | Critical | Emergency
+
+type quality_decision = {
+  approved: bool;
+  requires_inspection: bool;
+  production_allowed: bool;
+}
+
+(* Defect threshold by product type *)
+let defect_threshold product =
+  match product with
+  | ProductA -> 10  (* Strict *)
+  | ProductB -> 20  (* Moderate *)
+  | ProductC -> 30  (* Relaxed *)
+
+(* Temperature safety limits by mode *)
+let temp_limit mode =
+  match mode with
+  | Normal -> 80
+  | HighSpeed -> 90  (* Higher tolerance *)
+  | EcoMode -> 70    (* Stricter *)
+
+(* Check if temperature is safe *)
+let temp_safe temperature mode =
+  temperature <= temp_limit mode
+
+(* Emergency stop condition *)
+let requires_emergency_stop safety_level temperature =
+  safety_level = Emergency || temperature > 100
+
+(* Core quality and safety decision *)
+let determine_production_decision
+    product
+    mode
+    defect_score
+    temperature
+    safety_level
+    vibration =
+
+  (* Emergency stop override: halt production immediately *)
+  let emergency = requires_emergency_stop safety_level temperature in
+
+  if emergency then
+    { approved = false;
+      requires_inspection = true;
+      production_allowed = false }
+  else
+    (* Check defect score *)
+    let threshold = defect_threshold product in
+    let quality_ok = defect_score <= threshold in
+
+    if not quality_ok then
+      { approved = false;
+        requires_inspection = true;
+        production_allowed = true }
+    else
+      (* Check temperature safety *)
+      let temp_ok = temp_safe temperature mode in
+
+      if not temp_ok then
+        { approved = false;
+          requires_inspection = false;
+          production_allowed = false }
+      else
+        (* Check vibration (HighSpeed mode sensitive) *)
+        let vibration_ok = if mode = HighSpeed then vibration <= 50 else vibration <= 70 in
+
+        if not vibration_ok then
+          { approved = false;
+            requires_inspection = false;
+            production_allowed = false }
+        else
+          { approved = true;
+            requires_inspection = false;
+            production_allowed = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: HighSpeed mode scenarios *)
+let assume_highspeed
+    (product : product_type)
+    (mode : production_mode)
+    (defect_score : int)
+    (temperature : int)
+    (safety_level : safety_level)
+    (vibration : int) : bool =
+  mode = HighSpeed
+
+let highspeed_scenarios product mode defect_score temperature safety_level vibration =
+  determine_production_decision product mode defect_score temperature safety_level vibration
+[@@decomp top ~prune:true ~assuming:[%id assume_highspeed] ()]
+
+(* Q2: Can production continue at Critical safety level? *)
+let production_at_critical product mode defect_score temperature safety_level vibration =
+  let decision = determine_production_decision product mode defect_score temperature safety_level vibration in
+  safety_level = Critical && decision.production_allowed
+[@@decomp top ()]
+
+(* Q3: Emergency stop guarantee *)
+verify (fun product mode defect_score temperature vibration ->
+  let decision = determine_production_decision product mode defect_score temperature Emergency vibration in
+  not decision.production_allowed
+)

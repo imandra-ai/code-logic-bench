@@ -1,0 +1,194 @@
+(* Lane Keeping Controller *)
+
+(* Core types - simplified to reduce state space *)
+type sensor_status = Active | Degraded
+
+type weather = Clear | Rain
+
+type control_mode =
+  | FullAutonomous
+  | AssistedDriving
+  | ManualOverride
+
+type lane_keeping_decision = {
+  control_mode: control_mode;
+  allow_steering: bool;
+  require_driver_alert: bool;
+  max_steering_angle: int;  (* degrees *)
+  confidence_level: int;  (* 0-100 *)
+}
+
+(* Safe following distance multipliers (multiplexer pattern) *)
+let safe_distance_factor weather speed =
+  let base_factor =
+    match weather with
+    | Clear -> 10
+    | Rain -> 15
+  in
+  (* Speed affects safety margin *)
+  if speed < 40 then base_factor
+  else (base_factor * 13) / 10  (* 30% increase *)
+
+(* Sensor confidence calculation *)
+let sensor_confidence camera_status lidar_status =
+  match camera_status, lidar_status with
+  | Active, Active -> 95
+  | Active, Degraded -> 75
+  | Degraded, Active -> 70
+  | Degraded, Degraded -> 40
+
+(* Override pattern: weather degrades visibility BUT clear night is exception *)
+let visibility_acceptable weather time_of_day sensor_conf =
+  match weather with
+  | Clear ->
+    (* Clear weather allows operation... *)
+    let base_ok = true in
+    (* ...EXCEPT at night (6pm-6am) with degraded sensors *)
+    let night = time_of_day < 6 || time_of_day >= 18 in
+    let degraded = sensor_conf < 70 in
+    if night && degraded then false else base_ok
+
+  | Rain ->
+    (* Rain requires good sensors *)
+    sensor_conf >= 75
+
+(* Check if close obstacle *)
+let check_close_obstacle obstacle_distance speed weather =
+  let safe_dist = safe_distance_factor weather speed in
+  obstacle_distance < safe_dist && speed > 15
+
+(* Check if manual override needed *)
+let requires_manual_override camera_status lidar_status driver_intervention_time =
+  let both_degraded = camera_status = Degraded && lidar_status = Degraded in
+  let long_intervention = driver_intervention_time > 15 in
+  both_degraded || long_intervention
+
+(* Dead zone: certain combinations are ambiguous *)
+let is_valid_state obstacle_distance speed lane_offset =
+  (* Distances 48-52 with speed 38-42 and offset 28-32 are ambiguous *)
+  let in_dead_zone =
+    obstacle_distance >= 48 && obstacle_distance <= 52 &&
+    speed >= 38 && speed <= 42 &&
+    lane_offset >= 28 && lane_offset <= 32  (* offset in cm *)
+  in
+  (* Also invalid if values are out of reasonable bounds *)
+  let invalid_values =
+    obstacle_distance < 5 || obstacle_distance > 100 ||
+    speed < 10 || speed > 80 ||
+    lane_offset < 10 || lane_offset > 60
+  in
+
+  not (in_dead_zone || invalid_values)
+
+(* Max steering angle calculation *)
+let calculate_max_steering sensor_conf speed =
+  (* Higher speed or lower confidence reduces max steering *)
+  let base_angle = 45 in
+  let speed_factor = if speed < 30 then 100 else if speed < 60 then 80 else 60 in
+  let conf_factor = if sensor_conf >= 90 then 100 else if sensor_conf >= 70 then 80 else 60 in
+  (base_angle * speed_factor * conf_factor) / 10000
+
+(* Core decision function *)
+let determine_lane_keeping_control
+    camera_status
+    lidar_status
+    weather
+    time_of_day
+    obstacle_distance
+    speed
+    lane_offset
+    driver_intervention_time =
+
+  (* Check validity first *)
+  let valid = is_valid_state obstacle_distance speed lane_offset in
+
+  if not valid then
+    { control_mode = ManualOverride;
+      allow_steering = false;
+      require_driver_alert = false;
+      max_steering_angle = 0;
+      confidence_level = 0 }
+  else
+    (* Calculate sensor confidence *)
+    let sensor_conf = sensor_confidence camera_status lidar_status in
+
+    (* Check visibility *)
+    let visibility_ok = visibility_acceptable weather time_of_day sensor_conf in
+
+    (* Check close obstacle *)
+    let close_obstacle = check_close_obstacle obstacle_distance speed weather in
+
+    (* Check manual override requirements *)
+    let needs_manual = requires_manual_override camera_status lidar_status driver_intervention_time in
+
+    (* Determine control mode *)
+    let mode =
+      if close_obstacle || needs_manual || not visibility_ok then ManualOverride
+      else if sensor_conf >= 90 && lane_offset < 25 then FullAutonomous
+      else AssistedDriving
+    in
+
+    (* Determine steering allowance *)
+    let steering_allowed =
+      match mode with
+      | FullAutonomous | AssistedDriving -> true
+      | ManualOverride -> false
+    in
+
+    (* Driver alert requirements *)
+    let alert_needed =
+      (sensor_conf < 75) ||
+      (mode = AssistedDriving && lane_offset > 35) ||
+      close_obstacle
+    in
+
+    (* Calculate max steering *)
+    let max_angle = calculate_max_steering sensor_conf speed in
+
+    { control_mode = mode;
+      allow_steering = steering_allowed;
+      require_driver_alert = alert_needed;
+      max_steering_angle = max_angle;
+      confidence_level = sensor_conf }
+
+(* Analysis
+====================
+ *)
+
+(* Restrict input space for decomposition *)
+let assume_valid_inputs
+    (camera_status : sensor_status)
+    (lidar_status : sensor_status)
+    (weather : weather)
+    (time_of_day : int)
+    (obstacle_distance : int)
+    (speed : int)
+    (lane_offset : int)
+    (driver_intervention_time : int) : bool =
+  (* Focused ranges for tractable decomposition *)
+  (time_of_day = 12 || time_of_day = 20) &&
+  obstacle_distance >= 20 && obstacle_distance <= 60 &&
+  speed >= 20 && speed <= 50 &&
+  lane_offset >= 15 && lane_offset <= 40 &&
+  driver_intervention_time >= 10 && driver_intervention_time <= 20
+
+(* Q1: Enumerate all distinct lane keeping control scenarios *)
+let lane_keeping_scenarios camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time =
+  determine_lane_keeping_control camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time
+[@@decomp top ~prune:true ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q2: Can ManualOverride trigger due to close obstacle? *)
+let override_due_to_obstacle camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time =
+  let decision = determine_lane_keeping_control camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time in
+  obstacle_distance < 30 && decision.control_mode = ManualOverride
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q3: Safety property - Active sensors in Clear weather allow at least AssistedDriving *)
+verify (fun camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time ->
+  let valid = assume_valid_inputs camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time in
+  let decision = determine_lane_keeping_control camera_status lidar_status weather time_of_day obstacle_distance speed lane_offset driver_intervention_time in
+  valid ==>
+    ((weather = Clear && camera_status = Active && lidar_status = Active &&
+      obstacle_distance > 40 && lane_offset < 25 && driver_intervention_time <= 15)
+     ==> (decision.control_mode = FullAutonomous || decision.control_mode = AssistedDriving))
+)

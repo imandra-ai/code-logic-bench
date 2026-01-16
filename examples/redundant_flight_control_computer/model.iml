@@ -1,0 +1,159 @@
+(* Redundant Flight Control Computer *)
+
+(* Core types *)
+type computer_status = Operational | Degraded | Failed
+
+type flight_phase = Takeoff | Cruise | Landing
+
+type sensor_agreement = FullAgreement | PartialAgreement | Disagreement
+
+type control_decision = {
+  use_computer_a: bool;
+  use_computer_b: bool;
+  use_computer_c: bool;
+  require_pilot_intervention: bool;
+  system_confidence: int;  (* 0-100 *)
+}
+
+(* Confidence calculation (multiplexer pattern) *)
+let base_confidence flight_phase =
+  match flight_phase with
+  | Takeoff -> 95  (* Require high confidence *)
+  | Cruise -> 85
+  | Landing -> 98  (* Require highest confidence *)
+
+(* Sensor agreement affects confidence *)
+let agreement_factor agreement =
+  match agreement with
+  | FullAgreement -> 100  (* No reduction *)
+  | PartialAgreement -> 85  (* 15% reduction *)
+  | Disagreement -> 60  (* 40% reduction *)
+
+(* Count operational computers *)
+let count_operational comp_a comp_b comp_c =
+  (if comp_a = Operational then 1 else 0) +
+  (if comp_b = Operational then 1 else 0) +
+  (if comp_c = Operational then 1 else 0)
+
+(* Quorum: need at least 2 operational computers for autonomous operation *)
+let has_quorum comp_a comp_b comp_c =
+  count_operational comp_a comp_b comp_c >= 2
+
+(* Override pattern: critical phase requires pilot EXCEPT when full agreement *)
+let requires_pilot_override flight_phase agreement comp_a comp_b comp_c =
+  let critical_phase = (flight_phase = Takeoff || flight_phase = Landing) in
+
+  if critical_phase then
+    (* Override: Critical phases need pilot... *)
+    let needs_pilot = true in
+    (* ...EXCEPT with full agreement and all computers operational *)
+    let override = agreement = FullAgreement && has_quorum comp_a comp_b comp_c in
+    if override then false else needs_pilot
+  else
+    false  (* Cruise doesn't require pilot *)
+
+(* Dead zone: certain confidence/agreement combinations are ambiguous *)
+let is_valid_state confidence comp_degraded_count altitude =
+  (* Confidence 83-87 with 1 degraded computer at altitude 9800-10200 is ambiguous *)
+  let in_dead_zone =
+    confidence >= 83 && confidence <= 87 &&
+    comp_degraded_count = 1 &&
+    altitude >= 9800 && altitude <= 10200
+  in
+  let invalid =
+    confidence < 0 || confidence > 100 ||
+    altitude < 0 || altitude > 50000
+  in
+
+  not (in_dead_zone || invalid)
+
+(* Calculate which computers to use *)
+let select_computers comp_a comp_b comp_c =
+  let use_a = (comp_a = Operational || comp_a = Degraded) in
+  let use_b = (comp_b = Operational || comp_b = Degraded) in
+  let use_c = (comp_c = Operational || comp_c = Degraded) in
+
+  (* If quorum exists, use all operational + degraded *)
+  (* If no quorum, pilot takes over anyway *)
+  (use_a, use_b, use_c)
+
+(* Core decision function *)
+let determine_flight_control
+    comp_a
+    comp_b
+    comp_c
+    flight_phase
+    agreement
+    altitude =
+
+  let op_count = count_operational comp_a comp_b comp_c in
+  let degraded_count =
+    (if comp_a = Degraded then 1 else 0) +
+    (if comp_b = Degraded then 1 else 0) +
+    (if comp_c = Degraded then 1 else 0)
+  in
+
+  (* Calculate confidence *)
+  let base_conf = base_confidence flight_phase in
+  let agree_factor = agreement_factor agreement in
+  let confidence = (base_conf * agree_factor) / 100 in
+
+  (* Check validity *)
+  let valid = is_valid_state confidence degraded_count altitude in
+
+  if not valid then
+    { use_computer_a = false;
+      use_computer_b = false;
+      use_computer_c = false;
+      require_pilot_intervention = true;
+      system_confidence = 0 }
+  else
+    (* Check quorum *)
+    let quorum = has_quorum comp_a comp_b comp_c in
+
+    (* Check override requirement *)
+    let pilot_needed = requires_pilot_override flight_phase agreement comp_a comp_b comp_c in
+
+    (* Select computers *)
+    let (use_a, use_b, use_c) = select_computers comp_a comp_b comp_c in
+
+    { use_computer_a = use_a && quorum;
+      use_computer_b = use_b && quorum;
+      use_computer_c = use_c && quorum;
+      require_pilot_intervention = pilot_needed || not quorum;
+      system_confidence = confidence }
+
+(* Analysis
+====================
+ *)
+
+let assume_valid_inputs
+    (comp_a : computer_status)
+    (comp_b : computer_status)
+    (comp_c : computer_status)
+    (flight_phase : flight_phase)
+    (agreement : sensor_agreement)
+    (altitude : int) : bool =
+  altitude >= 0 && altitude <= 40000
+
+(* Q1: Enumerate control scenarios *)
+let control_scenarios comp_a comp_b comp_c flight_phase agreement altitude =
+  determine_flight_control comp_a comp_b comp_c flight_phase agreement altitude
+[@@decomp top ~prune:true ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q2: Can Landing phase operate without pilot? *)
+let landing_no_pilot comp_a comp_b comp_c flight_phase agreement altitude =
+  let decision = determine_flight_control comp_a comp_b comp_c flight_phase agreement altitude in
+  flight_phase = Landing && not decision.require_pilot_intervention
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]
+
+(* Q3: Can system use computer with 1 Failed computer? *)
+let use_with_one_failed comp_a comp_b comp_c flight_phase agreement altitude =
+  let decision = determine_flight_control comp_a comp_b comp_c flight_phase agreement altitude in
+  let failed_count =
+    (if comp_a = Failed then 1 else 0) +
+    (if comp_b = Failed then 1 else 0) +
+    (if comp_c = Failed then 1 else 0)
+  in
+  failed_count = 1 && (decision.use_computer_a || decision.use_computer_b || decision.use_computer_c)
+[@@decomp top ~assuming:[%id assume_valid_inputs] ()]

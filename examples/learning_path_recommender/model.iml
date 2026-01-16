@@ -1,0 +1,146 @@
+(* Learning Path Recommender *)
+
+(* Core types *)
+type difficulty_level = Beginner | Intermediate | Advanced | Expert
+
+type goal_priority = Low | Medium | High
+
+type learning_style = Visual | Auditory | Kinesthetic
+
+type recommendation_result = Recommended | Deferred | Excluded
+
+(* High priority goals can override style mismatch *)
+(* BUT only if student has minimum competency (30%) *)
+let high_priority_override goal_priority competency_level style_match =
+  goal_priority = High && competency_level >= 30 && not style_match
+
+(* Prerequisite threshold depends on difficulty *)
+let prerequisite_threshold difficulty =
+  match difficulty with
+  | Beginner -> 40
+  | Intermediate -> 60
+  | Advanced -> 70
+  | Expert -> 80
+
+(* Competency levels near thresholds are ambiguous *)
+(* For Intermediate (60% threshold), 55-65% is uncertain *)
+let in_competency_dead_zone competency_level difficulty =
+  let threshold = prerequisite_threshold difficulty in
+  competency_level >= (threshold - 5) && competency_level <= (threshold + 5)
+
+(* Check if style matches *)
+let style_matches student_style module_style =
+  student_style = module_style
+
+(* Calculate goal relevance score *)
+let goal_relevance_score goal_priority =
+  match goal_priority with
+  | High -> 3
+  | Medium -> 2
+  | Low -> 1
+
+(* Recommendation needs 3 out of 5 factors *)
+let calculate_recommendation_score
+    prereq_met
+    style_match
+    goal_relevant
+    not_failed_before
+    engagement_ok =
+  let count =
+    (if prereq_met then 1 else 0) +
+    (if style_match then 1 else 0) +
+    (if goal_relevant then 1 else 0) +
+    (if not_failed_before then 1 else 0) +
+    (if engagement_ok then 1 else 0)
+  in
+  count
+
+(* Core module recommendation decision *)
+let determine_module_recommendation
+    (* Module characteristics *)
+    module_difficulty
+    style_matches
+    (* Student state *)
+    competency_level
+    engagement_good
+    (* Goal alignment *)
+    goal_priority
+    goal_aligned =
+
+  (* Check competency dead zone first *)
+  let in_dead_zone = in_competency_dead_zone competency_level module_difficulty in
+
+  if in_dead_zone then
+    Deferred  (* Dead zone → defer for assessment *)
+  else
+    (* Check if prerequisites met *)
+    let threshold = prerequisite_threshold module_difficulty in
+    let prereq_met = competency_level >= threshold in
+
+    (* If prerequisites not met, exclude immediately *)
+    if not prereq_met then
+      Excluded
+    else
+      (* Check high priority override *)
+      let is_override = high_priority_override goal_priority competency_level style_matches in
+
+      if is_override then
+        Recommended  (* High priority overrides style mismatch *)
+      else
+        (* Normal recommendation logic with quorum *)
+
+        (* Check individual factors *)
+        let goal_relevant = goal_aligned && (goal_relevance_score goal_priority) >= 2 in
+
+        (* Calculate recommendation score (quorum - simplified to 3 factors) *)
+        let score =
+          (if prereq_met then 1 else 0) +
+          (if style_matches then 1 else 0) +
+          (if goal_relevant then 1 else 0) +
+          (if engagement_good then 1 else 0)
+        in
+
+        (* Need 3 out of 4 for recommendation *)
+        if score >= 3 then
+          Recommended
+        else if score >= 2 then
+          Deferred  (* Borderline cases *)
+        else
+          Excluded
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all module recommendation scenarios *)
+let all_recommendation_scenarios = determine_module_recommendation
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Expert modules ever be recommended with competency < 80%? *)
+let expert_low_competency_recommended
+    module_difficulty style_matches
+    competency_level engagement_good
+    goal_priority goal_aligned =
+  let result = determine_module_recommendation
+    module_difficulty style_matches
+    competency_level engagement_good
+    goal_priority goal_aligned
+  in
+  module_difficulty = Expert && competency_level < 80 && result = Recommended
+[@@decomp top ()]
+
+(* Q3: Safety property - modules in competency dead zone never directly recommended *)
+verify (fun
+    module_difficulty style_matches
+    competency_level engagement_good
+    goal_priority goal_aligned ->
+  let result = determine_module_recommendation
+    module_difficulty style_matches
+    competency_level engagement_good
+    goal_priority goal_aligned
+  in
+  let in_dead_zone = in_competency_dead_zone competency_level module_difficulty in
+
+  (* Dead zone should never lead to direct recommendation *)
+  in_dead_zone ==> result <> Recommended
+)

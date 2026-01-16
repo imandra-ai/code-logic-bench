@@ -1,0 +1,163 @@
+(* Smart Waste Management Scheduler *)
+
+(* Core types *)
+type waste_type = Recyclable | Organic | General | Hazardous
+
+type weather = Sunny | Rainy | Snowy | Extreme
+
+type truck_capability = Standard | Organic_Only | Hazardous_Only | Multi_Type
+
+type collection_decision = {
+  approved: bool;
+  priority_score: int;
+  requires_special_handling: bool;
+  estimated_time: int;
+}
+
+(* Bin parameters *)
+let fill_threshold_by_waste waste =
+  match waste with
+  | Hazardous -> 75  (* 75% - must empty sooner for safety *)
+  | Organic -> 80    (* 80% - decomposition concerns *)
+  | Recyclable -> 85 (* 85% - less urgent *)
+  | General -> 90    (* 90% - most tolerant *)
+
+(* Weather affects collection time *)
+let weather_time_multiplier weather =
+  match weather with
+  | Sunny -> 1
+  | Rainy -> 2
+  | Snowy -> 3
+  | Extreme -> 5
+
+(* Truck compatibility with waste type *)
+let truck_can_collect truck_cap waste =
+  match truck_cap, waste with
+  | Hazardous_Only, Hazardous -> true
+  | Hazardous_Only, _ -> false
+  | Organic_Only, Organic -> true
+  | Organic_Only, _ -> false
+  | Multi_Type, _ -> true
+  | Standard, Hazardous -> false
+  | Standard, Organic -> false
+  | Standard, _ -> true
+
+(* Check if bin is overfilled based on waste-specific threshold *)
+let is_overfilled fill_pct waste =
+  let threshold = fill_threshold_by_waste waste in
+  fill_pct >= threshold
+
+(* Calculate base priority score *)
+let calculate_base_priority fill_pct waste days_since_empty =
+  let fill_component = fill_pct in
+  let time_component = days_since_empty * 5 in
+  let waste_urgency = match waste with
+    | Hazardous -> 50
+    | Organic -> 30
+    | Recyclable -> 10
+    | General -> 20
+  in
+  fill_component + time_component + waste_urgency
+
+(* Escalate priority if over threshold *)
+let apply_threshold_escalation base_score fill_pct waste =
+  if is_overfilled fill_pct waste then
+    base_score * 2  (* Double priority when over threshold *)
+  else
+    base_score
+
+(* Weather penalty for extreme conditions *)
+let apply_weather_penalty score weather =
+  match weather with
+  | Extreme -> score / 2  (* Halve priority in extreme weather *)
+  | _ -> score
+
+(* Emergency override: Hazardous waste at 90%+ is always priority *)
+let check_emergency_override fill_pct waste =
+  waste = Hazardous && fill_pct >= 90
+
+(* Core decision function *)
+let determine_collection_decision
+    fill_pct
+    waste
+    days_since_empty
+    truck_cap
+    weather
+    fuel_level =
+
+  (* Check truck compatibility first *)
+  let can_collect = truck_can_collect truck_cap waste in
+
+  if not can_collect then
+    { approved = false;
+      priority_score = 0;
+      requires_special_handling = false;
+      estimated_time = 0 }
+  else
+    (* Check emergency override *)
+    let is_emergency = check_emergency_override fill_pct waste in
+
+    if is_emergency then
+      (* Emergency: immediate collection *)
+      let time = 30 * (weather_time_multiplier weather) in
+      { approved = true;
+        priority_score = 1000;  (* Maximum priority *)
+        requires_special_handling = true;
+        estimated_time = time }
+    else
+      (* Check fuel adequacy (need at least 20% for safety margin) *)
+      let sufficient_fuel = fuel_level >= 20 in
+
+      if not sufficient_fuel then
+        { approved = false;
+          priority_score = 0;
+          requires_special_handling = false;
+          estimated_time = 0 }
+      else
+        (* Normal priority calculation *)
+        let base = calculate_base_priority fill_pct waste days_since_empty in
+        let with_threshold = apply_threshold_escalation base fill_pct waste in
+        let final_priority = apply_weather_penalty with_threshold weather in
+
+        (* Approve if priority meets minimum threshold *)
+        let min_threshold = 50 in
+        let approved = final_priority >= min_threshold in
+
+        let time = (if approved then 45 else 0) * (weather_time_multiplier weather) in
+
+        { approved = approved;
+          priority_score = final_priority;
+          requires_special_handling = (waste = Hazardous);
+          estimated_time = time }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for Hazardous waste with capable trucks *)
+let assume_hazardous_capable
+    (fill_pct : int)
+    (waste : waste_type)
+    (days_since_empty : int)
+    (truck_cap : truck_capability)
+    (weather : weather)
+    (fuel_level : int) : bool =
+  waste = Hazardous && (truck_cap = Hazardous_Only || truck_cap = Multi_Type)
+
+let hazardous_scenarios fill_pct waste days_since_empty truck_cap weather fuel_level =
+  determine_collection_decision fill_pct waste days_since_empty truck_cap weather fuel_level
+[@@decomp top ~prune:true ~assuming:[%id assume_hazardous_capable] ()]
+
+(* Q2: Can approval happen with low fuel? *)
+let approved_with_low_fuel fill_pct waste days_since_empty truck_cap weather fuel_level =
+  let decision = determine_collection_decision fill_pct waste days_since_empty truck_cap weather fuel_level in
+  fuel_level < 20 && decision.approved
+[@@decomp top ()]
+
+(* Q3: Organic at exact threshold property *)
+verify (fun fill_pct days_since_empty truck_cap fuel_level ->
+  let decision = determine_collection_decision fill_pct Organic days_since_empty truck_cap Sunny fuel_level in
+  let at_threshold = fill_pct = 80 in
+  let capable = truck_can_collect truck_cap Organic in
+  (at_threshold && fuel_level >= 20 && capable) ==> decision.approved
+)

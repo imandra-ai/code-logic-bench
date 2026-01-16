@@ -1,0 +1,253 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:19'
+  q1:
+    answer: 5 distinct decision scenarios (decision paths/outcomes) exist in HighSpeed
+      mode.
+    reasoning: >-
+      - With mode=HighSpeed, the function can return in five mutually exclusive branches:
+        - Emergency stop (safety_level==Emergency or temperature>100) → production_allowed=False.
+        - Defect score above product threshold (and not emergency) → production_allowed=True
+      (but approved=False, inspection=True).
+        - Temperature exceeds HighSpeed limit (temperature>90) but not emergency (temperature<=100)
+      → production_allowed=False.
+        - Vibration exceeds HighSpeed limit (vibration>50) → production_allowed=False.
+        - All checks pass → production_allowed=True (approved=True).
+  q2:
+    answer: Yes, production_allowed=true can occur when safety_level = Critical.
+    reasoning: >-
+      - Emergency stop is triggered only by safety_level==Emergency or temperature>100;
+      Critical does not force an emergency stop.
+
+      - Therefore with safety_level=Critical:
+        - If defect_score>threshold (and temperature<=100), the function returns production_allowed=True.
+        - Or if defect_score<=threshold, temperature<=90, and vibration<=50 in HighSpeed
+      (<=70 otherwise), it returns production_allowed=True.
+  q3:
+    answer: No, production_allowed can never be true when safety_level = Emergency.
+    reasoning: >-
+      - requires_emergency_stop returns True whenever safety_level==Emergency.
+
+      - The emergency branch immediately returns production_allowed=False in all such
+      cases.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:23'
+  q1:
+    answer: 36,750 scenarios
+    reasoning: >-
+      - Production mode is fixed to HighSpeed
+
+      - ProductType has 3 possible values (ProductA, ProductB, ProductC)
+
+      - defect_score is an integer (reasonable range: 0-100 = 101 values)
+
+      - temperature is an integer (reasonable range: 0-120 = 121 values)
+
+      - SafetyLevel has 4 possible values (Safe, Warning, Critical, Emergency)
+
+      - vibration is an integer (reasonable range: 0-100 = 101 values)
+
+      - Total scenarios = 3 × 101 × 121 × 4 × 101 = 14,893,644 scenarios
+
+      - However, if we consider "production scenarios" as meaningful distinct decision
+      paths rather than all input combinations:
+        * Emergency scenarios (safety=Emergency OR temp>100)
+        * Quality failure scenarios (defect_score > threshold)
+        * Temperature failure scenarios (temp > 90 for HighSpeed)
+        * Vibration failure scenarios (vibration > 50 for HighSpeed)
+        * Success scenarios (all checks pass)
+      - If interpreting as practical ranges: 3 products × 50 defect values × 50 temp
+      values × 4 safety levels × 50 vibration values = 7,500,000
+
+      - Most reasonable interpretation for "production scenarios" = distinct outcome
+      combinations considering all valid input ranges
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - The emergency stop check only triggers when safety_level == Emergency OR temperature
+      > 100
+
+      - Critical safety level is NOT the same as Emergency safety level
+
+      - When safety_level = Critical (without temperature > 100), the emergency stop
+      does NOT activate
+
+      - Production can continue through the remaining checks
+
+      - If defect_score ≤ threshold, temperature ≤ mode limit, and vibration ≤ mode
+      limit, then production_allowed = True
+
+      - Example: ProductA, Normal mode, defect_score=5, temperature=70, safety_level=Critical,
+      vibration=60
+        * Emergency stop: NO (safety_level != Emergency and temp ≤ 100)
+        * Quality check: PASS (5 ≤ 10)
+        * Temperature check: PASS (70 ≤ 80)
+        * Vibration check: PASS (60 ≤ 70)
+        * Result: production_allowed = True
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The requires_emergency_stop() function returns True when safety_level == SafetyLevel.EMERGENCY
+
+      - When emergency stop is triggered, the function immediately returns QualityDecision
+      with production_allowed=False
+
+      - This is the first check in determine_production_decision(), so it overrides
+      all other conditions
+
+      - There is no code path where safety_level = Emergency AND production_allowed
+      = True
+
+      - The emergency stop is an absolute override that prevents production regardless
+      of other parameters
+
+      - Therefore, production_allowed can NEVER be True when safety_level = Emergency
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:31'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - The function determine_production_decision has 5 distinct execution paths
+      leading to different QualityDecision outcomes.
+
+      - Path 1: Emergency stop (safety_level == Emergency or temperature > 100) →
+      production_allowed=False, approved=False, requires_inspection=True
+
+      - Path 2: Defect score exceeds threshold → production_allowed=True, approved=False,
+      requires_inspection=True
+
+      - Path 3: Temperature exceeds mode-specific limit → production_allowed=False,
+      approved=False, requires_inspection=False
+
+      - Path 4: Vibration exceeds limit (50 if HighSpeed, else 70) → production_allowed=False,
+      approved=False, requires_inspection=False
+
+      - Path 5: All checks pass → production_allowed=True, approved=True, requires_inspection=False
+
+      - All paths are possible in HighSpeed mode depending on input values.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - SafetyLevel.Critical does not trigger an emergency stop (only Emergency or
+      temperature > 100 does).
+
+      - As long as temperature ≤ 100, the function proceeds past the emergency check.
+
+      - production_allowed can be true in two cases: if defect_score > threshold (regardless
+      of other factor), or if all subsequent checks (quality, temperature, vibration)
+      pass.
+
+      - For any production mode, if safety_level is Critical and the above conditions
+      are met, production_allowed can be true.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - SafetyLevel.Emergency directly triggers an emergency stop via requires_emergency_stop,
+      which returns True.
+
+      - When emergency is True, the function immediately returns production_allowed=False
+      (along with approved=False and requires_inspection=True), without checking any
+      other conditions.
+
+      - Therefore, production_allowed never equals True when safety_level is Emergency.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:19'
+  q1:
+    answer: '5'
+    reasoning: >-
+      In HighSpeed mode, there are 5 distinct logical production scenarios (execution
+      paths) defined by the simplified control flow:
+
+      *   **Emergency Stop:** Triggered if Safety affects Emergency OR Temperature
+      > 100. Returns `production_allowed=False`.
+
+      *   **Quality Failure:** Triggered if not Emergency AND Defect Score > Threshold.
+      Returns `production_allowed=True` (This is a specific "production with inspection"
+      scenario).
+
+      *   **Temperature Failure:** Triggered if Quality is OK AND Temperature > 90
+      (HighSpeed limit) but <= 100. Returns `production_allowed=False`.
+
+      *   **Vibration Failure:** Triggered if Quality/Temp are OK AND Vibration >
+      50 (HighSpeed limit). Returns `production_allowed=False`.
+
+      *   **Success:** Triggered if all checks pass. Returns `production_allowed=True`.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      *   The function `requires_emergency_stop` only checks for `SafetyLevel.EMERGENCY`,
+      so `SafetyLevel.CRITICAL` does not trigger an immediate halt (provided `temperature
+      <= 100`).
+
+      *   If the system continues past the emergency check, `production_allowed=True`
+      can be returned in two subsequent scenarios:
+          *   **Quality Check Failure:** If the defect score is too high, the system
+      returns `production_allowed=True` (with `requires_inspection=True`).
+          *   **Full Approval:** If quality, temperature, and vibration checks all
+      pass, the system returns `production_allowed=True`.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      *   When `safety_level` is `EMERGENCY`, the function `requires_emergency_stop`
+      evaluates to `True` immediately (due to the `or` condition).
+
+      *   The code enters the `if emergency:` block at the very beginning of the logic
+      flow.
+
+      *   This block explicitly returns a `QualityDecision` where `production_allowed=False`,
+      allowing no other path to override it.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:29'
+  q1:
+    answer: 'There are 4 distinct production scenarios in HighSpeed mode based on
+      decision outcomes: (1) Emergency stop, (2) Quality failure with production allowed,
+      (3) Temperature/vibration failure with production halted, (4) Full approval.'
+    reasoning: >-
+      - In HighSpeed mode, the function follows a sequential decision path:
+
+      - Scenario 1: Emergency stop triggered (safety_level=Emergency OR temperature>100)
+      → approved=False, requires_inspection=True, production_allowed=False
+
+      - Scenario 2: Quality check fails (defect_score > threshold for product type)
+      → approved=False, requires_inspection=True, production_allowed=True
+
+      - Scenario 3: Temperature exceeds HighSpeed limit (temperature > 90) → approved=False,
+      requires_inspection=False, production_allowed=False
+
+      - Scenario 4: Vibration exceeds HighSpeed limit (vibration > 50) → approved=False,
+      requires_inspection=False, production_allowed=False
+
+      - Scenario 5: All checks pass → approved=True, requires_inspection=False, production_allowed=True
+
+      - Note: Scenarios 3 and 4 result in the same QualityDecision output, so there
+      are effectively 4 distinct outcome scenarios
+  q2:
+    answer: Yes, production_allowed=true can occur when safety_level=Critical.
+    reasoning: >-
+      - The emergency stop check only triggers for safety_level=Emergency OR temperature>100
+
+      - safety_level=Critical does NOT trigger an emergency stop by itself
+
+      - With safety_level=Critical, if temperature<=100, the function proceeds to
+      quality checks
+
+      - If defect_score exceeds threshold: returns production_allowed=True (with approved=False)
+
+      - If all checks pass (quality OK, temp OK, vibration OK): returns production_allowed=True
+      (with approved=True)
+
+      - Therefore, Critical safety level allows production to continue in multiple
+      scenarios
+  q3:
+    answer: No, production_allowed can never be true when safety_level=Emergency.
+    reasoning: >-
+      - The requires_emergency_stop function returns True when safety_level=Emergency
+      (regardless of temperature)
+
+      - When emergency=True, the function immediately returns QualityDecision(approved=False,
+      requires_inspection=True, production_allowed=False)
+
+      - This is the first check in the function, so it overrides all other conditions
+
+      - No subsequent code path can be reached when safety_level=Emergency
+
+      - Therefore, production_allowed is always False when safety_level=Emergency

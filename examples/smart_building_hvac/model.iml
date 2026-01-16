@@ -1,0 +1,187 @@
+(* Smart Building HVAC System *)
+
+(* Core types *)
+type hvac_mode =
+  | Off
+  | Ventilation
+  | Heating
+  | Cooling
+  | Emergency
+
+type occupancy_level = Empty | Occupied
+
+type season = Summer | Winter
+
+type emergency_state = NoEmergency | FireAlarm | MaintenanceMode
+
+type temp_need = NoHeating | Comfortable | MildHeating | NeedHeating | MildCooling | NeedCooling
+
+type hvac_control_decision = {
+  selected_mode: hvac_mode;
+  fan_speed: int;
+  requires_override: bool;
+}
+
+(* Temperature diff classification thresholds depend on season *)
+let classify_temp_need temp_diff season occupancy =
+  match season, occupancy with
+  | _, Empty -> NoHeating
+  | Summer, Occupied ->
+    if temp_diff >= 4 then NeedCooling
+    else if temp_diff >= 2 then MildCooling
+    else Comfortable
+  | Winter, Occupied ->
+    if temp_diff >= 4 then NeedHeating
+    else if temp_diff >= 2 then MildHeating
+    else Comfortable
+
+(* Dead zone: temp_diff = 3 creates ambiguous boundary *)
+let in_dead_zone temp_diff =
+  temp_diff = 3
+
+(* Emergency override with exceptions *)
+let apply_emergency_mode base_mode emergency_state battery_level maintenance_hours =
+  match emergency_state with
+  | FireAlarm ->
+    (* Fire forces Emergency... *)
+    (* ...EXCEPT if battery critical AND maintenance overdue, must go Off *)
+    if battery_level < 10 && maintenance_hours > 10000 then Off
+    else Emergency
+
+  | MaintenanceMode ->
+    (* Maintenance forces Off... *)
+    (* ...EXCEPT if battery OK and maintenance not too overdue, allow Ventilation *)
+    if battery_level >= 50 && maintenance_hours < 9000 then Ventilation
+    else Off
+
+  | NoEmergency -> base_mode
+
+(* Quorum-based energy limiting *)
+let count_energy_constraints battery_level power_consumption external_power =
+  let c1 = battery_level < 30 in
+  let c2 = power_consumption > 5000 in
+  let c3 = not external_power in
+  (if c1 then 1 else 0) + (if c2 then 1 else 0) + (if c3 then 1 else 0)
+
+(* Core decision function *)
+let determine_hvac_control
+    temp_diff
+    season
+    occupancy
+    emergency_state
+    battery_level
+    power_consumption
+    external_power
+    maintenance_hours =
+
+  (* Step 1: Classify temperature need *)
+  let temp_need = classify_temp_need temp_diff season occupancy in
+
+  (* Step 2: Determine base mode from temp need *)
+  let base_mode =
+    match occupancy, temp_need with
+    | Empty, _ -> Off
+    | Occupied, NoHeating -> Ventilation
+    | Occupied, Comfortable -> Ventilation
+    | Occupied, MildHeating -> if in_dead_zone temp_diff then Ventilation else Heating
+    | Occupied, NeedHeating -> Heating
+    | Occupied, MildCooling -> if in_dead_zone temp_diff then Ventilation else Cooling
+    | Occupied, NeedCooling -> Cooling
+  in
+
+  (* Step 3: Apply emergency overrides *)
+  let mode_after_emergency = apply_emergency_mode base_mode emergency_state battery_level maintenance_hours in
+
+  (* Step 4: Check energy constraints *)
+  let energy_constraint_count = count_energy_constraints battery_level power_consumption external_power in
+
+  (* If 2+ energy constraints, downgrade non-emergency modes *)
+  let final_mode =
+    if energy_constraint_count >= 2 then
+      match mode_after_emergency with
+      | Emergency -> Emergency  (* Never downgrade emergency *)
+      | Heating | Cooling -> Ventilation  (* Downgrade to lower power *)
+      | _ -> mode_after_emergency
+    else mode_after_emergency
+  in
+
+  (* Step 5: Calculate fan speed *)
+  let fan_speed =
+    match final_mode with
+    | Off -> 0
+    | Emergency -> 100
+    | Ventilation -> 40
+    | Heating -> 70
+    | Cooling -> 80
+  in
+
+  (* Step 6: Check if override required *)
+  let override_needed =
+    (final_mode = Off && emergency_state = FireAlarm) ||
+    (maintenance_hours > 10000 && emergency_state <> NoEmergency)
+  in
+
+  { selected_mode = final_mode;
+    fan_speed = fan_speed;
+    requires_override = override_needed }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Decomposition target - enumerate all distinct HVAC control scenarios *)
+let hvac_control_scenarios = determine_hvac_control
+[@@decomp top ~prune:true ()
+  ~assuming:{|
+    temp_diff >= 0 && temp_diff <= 6 &&
+    battery_level >= 0 && battery_level <= 100 &&
+    power_consumption >= 4000 && power_consumption <= 6000 &&
+    maintenance_hours >= 0 && maintenance_hours <= 12000
+  |}
+  ~basis:{| temp_diff, battery_level, power_consumption, maintenance_hours |}
+]
+
+(* Q2: When does the system select Emergency mode? *)
+let selects_emergency_mode
+    temp_diff
+    season
+    occupancy
+    emergency_state
+    battery_level
+    power_consumption
+    external_power
+    maintenance_hours =
+  let decision = determine_hvac_control
+      temp_diff season occupancy emergency_state
+      battery_level power_consumption external_power maintenance_hours in
+  decision.selected_mode = Emergency
+[@@decomp top ()
+  ~assuming:{|
+    temp_diff >= 0 && temp_diff <= 6 &&
+    battery_level >= 0 && battery_level <= 100 &&
+    power_consumption >= 4000 && power_consumption <= 6000 &&
+    maintenance_hours >= 0 && maintenance_hours <= 12000
+  |}
+  ~basis:{| temp_diff, battery_level, power_consumption, maintenance_hours |}
+]
+
+(* Q3: Safety property - Fire alarm must result in Emergency or Off with override *)
+verify (fun
+    temp_diff
+    season
+    occupancy
+    emergency_state
+    battery_level
+    power_consumption
+    external_power
+    maintenance_hours ->
+  let decision = determine_hvac_control
+      temp_diff season occupancy emergency_state
+      battery_level power_consumption external_power maintenance_hours in
+  let fire_alarm = (emergency_state = FireAlarm) in
+  let safe_outcome =
+    (decision.selected_mode = Emergency) ||
+    (decision.selected_mode = Off && decision.requires_override = true) in
+
+  fire_alarm ==> safe_outcome
+)

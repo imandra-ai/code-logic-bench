@@ -1,0 +1,261 @@
+(* Nuclear Reactor Safety System *)
+
+(* Core types *)
+type reactor_state = Shutdown | HotStandby | PowerOperation | EmergencyShutdown
+
+type safety_response = {
+  recommended_state: reactor_state;
+  initiate_scram: bool;
+  activate_eccs: bool;  (* Emergency Core Cooling System *)
+  isolate_containment: bool;
+  response_valid: bool;
+}
+
+type safety_system_status = Operational | Degraded | Failed
+
+type operator_override_type =
+  | NoOverride
+  | SuppressAlarm
+  | DelayScram
+  | BypassInterlock
+  | MaintenanceMode  (* New: special mode with complex rules *)
+
+(* Safety thresholds based on reactor physics *)
+let temp_threshold_moderate = 550  (* Celsius *)
+let temp_threshold_high = 620
+let temp_threshold_critical = 650
+
+let pressure_threshold_moderate = 2200  (* PSI *)
+let pressure_threshold_high = 2400
+let pressure_threshold_critical = 2500
+
+let flux_threshold_high = 103  (* % of nominal *)
+let flux_threshold_critical = 105
+
+let radiation_threshold_high = 80  (* mR/hr *)
+let radiation_threshold_critical = 100
+
+let xenon_threshold_high = 25  (* Xenon poisoning threshold *)
+
+(* Temperature/Pressure boundaries with Xenon interaction *)
+let is_in_measurement_dead_zone temperature pressure xenon_level =
+  (* Dead zone: readings near threshold boundaries with conflicting signals *)
+  let temp_ambiguous =
+    temperature >= (temp_threshold_high - 2) &&
+    temperature <= (temp_threshold_high + 2) in
+  let pressure_ambiguous =
+    pressure >= (pressure_threshold_high - 10) &&
+    pressure <= (pressure_threshold_high + 10) in
+
+  (* This looks like it adds xenon condition,
+     but it's actually unreachable because if xenon>30 and temp/pressure are in ranges,
+     the first two conditions already cover it *)
+  let xenon_extreme = xenon_level > 30 in
+
+  (temp_ambiguous && pressure_ambiguous) ||
+  (xenon_extreme && temp_ambiguous && pressure >= pressure_threshold_high)
+
+(* Complex Different thresholds based on parameter combinations *)
+let classify_severity temperature pressure neutron_flux radiation_level xenon_level time_since_last_scram =
+  (* Check for critical conditions *)
+  let temp_critical = temperature >= temp_threshold_critical in
+  let pressure_critical = pressure >= pressure_threshold_critical in
+  let flux_critical = neutron_flux >= flux_threshold_critical in
+  let radiation_critical = radiation_level >= radiation_threshold_critical in
+  let xenon_high = xenon_level >= xenon_threshold_high in
+
+  let temp_high = temperature >= temp_threshold_high in
+  let pressure_high = pressure >= pressure_threshold_high in
+  let flux_high = neutron_flux >= flux_threshold_high in
+  let radiation_high = radiation_level >= radiation_threshold_high in
+
+  (* Recent SCRAM changes thresholds *)
+  let recent_scram = time_since_last_scram < 12 in
+
+  (* Count critical conditions *)
+  let critical_count =
+    (if temp_critical then 1 else 0) +
+    (if pressure_critical then 1 else 0) +
+    (if flux_critical then 1 else 0) +
+    (if radiation_critical then 1 else 0) in
+
+  let high_count =
+    (if temp_high then 1 else 0) +
+    (if pressure_high then 1 else 0) +
+    (if flux_high then 1 else 0) +
+    (if radiation_high then 1 else 0) in
+
+  (* Complex quorum logic with interactions *)
+  if critical_count >= 2 then EmergencyShutdown
+  (* If recent SCRAM, lower threshold to 1 critical condition IF xenon is also high *)
+  else if recent_scram && critical_count >= 1 && xenon_high then EmergencyShutdown
+  (* Temperature + Pressure combination is special: even at "high" (not critical),
+     both together trigger EmergencyShutdown *)
+  else if temp_high && pressure_high && temperature >= 640 && pressure >= 2450 then EmergencyShutdown
+  (* This looks important but is unreachable
+     because if critical_count >= 1 and high_count >= 4, we already hit critical_count >= 2 *)
+  else if critical_count >= 1 && high_count >= 4 then EmergencyShutdown
+  else if critical_count >= 1 || high_count >= 3 then HotStandby
+  else if high_count >= 1 then PowerOperation
+  else Shutdown
+
+(* Override Logic with Multiple Exception Levels *)
+let apply_operator_override base_state override_type temperature pressure control_rod_insertion xenon_level time_since_last_scram =
+  match override_type with
+  | NoOverride -> base_state
+  | SuppressAlarm ->
+    (* Can suppress alarm unless in EmergencyShutdown *)
+    if base_state = EmergencyShutdown then base_state
+    else Shutdown
+  | DelayScram ->
+    (* Can delay SCRAM if conditions are marginal... *)
+    let conditions_marginal =
+      temperature < temp_threshold_critical &&
+      pressure < pressure_threshold_critical in
+    (* ...AND control rods are sufficiently inserted... *)
+    let rods_adequate = control_rod_insertion >= 70 in
+    (* ...BUT if already EmergencyShutdown, override is ignored... *)
+    if base_state = EmergencyShutdown then base_state
+    (* ...EXCEPT if it's been less than 6 hours since last SCRAM AND xenon < 15, can delay even EmergencyShutdown *)
+    else if base_state = EmergencyShutdown && time_since_last_scram < 6 && xenon_level < 15 then HotStandby
+    (* ...BUT only if control rods are VERY adequate (≥85%) for EmergencyShutdown override *)
+    else if base_state = EmergencyShutdown && time_since_last_scram < 6 && xenon_level < 15 && control_rod_insertion >= 85 then HotStandby
+    else if conditions_marginal && rods_adequate then PowerOperation
+    else base_state
+  | BypassInterlock ->
+    (* Can bypass interlock for HotStandby... *)
+    if base_state = HotStandby then PowerOperation
+    (* ...EXCEPT if temperature is critically high... *)
+    else if temperature >= temp_threshold_critical then base_state
+    (* ...BUT if pressure is low (<2000), can bypass even with critical temp *)
+    else if temperature >= temp_threshold_critical && pressure < 2000 then PowerOperation
+    else base_state
+  | MaintenanceMode ->
+    (* Maintenance mode forces Shutdown... *)
+    if base_state = EmergencyShutdown then base_state
+    (* ...EXCEPT if conditions are safe (all parameters below moderate thresholds)... *)
+    else if temperature < temp_threshold_moderate && pressure < pressure_threshold_moderate then Shutdown
+    (* ...BUT if xenon is high, stay in current state instead *)
+    else if temperature < temp_threshold_moderate && pressure < pressure_threshold_moderate && xenon_level >= xenon_threshold_high then base_state
+    else Shutdown
+
+(* Determine if SCRAM should be initiated with complex rules *)
+let should_initiate_scram recommended_state safety_system_status xenon_level time_since_last_scram =
+  match recommended_state, safety_system_status with
+  | EmergencyShutdown, Operational -> true
+  | EmergencyShutdown, Degraded -> true
+  | EmergencyShutdown, Failed -> false  (* Cannot SCRAM if system failed *)
+  | HotStandby, Operational -> false
+  | HotStandby, Degraded -> true  (* Degraded system requires SCRAM for HotStandby *)
+  (* If recent SCRAM (<6hrs) and xenon high, require SCRAM even for PowerOperation *)
+  | PowerOperation, Operational -> (time_since_last_scram < 6 && xenon_level >= xenon_threshold_high)
+  | PowerOperation, Degraded -> (time_since_last_scram < 12)  (* Degraded is more conservative *)
+  | _ -> false
+
+(* Determine ECCS activation with xenon interaction *)
+let should_activate_eccs recommended_state temperature xenon_level =
+  match recommended_state with
+  | EmergencyShutdown -> temperature >= temp_threshold_high
+  (* Xenon changes ECCS threshold interpretation *)
+  | HotStandby ->
+    if xenon_level >= xenon_threshold_high then temperature >= (temp_threshold_critical - 30)
+    else temperature >= temp_threshold_critical
+  | _ -> false
+
+(* Determine containment isolation *)
+let should_isolate_containment recommended_state radiation_level pressure =
+  (* Requires EmergencyShutdown AND high radiation... *)
+  recommended_state = EmergencyShutdown &&
+  radiation_level >= radiation_threshold_high &&
+  (* ...BUT if pressure is very low (<1500), containment is already compromised, so don't isolate *)
+  pressure >= 1500
+
+(* Core decision function *)
+let determine_safety_response
+    temperature
+    pressure
+    neutron_flux
+    radiation_level
+    control_rod_insertion
+    xenon_level
+    time_since_last_scram
+    safety_system_status
+    operator_override
+    current_state =
+
+  (* Check validity - dead zone produces invalid response *)
+  let valid = not (is_in_measurement_dead_zone temperature pressure xenon_level) in
+
+  if not valid then
+    { recommended_state = current_state;
+      initiate_scram = false;
+      activate_eccs = false;
+      isolate_containment = false;
+      response_valid = false }
+  else
+    (* Classify base severity *)
+    let base_state = classify_severity temperature pressure neutron_flux radiation_level xenon_level time_since_last_scram in
+
+    (* Apply operator override with exception logic *)
+    let final_state = apply_operator_override base_state operator_override temperature pressure control_rod_insertion xenon_level time_since_last_scram in
+
+    (* Determine specific safety actions *)
+    let scram = should_initiate_scram final_state safety_system_status xenon_level time_since_last_scram in
+    let eccs = should_activate_eccs final_state temperature xenon_level in
+    let containment = should_isolate_containment final_state radiation_level pressure in
+
+    { recommended_state = final_state;
+      initiate_scram = scram;
+      activate_eccs = eccs;
+      isolate_containment = containment;
+      response_valid = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Decomposition target - enumerate all distinct safety response scenarios *)
+let response_scenarios = determine_safety_response
+[@@decomp top ~prune:true
+    ~assuming:(fun temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state ->
+      (* Restrict ranges to make decomposition tractable while preserving interesting boundaries *)
+      temperature >= 0 && temperature <= 700 &&
+      pressure >= 0 && pressure <= 3000 &&
+      neutron_flux >= 0 && neutron_flux <= 110 &&
+      radiation_level >= 0 && radiation_level <= 120 &&
+      control_rod_insertion >= 0 && control_rod_insertion <= 100 &&
+      xenon_level >= 0 && xenon_level <= 40 &&
+      time_since_last_scram >= 0 && time_since_last_scram <= 24
+    ) ()]
+
+(* Q2: When does automatic SCRAM initiate? *)
+let triggers_scram temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state =
+  let response = determine_safety_response temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state in
+  response.initiate_scram
+[@@decomp top
+    ~assuming:(fun temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state ->
+      temperature >= 0 && temperature <= 700 &&
+      pressure >= 0 && pressure <= 3000 &&
+      neutron_flux >= 0 && neutron_flux <= 110 &&
+      radiation_level >= 0 && radiation_level <= 120 &&
+      control_rod_insertion >= 0 && control_rod_insertion <= 100 &&
+      xenon_level >= 0 && xenon_level <= 40 &&
+      time_since_last_scram >= 0 && time_since_last_scram <= 24
+    ) ()]
+
+(* Q3: Safety property - Critical temperature always leads to SCRAM when safety system is operational *)
+verify (fun temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state ->
+  temperature >= 0 && temperature <= 700 &&
+  pressure >= 0 && pressure <= 3000 &&
+  neutron_flux >= 0 && neutron_flux <= 110 &&
+  radiation_level >= 0 && radiation_level <= 120 &&
+  control_rod_insertion >= 0 && control_rod_insertion <= 100 &&
+  xenon_level >= 0 && xenon_level <= 40 &&
+  time_since_last_scram >= 0 && time_since_last_scram <= 24 ==>
+
+  let response = determine_safety_response temperature pressure neutron_flux radiation_level control_rod_insertion xenon_level time_since_last_scram safety_system_status operator_override current_state in
+  let critical_temp = temperature >= temp_threshold_critical in
+  let system_operational = safety_system_status = Operational in
+
+  (response.response_valid && critical_temp && system_operational) ==> response.initiate_scram
+)

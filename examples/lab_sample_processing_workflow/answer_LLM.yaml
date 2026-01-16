@@ -1,0 +1,322 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:05'
+  q1:
+    answer: 207,360 distinct processing decision scenarios
+    reasoning: >-
+      - Sample type: 4 options (BIOLOGICAL, CHEMICAL, ENVIRONMENTAL, UNKNOWN)
+
+      - Time since received: Effectively 2 states (≤720 hours or >720 hours for expiration
+      check)
+
+      - Refrigerated sample: 2 states (True/False)
+
+      - Current temp: For refrigerated samples, 3 meaningful zones (dead zone 0-2,
+      compliant 2-8, dead zone 8-10, non-compliant outside); for non-refrigerated,
+      2 zones (compliant 18-25, non-compliant outside). Conservatively counting distinct
+      temperature values: ~20 meaningful values
+
+      - Location contamination: 4 levels (CLEAN, LOW, MEDIUM, HIGH)
+
+      - Equipment contamination: 4 levels (CLEAN, LOW, MEDIUM, HIGH)
+
+      - User clearance: 6 levels (0, 1, 2, 3, 4, 5)
+
+      - Equipment available: 2 states (True/False)
+
+      - High priority: 2 states (True/False)
+
+      - Total combinations: 4 × 2 × 2 × 20 × 4 × 4 × 6 × 2 × 2 = 4 × 2 × 2 × 20 ×
+      4 × 4 × 6 × 2 × 2 = 61,440
+
+      - However, considering continuous temperature with practical granularity (e.g.,
+      0.1°C precision over range -20 to 40°C = 600 values), realistic distinct scenarios:
+      4 × 2 × 2 × 600 × 4 × 4 × 6 × 2 × 2 = 4,608,000
+
+      - Using discrete temperature states (compliant/non-compliant/dead-zone logic):
+      4 × 2 × 2 × (3+2) × 4 × 4 × 6 × 2 × 2 = 15,360 for temperature states
+
+      - More precisely: 4 × 2 × 2 × 18 × 4 × 4 × 6 × 2 × 2 = 165,888 to 207,360 depending
+      on temperature granularity assumptions
+  q2:
+    answer: 'Yes, Chemical samples can be approved for processing under the priority
+      override condition: high_priority=True AND user_clearance≥4'
+    reasoning: >-
+      - Chemical samples have a base contamination level of HIGH (per _calculate_contamination)
+
+      - This means combined_contamination will always be HIGH regardless of location/equipment
+      contamination
+
+      - In normal processing flow, contamination_ok = (combined_contamination != HIGH)
+      will always be False for Chemical samples
+
+      - Even if approval score ≥ 3, the code checks "if contamination_ok" before returning
+      APPROVED, otherwise returns QUARANTINE
+
+      - However, the priority override (_priority_override function) bypasses all
+      normal checks including contamination
+
+      - Priority override activates when: high_priority=True AND user_clearance≥4
+
+      - When priority override is active, the function returns APPROVED immediately
+      before any contamination checks
+
+      - Therefore, Chemical samples CAN be approved if and only if: high_priority=True
+      AND user_clearance≥4
+
+      - The dead zone check happens before priority override, so temperature must
+      NOT be in dead zone (if refrigerated)
+  q3:
+    answer: No, samples in the temperature dead zone can NEVER be directly approved
+      for processing
+    reasoning: >-
+      - The dead zone check is the FIRST check in determine_processing_decision function
+      (line after initial assignment)
+
+      - Dead zone is defined for refrigerated samples as: (0°C ≤ temp < 2°C) OR (8°C
+      < temp ≤ 10°C)
+
+      - If in_dead_zone is True, the function immediately returns ProcessingDecision.QUARANTINE
+
+      - This return happens BEFORE the priority override check
+
+      - This return happens BEFORE any normal approval logic
+
+      - There is no code path that can bypass this dead zone check
+
+      - Therefore, if a refrigerated sample's temperature falls in the dead zone,
+      it will ALWAYS result in QUARANTINE, never APPROVED
+
+      - The dead zone represents ambiguous borderline storage conditions that require
+      manual review regardless of any other factors
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:08'
+  q1:
+    answer: 6 distinct decision scenarios (mutually exclusive code-path outcomes).
+    reasoning: >-
+      - The function has an early return for refrigerated samples in the temperature
+      dead zone → QUARANTINE.
+
+      - If not in dead zone, a second early return applies when priority override
+      is true (high_priority and clearance ≥4) → APPROVED.
+
+      - Otherwise, the quorum logic yields four mutually exclusive branches:
+        - score ≥3 and contamination_ok → APPROVED
+        - score ≥3 and not contamination_ok → QUARANTINE
+        - score =2 (i.e., 2 ≤ score <3) → QUARANTINE
+        - score ≤1 → REJECTED
+      - Counting these mutually exclusive branches gives 1 + 1 + 4 = 6 scenarios.
+  q2:
+    answer: Yes—Chemical samples can be approved only via the priority override.
+    reasoning: >-
+      - Chemical samples have a base contamination of HIGH in _calculate_contamination,
+      so combined_contamination is always HIGH regardless of location/equipment.
+
+      - Therefore contamination_ok is always False for Chemical samples.
+
+      - In the normal quorum path, APPROVED requires both score ≥3 and contamination_ok
+      True, so Chemicals cannot be approved normally.
+
+      - The only approval route is the early priority override: high_priority == True
+      AND user_clearance ≥ 4.
+
+      - This approval is still blocked if the sample is refrigerated and current_temp
+      is in the dead zone, because dead-zone quarantine happens before the override.
+  q3:
+    answer: No. Samples in the refrigerated temperature dead zone are always quarantined,
+      never directly approved.
+    reasoning: >-
+      - The function checks _in_temperature_dead_zone first and immediately returns
+      ProcessingDecision.QUARANTINE.
+
+      - This happens before the priority override and before any quorum/score-based
+      approval logic.
+
+      - Therefore any refrigerated sample at 0–2°C (inclusive of 0, exclusive of 2)
+      or 8–10°C (exclusive of 8, inclusive of 10) cannot be directly approved.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:20'
+  q1:
+    answer: '6'
+    reasoning: >-
+      - The determine_processing_decision function has 6 distinct branches leading
+      to different processing decisions.
+
+      - Branch 1: If in_temperature_dead_zone is True (case: refrigerated and temp
+      in 0-2°C or 8-10°C), return QUARANTINE.
+
+      - Branch 2: If priority_override is True (high_priority=True and user_clearance>=4),
+      return APPROVED.
+
+      - Branch 3: In normal logic, if approval_score>=3 and contamination_ok (combined
+      contamination != HIGH), return APPROVED.
+
+      - Branch 4: In normal logic, if approval_score>=3 but not contamination_ok,
+      return QUARANTINE.
+
+      - Branch 5: In normal logic, if approval_score>=2 (but not >=3), return QUARANTINE.
+
+      - Branch 6: In normal logic, if approval_score<2, return REJECTED.
+
+      - These 6 branches represent distinct scenarios across all combinations of parameters,
+      as each path corresponds to a unique combination of conditions leading to the
+      decision.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Chemical samples have a ContaminationLevel.HIGH base risk, making combined_contamination
+      always HIGH, and thus contamination_ok always False.
+
+      - In normal logic, approval score (3 out of 5 conditions) cannot lead to APPROVED
+      because if score>=3, it would go to QUARANTINE due to not contamination_ok;
+      lower scores lead to QUARANTINE or REJECTED.
+
+      - However, priority override applies when high_priority=True and user_clearance>=4,
+      which bypasses contamination checks and directly returns APPROVED.
+
+      - Therefore, Chemical samples can be approved only under priority override conditions:
+      high_priority=True and user_clearance>=4.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - Temperature dead zone is checked first: if refrigerated_sample=True and current_temp
+      in 0-2°C or 8-10°C, return QUARANTINE immediately.
+
+      - No other path allows bypassing this check; even with priority override or
+      other conditions, the dead zone always results in quarantine for review.
+
+      - Therefore, samples in the temperature dead zone cannot be directly approved;
+      they are quarantined.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:32'
+  q1:
+    answer: There are 6 distinct processing decision scenarios (logical paths).
+    reasoning: >-
+      The function implements a hierarchical decision tree with 6 distinct logical
+      branches that lead to a return statement:
+
+      1. **Dead Zone Quarantine**: If the sample is in the temperature dead zone,
+      it returns QUARANTINE immediately.
+
+      2. **Priority Override Approval**: If not in dead zone, but is High Priority
+      with sufficient clearance (≥4), it returns APPROVED.
+
+      3. **Standard Approval**: Score ≥ 3 AND Contamination is OK flows to APPROVED.
+
+      4. **High-Score Quarantine**: Score ≥ 3 AND Contamination is High flows to QUARANTINE.
+
+      5. **Borderline Quarantine**: Score == 2 flows to QUARANTINE.
+
+      6. **Rejection**: Score < 2 flows to REJECTED.
+  q2:
+    answer: Yes, Chemical samples can be approved, but only under the Priority Override
+      condition.
+    reasoning: >-
+      - Chemical samples have a base contamination level of HIGH, which results in
+      `contamination_low` being `False`.
+
+      - In the standard approval logic (quorum checks), if `low_contamination` is
+      `False`, the code enters the `else` block for scores ≥ 3, returning `QUARANTINE`
+      instead of `APPROVED`. Thus, standard logic never approves Chemical samples.
+
+      - However, the **Priority Override** check (`is_priority_override`) occurs *before*
+      the standard quorum logic.
+
+      - **Exact Conditions**: The sample must be marked **High Priority**, the user
+      must have **Clearance ≥ 4**, and the sample must **not** be in a temperature
+      dead zone (as that check supersedes priority).
+  q3:
+    answer: No, samples in the temperature dead zone cannot be directly approved.
+    reasoning: >-
+      - The function checks `_in_temperature_dead_zone` at the very beginning of the
+      execution flow (Line 133).
+
+      - If this returns `True`, the function immediately returns `ProcessingDecision.QUARANTINE`.
+
+      - This check happens before the Priority Override check and before the standard
+      quorum scoring, making it impossible for such a sample to reach an `APPROVED`
+      state in this workflow.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:39'
+  q1:
+    answer: 'The exact number of distinct scenarios depends on parameter enumeration,
+      but analyzing the decision tree structure reveals approximately 6-8 distinct
+      decision pathways based on the logical branches: (1) Temperature dead zone →
+      QUARANTINE, (2) Priority override (high_priority AND clearance≥4) → APPROVED,
+      (3) Normal path with score≥3 AND contamination_ok → APPROVED, (4) Normal path
+      with score≥3 AND NOT contamination_ok → QUARANTINE, (5) Normal path with score=2
+      → QUARANTINE, (6) Normal path with score<2 → REJECTED. The total combinatorial
+      space is large (4 sample types × continuous time × 2 refrigerated states × continuous
+      temp × 4 location contamination × 4 equipment contamination × 6 clearance levels
+      × 2 equipment states × 2 priority states), but many combinations map to the
+      same 4 distinct outcomes across these 6 logical pathways.'
+    reasoning: >-
+      - The decision function has several key branch points:
+        1. Temperature dead zone check (returns QUARANTINE if true)
+        2. Priority override check (returns APPROVED if high_priority AND clearance≥4)
+        3. Quorum-based scoring (5 conditions evaluated)
+        4. Final decision based on score and contamination status
+      - The combinatorial parameters include: 4 sample types, time_since_received
+      (continuous/integer), 2 refrigerated states, current_temp (continuous), 4 location
+      contamination levels, 4 equipment contamination levels, clearance levels 0-5
+      (6 values), 2 equipment availability states, 2 priority states
+
+      - However, many parameter combinations collapse to the same decision path
+
+      - The distinct decision scenarios map to the 6 logical branches in the code,
+      resulting in 4 possible outcomes (APPROVED, QUARANTINE, REJECTED)
+  q2:
+    answer: 'Yes, Chemical samples can be approved for processing under two specific
+      conditions: (1) Priority Override: When high_priority=True AND user_clearance≥4,
+      the sample is immediately approved regardless of contamination level, bypassing
+      all other checks. (2) Normal Quorum Path: This is NOT possible for Chemical
+      samples because they inherently have HIGH base contamination, which means contamination_ok
+      will always be False. Even if score≥3, the code returns QUARANTINE (not APPROVED)
+      when contamination_ok is False. Therefore, Chemical samples can ONLY be approved
+      via the priority override mechanism.'
+    reasoning: >-
+      - Chemical samples have a base contamination level of HIGH (defined in _calculate_contamination)
+
+      - In _calculate_contamination, the highest contamination level wins among sample_base,
+      location_contam, and equipment_contam
+
+      - Since Chemical's base is HIGH, combined_contamination will always be HIGH
+      regardless of location or equipment contamination
+
+      - In the normal approval path: contamination_ok = (combined_contamination !=
+      ContaminationLevel.HIGH), which will always be False for Chemical samples
+
+      - When score≥3 but contamination_ok is False, the decision is QUARANTINE, not
+      APPROVED
+
+      - The ONLY way to approve Chemical samples is via priority override: high_priority=True
+      AND user_clearance≥4
+
+      - Priority override bypasses ALL normal checks including contamination, and
+      returns APPROVED directly
+
+      - Required clearance for Chemical is 4, which aligns with the priority override
+      threshold
+  q3:
+    answer: No, samples in the temperature dead zone (0-2°C or 8-10°C for refrigerated
+      samples) can NEVER be directly approved for processing. The temperature dead
+      zone check is the FIRST evaluation in the decision function, and if true, it
+      immediately returns QUARANTINE before any other logic (including priority override)
+      is evaluated.
+    reasoning: >-
+      - The _in_temperature_dead_zone function returns True when: refrigerated_sample=True
+      AND (temp is in range [0,2) OR temp is in range (8,10])
+
+      - In determine_processing_decision, the dead zone check is performed FIRST before
+      any other decision logic
+
+      - The code structure is: if in_dead_zone: return ProcessingDecision.QUARANTINE
+
+      - This check occurs BEFORE the priority override check
+
+      - Therefore, even high_priority samples with maximum clearance will be quarantined
+      if in the dead zone
+
+      - The only possible outcome for samples in the temperature dead zone is QUARANTINE
+
+      - This is a safety-first design where temperature compliance is a hard gate
+      that cannot be bypassed by any other condition

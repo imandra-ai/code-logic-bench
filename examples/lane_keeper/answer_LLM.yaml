@@ -1,0 +1,406 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - The determine_lane_keeping_control function determines one of three distinct
+      control modes: FULL_AUTONOMOUS, ASSISTED_DRIVING, or MANUAL_OVERRIDE, based
+      on various conditions. Thus, there are 3 distinct lane keeping control scenarios.
+
+      - The exact numeric thresholds that determine these scenarios include:
+        - In _is_valid_state: obstacle_distance &lt; 5 or &gt; 100, speed &lt; 10
+      or &gt; 80, lane_offset &lt; 10 or &gt; 60; dead zone: 48 &lt;= obstacle_distance
+      &lt;= 52, 38 &lt;= speed &lt;= 42, 28 &lt;= lane_offset &lt;= 32.
+        - In _safe_distance_factor: speed &lt; 40.
+        - In _sensor_confidence: confidence levels of 40, 70, 75, 95.
+        - In _visibility_acceptable: time_of_day &lt; 6 or &gt;= 18, sensor_conf &lt;
+      70.
+        - In _check_close_obstacle: speed &gt; 15.
+        - In _requires_manual_override: driver_intervention_time &gt; 15.
+        - In control mode determination: sensor_conf &gt;= 90, lane_offset &lt; 25,
+      lane_offset &gt; 35.
+        - In _calculate_max_steering: speed &lt; 30, speed &lt; 60, sensor_conf &gt;=
+      90, sensor_conf &gt;= 70.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - ManualOverride triggers when close_obstacle or needs_manual or not visibility_ok
+      is true.
+
+      - Specifically, when the obstacle is close, ManualOverride can trigger because
+      close_obstacle being true (as determined by _check_close_obstacle) directly
+      causes mode = ControlMode.MANUAL_OVERRIDE.
+
+      - The conditions for close_obstacle being true are: obstacle_distance &lt; safe_dist
+      and speed &gt; 15, where safe_dist is calculated by _safe_distance_factor based
+      on weather and speed (base 10 for CLEAR or 15 for RAIN, multiplied by 1.3 if
+      speed &gt;= 40).
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The safety property states that Clear weather + Active sensors with good conditions
+      allow driving, meaning the control mode should be FULL_AUTONOMOUS or ASSISTED_DRIVING
+      (allowing steering), not MANUAL_OVERRIDE.
+
+      - In clear weather with both sensors ACTIVE (sensor_conf = 95), visibility_ok
+      is true unless at night with degraded sensors (but sensors are active, so ok).
+
+      - Assuming "good conditions" means valid state (_is_valid_state true), no close
+      obstacle, driver_intervention_time &lt;= 15, and lane_offset within range.
+
+      - Under these conditions, the system will select FULL_AUTONOMOUS if sensor_conf
+      &gt;= 90 and lane_offset &lt; 25, or ASSISTED_DRIVING otherwise, both allowing
+      steering/driving.
+
+      - It cannot be violated because the invalid state check comes first but is excluded
+      by good conditions; close_obstacle and needs_manual are false; visibility_ok
+      is true.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:53'
+  q1:
+    answer: 'There are 3 distinct control mode scenarios (FullAutonomous, AssistedDriving,
+      ManualOverride). Key numeric thresholds: sensor_conf=[40,70,75,90,95], speed=[15,30,40,60],
+      obstacle_distance=[10,13,15,19.5], lane_offset=[25,35], time_of_day=[6,18],
+      driver_intervention_time=[15], state validity bounds=[obstacle_distance:5-100m,
+      speed:10-80km/h, lane_offset:10-60cm, dead_zone:48-52m/38-42km/h/28-32cm]'
+    reasoning: >-
+      - Control modes: 3 distinct scenarios (FullAutonomous, AssistedDriving, ManualOverride)
+
+      - Sensor confidence thresholds: 40 (both degraded), 70 (one degraded+active),
+      75 (camera active+lidar degraded OR rain threshold), 90 (FullAutonomous requirement),
+      95 (both active)
+
+      - Speed thresholds: 15 km/h (minimum for close obstacle), 30 km/h (steering
+      calc boundary), 40 km/h (safe distance factor), 60 km/h (steering calc boundary)
+
+      - Safe distance factors: Clear weather: 10 (speed<40) or 13 (speed>=40), Rain:
+      15 (speed<40) or 19.5 (speed>=40)
+
+      - Lane offset thresholds: 25 cm (FullAutonomous max), 35 cm (alert threshold
+      in AssistedDriving)
+
+      - Time of day: 6 (night ends), 18 (night starts) - defines night as <6 or >=18
+
+      - Driver intervention: 15 seconds (manual override trigger)
+
+      - State validity: obstacle_distance [5,100]m, speed [10,80]km/h, lane_offset
+      [10,60]cm, dead zone: 48-52m & 38-42km/h & 28-32cm
+  q2:
+    answer: 'YES, ManualOverride can trigger when obstacle is close. Conditions: (obstacle_distance
+      < safe_distance_factor AND speed > 15) OR (both_sensors_degraded) OR (driver_intervention_time
+      > 15) OR (!visibility_ok) OR (!valid_state). Close obstacle directly triggers
+      ManualOverride.'
+    reasoning: >-
+      - close_obstacle is calculated as: obstacle_distance < _safe_distance_factor(weather,
+      speed) AND speed > 15
+
+      - Safe distance varies: Clear/speed<40: 10m, Clear/speed>=40: 13m, Rain/speed<40:
+      15m, Rain/speed>=40: 19.5m
+
+      - ManualOverride triggers when: close_obstacle OR needs_manual OR !visibility_ok
+      OR !valid_state
+
+      - Therefore, YES - when obstacle_distance is below the safe threshold AND speed>15,
+      close_obstacle=True → mode=ManualOverride
+
+      - Additional ManualOverride conditions: both sensors degraded, driver_intervention_time
+      > 15 seconds, poor visibility (rain with sensor_conf<75, or clear night with
+      sensor_conf<70), or invalid state
+
+      - Close obstacle is a PRIMARY trigger for ManualOverride, independent of other
+      conditions
+  q3:
+    answer: YES, this safety property CAN be violated. Clear weather with active sensors
+      (sensor_conf=95) will violate autonomous driving capability at night (time_of_day<6
+      or >=18) if any other ManualOverride condition is met (close obstacle, driver_intervention_time>15,
+      or invalid state).
+    reasoning: >-
+      - "Clear weather + Active sensors" interpretation: Weather.CLEAR + camera_status=ACTIVE
+      + lidar_status=ACTIVE → sensor_conf=95
+
+      - With sensor_conf=95 (>70), visibility_acceptable returns True for all times
+      of day (day and night) in clear weather
+
+      - However, "allow driving" (FullAutonomous or AssistedDriving) requires: visibility_ok
+      AND !close_obstacle AND !needs_manual AND valid_state
+
+      - VIOLATION scenarios even with clear weather + active sensors:
+        1. Close obstacle: obstacle_distance < safe_distance (10 or 13m depending
+      on speed) AND speed>15 → ManualOverride
+        2. driver_intervention_time > 15 seconds → needs_manual=True → ManualOverride
+        3. Invalid state (dead zone or out of bounds) → ManualOverride
+      - Therefore, YES - the property CAN be violated when clear weather + active
+      sensors exist but other safety conditions fail
+
+      - The property statement is ambiguous about "good conditions" - if it means
+      ALL conditions are good, it's tautological; if it means only weather+sensors,
+      it CAN be violated
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:57'
+  q1:
+    answer: >-
+      There are 4 distinct top-level control scenarios (paths) in determine_lane_keeping_control:
+      (1) Invalid state → ManualOverride (steering disabled); (2) Valid state but
+      a “forced manual” condition holds (close obstacle OR manual-override quorum
+      OR unacceptable visibility) → ManualOverride; (3) Valid state, not forced manual,
+      and high confidence + small lane offset → FullAutonomous; (4) Otherwise (valid,
+      not forced manual, but not meeting FullAutonomous thresholds) → AssistedDriving.
+
+
+      Numeric thresholds that define these scenarios:
+
+      - State validity gate (_is_valid_state):
+        - Invalid if any out-of-bounds: obstacle_distance < 5 or > 100; speed < 10
+      or > 80; lane_offset < 10 or > 60.
+        - Also invalid if in dead zone (all simultaneously): 48–52 m obstacle_distance
+      AND 38–42 km/h speed AND 28–32 cm lane_offset. - Forced manual conditions (any
+      triggers ManualOverride):
+        - Close obstacle (_check_close_obstacle): speed > 15 AND obstacle_distance
+      < safe_dist where
+          - safe_dist = 10 (Clear & speed < 40)
+          - safe_dist = 13 (Clear & speed ≥ 40)  [ (10*13)//10 ]
+          - safe_dist = 15 (Rain & speed < 40)
+          - safe_dist = 19 (Rain & speed ≥ 40)  [ (15*13)//10 ]
+        - Manual override quorum (_requires_manual_override): (camera=DEGRADED AND
+      lidar=DEGRADED) OR driver_intervention_time > 15 seconds.
+        - Visibility unacceptable (_visibility_acceptable):
+          - Clear: unacceptable only when night AND sensor_conf < 70, where night
+      is time_of_day < 6 OR time_of_day ≥ 18.
+          - Rain: unacceptable when sensor_conf < 75.
+        - Sensor confidence mapping (_sensor_confidence) is discrete: 95 (both ACTIVE),
+      75 (camera ACTIVE/lidar DEGRADED), 70 (camera DEGRADED/lidar ACTIVE), 40 (both
+      DEGRADED). - FullAutonomous selection (when not forced manual): sensor_conf
+      ≥ 90 AND lane_offset < 25 cm.
+
+      - Otherwise: AssistedDriving.
+    reasoning: >-
+      - The function has an early return for invalid state, creating a distinct outcome.
+
+      - After validity, mode selection is a three-way if/elif/else:
+        - First branch forces MANUAL_OVERRIDE based on three predicates (close_obstacle,
+      needs_manual, visibility_ok).
+        - Second branch selects FULL_AUTONOMOUS with explicit numeric thresholds (sensor_conf
+      and lane_offset).
+        - Final branch defaults to ASSISTED_DRIVING.
+      - Numeric thresholds are taken directly from the helper predicates:
+        - validity bounds + dead-zone ranges,
+        - safe distance multiplexer constants and speed cutoffs,
+        - night hours cutoff,
+        - sensor confidence cutoffs (70/75/90),
+        - driver intervention cutoff (15s),
+        - lane offset cutoff (25cm).
+  q2:
+    answer: >-
+      Yes. ManualOverride will trigger when an obstacle is “close” because close_obstacle
+      is OR’ed into the ManualOverride condition.
+
+
+      It happens when:
+
+      - The state is valid (otherwise it is ManualOverride anyway), AND
+
+      - speed > 15 km/h, AND
+
+      - obstacle_distance is below the weather/speed-dependent safe distance:
+        - Clear: obstacle_distance < 10 m if speed < 40, else < 13 m
+        - Rain: obstacle_distance < 15 m if speed < 40, else < 19 m
+    reasoning: >-
+      - determine_lane_keeping_control sets mode=MANUAL_OVERRIDE if close_obstacle
+      is true.
+
+      - _check_close_obstacle defines close_obstacle using a strict “< safe_dist”
+      check plus speed > 15.
+
+      - safe_dist comes from _safe_distance_factor with a weather-based base (10 vs
+      15) and a speed cutoff at 40 km/h, increasing by 30% (integer floor).
+  q3:
+    answer: >-
+      Yes, that safety property can be violated in this implementation.
+
+
+      Even with Clear weather and both sensors ACTIVE (sensor_conf=95, visibility_ok
+      always true even at night), the controller can still select ManualOverride if
+      either:
+
+      - driver_intervention_time > 15 seconds (needs_manual becomes true), or
+
+      - a close obstacle is detected (as defined by the close-obstacle thresholds),
+      or
+
+      - the state is deemed invalid by _is_valid_state (out-of-bounds or dead-zone
+      combination).
+
+
+      So “Clear + active sensors” is not sufficient to guarantee autonomous/assisted
+      driving; additional constraints (valid state, no close obstacle, driver_intervention_time
+      ≤ 15) are required.
+    reasoning: >-
+      - In clear weather with both sensors ACTIVE, sensor_conf=95 and visibility_ok
+      is true (since degraded is false).
+
+      - However, mode selection prioritizes the forced-manual branch: (close_obstacle
+      OR needs_manual OR not visibility_ok).
+
+      - needs_manual becomes true solely from driver_intervention_time > 15, independent
+      of weather/sensors.
+
+      - close_obstacle can be true regardless of sensor status.
+
+      - The function can return ManualOverride before any of these if the state fails
+      _is_valid_state.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:07'
+  q1:
+    answer: 'There are 4 distinct lane keeping control scenarios: Invalid State (ManualOverride),
+      Forced Safety Stop (ManualOverride), Full Autonomous, and Assisted Driving.'
+    reasoning: >-
+      **Scenario 1: Invalid State (Result: ManualOverride)**
+
+      - Thresholds: `obstacle_distance` < 5m or > 100m; `speed` < 10km/h or > 80km/h;
+      `lane_offset` < 10cm or > 60cm.
+
+      - Also triggers in 'Dead Zone': `obstacle_distance` 48-52m AND `speed` 38-42km/h
+      AND `lane_offset` 28-32cm.
+
+
+      **Scenario 2: Forced Safety Stop (Result: ManualOverride)**
+
+      - Triggered if state is valid but any of the following occur:
+        - Close Obstacle: `speed` > 15km/h AND `obstacle_distance` < SafeDistance
+      (10m, 13m, 15m, or 19m).
+        - Manual Needed: Driver `intervention_time` > 15s OR (Camera is Degraded AND
+      Lidar is Degraded).
+        - Visibility Bad: (Rain AND Confidence < 75) OR (Clear AND Night [18:00-06:00]
+      AND Confidence < 70).
+
+      **Scenario 3: Full Autonomous (Result: FullAutonomous)**
+
+      - Thresholds: Must not be in Scenario 1 or 2, AND `sensor_confidence` >= 90
+      AND `lane_offset` < 25cm.
+
+
+      **Scenario 4: Assisted Driving (Result: AssistedDriving)**
+
+      - Thresholds: Must not be in Scenario 1 or 2, AND (`sensor_confidence` < 90
+      OR `lane_offset` >= 25cm).
+  q2:
+    answer: Yes, ManualOverride can trigger due to a close obstacle. It triggers when
+      vehicle speed exceeds 15 km/h and the obstacle is within the calculated safe
+      distance.
+    reasoning: >-
+      **Speed Condition:** The vehicle speed must be strictly greater than 15 km/h.
+
+      **Distance Condition:** The threshold depends on Weather and Speed (calculated
+      by `_safe_distance_factor`):
+
+      - **10 meters**: Weather is Clear, Speed < 40 km/h.
+
+      - **13 meters**: Weather is Clear, Speed >= 40 km/h (10 * 1.3).
+
+      - **15 meters**: Weather is Rain, Speed < 40 km/h.
+
+      - **19 meters**: Weather is Rain, Speed >= 40 km/h (15 * 1.3, integer division).
+  q3:
+    answer: Yes, the property can be violated. Even with Clear Weather and Active
+      Sensors (Confidence 95), the system may still default to ManualOverride (disallowing
+      steering).
+    reasoning: >-
+      **Driver Intervention Timeout:** If `driver_intervention_time` > 15 seconds,
+      `needs_manual` becomes True, forcing `ControlMode.MANUAL_OVERRIDE` regardless
+      of weather or sensor status.
+
+      **Close Obstacle:** If an obstacle is detected within the safe distance (e.g.,
+      <10m at <40km/h), `close_obstacle` becomes True, forcing `MANUAL_OVERRIDE` even
+      if sensors are perfect.
+
+      **Dead Zone:** If the inputs fall exactly into the 'dead zone' (Distance 48-52,
+      Speed 38-42, Offset 28-32), the state is considered invalid (`_is_valid_state`
+      returns False), causing an immediate fall-through to `MANUAL_OVERRIDE`.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:42'
+  q1:
+    answer: 'There are 4 distinct control mode scenarios in determine_lane_keeping_control:
+      ManualOverride (invalid state), ManualOverride (close obstacle/needs manual/poor
+      visibility), FullAutonomous, and AssistedDriving. The key numeric thresholds
+      are: obstacle_distance boundaries (5, 48-52, 100), speed boundaries (10, 15,
+      38-42, 40, 80), lane_offset boundaries (10, 25, 28-32, 60), sensor_conf thresholds
+      (70, 75, 90), safe_distance factors (10 for clear, 15 for rain, with 30% increase
+      for speed >= 40), time_of_day night hours (< 6 or >= 18), and driver_intervention_time
+      threshold (> 15).'
+    reasoning: >-
+      - The function has 4 distinct control mode outcomes:
+        1. ManualOverride when state is invalid (dead zone or out of bounds)
+        2. ManualOverride when close_obstacle OR needs_manual OR NOT visibility_ok
+        3. FullAutonomous when sensor_conf >= 90 AND lane_offset < 25
+        4. AssistedDriving (default case when none of the above apply)
+
+      - Key numeric thresholds identified:
+        - _is_valid_state: dead zone at obstacle_distance 48-52, speed 38-42, lane_offset
+      28-32; invalid bounds: obstacle_distance <5 or >100, speed <10 or >80, lane_offset
+      <10 or >60
+        - _safe_distance_factor: base factor 10 (clear) or 15 (rain); 30% increase
+      when speed >= 40
+        - _check_close_obstacle: obstacle_distance < safe_dist AND speed > 15
+        - _sensor_confidence: 95 (both active), 75 (camera active/lidar degraded),
+      70 (camera degraded/lidar active), 40 (both degraded)
+        - _visibility_acceptable: night is time_of_day < 6 or >= 18; degraded is sensor_conf
+      < 70; rain requires sensor_conf >= 75
+        - _requires_manual_override: driver_intervention_time > 15
+        - Control mode selection: sensor_conf >= 90 AND lane_offset < 25 for FullAutonomous
+  q2:
+    answer: 'Yes, ManualOverride can trigger when obstacle is close. In fact, a close
+      obstacle is one of the direct triggers for ManualOverride. The conditions are:
+      obstacle_distance < safe_distance (which is 10-19.5 meters depending on weather
+      and speed) AND speed > 15 km/h. Additionally, even when obstacle is close, ManualOverride
+      would trigger regardless due to the close_obstacle flag being set in the control
+      mode decision logic.'
+    reasoning: >-
+      - _check_close_obstacle returns True when: obstacle_distance < safe_dist AND
+      speed > 15
+
+      - safe_dist is calculated by _safe_distance_factor:
+        - Clear weather, speed < 40: safe_dist = 10
+        - Clear weather, speed >= 40: safe_dist = 13 (10 * 13 // 10)
+        - Rain, speed < 40: safe_dist = 15
+        - Rain, speed >= 40: safe_dist = 19 (15 * 13 // 10)
+      - In determine_lane_keeping_control, close_obstacle is one of three conditions
+      that trigger ManualOverride: "if close_obstacle or needs_manual or not visibility_ok"
+
+      - So ManualOverride is ALWAYS triggered when obstacle is close (and speed >
+      15)
+
+      - ManualOverride can also trigger when obstacle is close due to other factors
+      (needs_manual, visibility_ok being false)
+  q3:
+    answer: 'Yes, the safety property can be violated under specific conditions. Clear
+      weather with active sensors (good conditions) does NOT guarantee driving (FullAutonomous
+      or AssistedDriving) in these cases: (1) when driver_intervention_time > 15 seconds
+      (triggers ManualOverride via needs_manual), (2) when there''s a close obstacle
+      (obstacle_distance < 10-13m with speed > 15), (3) when the state is invalid
+      (dead zone or out of bounds values), or (4) at night (time < 6 or time >= 18)
+      with sensor_conf < 70 (though this requires degraded sensors, not fully active).'
+    reasoning: >-
+      - "Clear weather + Active sensors with good conditions" would mean:
+        - weather = Weather.CLEAR
+        - camera_status = SensorStatus.ACTIVE and lidar_status = SensorStatus.ACTIVE
+        - This gives sensor_conf = 95 (which is >= 70, so not degraded)
+
+      - With these conditions, _visibility_acceptable returns True because:
+        - In clear weather, visibility is acceptable UNLESS (night AND degraded)
+        - With sensor_conf = 95 (>= 70), degraded = False
+        - So visibility_ok = True regardless of time_of_day
+
+      - However, ManualOverride can still trigger if:
+        1. close_obstacle is True: obstacle_distance < safe_dist (10 or 13) AND speed
+      > 15
+        2. needs_manual is True: both_degraded (False with active sensors) OR driver_intervention_time
+      > 15
+        3. State is invalid (dead zone or out of bounds)
+
+      - So YES, the property CAN be violated if:
+        - driver_intervention_time > 15 (long time since driver intervention)
+        - Obstacle is dangerously close
+        - Vehicle is in dead zone or has invalid parameter values
+
+      - The safety property is NOT absolutely guaranteed even with clear weather and
+      active sensors

@@ -1,0 +1,236 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:45'
+  q1:
+    answer: 6 distinct scenarios (unique NeighborDecision output combinations).
+    reasoning: >-
+      - The function returns only a small set of distinct NeighborDecision tuples.
+
+      - Dead timer expired branch: (establish_adjacency=False, become_full=False,
+      priority_higher=False, dead_timer_expired=True) → 1 scenario.
+
+      - Adjacency-establishment branch (Init/TwoWay): (True, False, priority_higher,
+      False) where priority_higher can be True or False → 2 scenarios.
+
+      - Full-transition branch (Exchange/Loading/Full with non-MaxAge LSA): (False,
+      True, priority_higher, False) where priority_higher can be True or False → 2
+      scenarios.
+
+      - All remaining paths (non-dead, not adjacency phase, and either state disallows
+      Full or LSA is MaxAge): (False, False, False, False) → 1 scenario.
+
+      - Total = 1 + 2 + 2 + 1 = 6.
+  q2:
+    answer: No.
+    reasoning: >-
+      - become_full is set to True only in the can_be_full branch when lsa_ok is True.
+
+      - lsa_ok is defined as categorize_lsa_age(lsa_age_seconds) != MAX_AGE.
+
+      - MAX_AGE occurs when lsa_age_seconds >= 3600.
+
+      - Therefore if lsa_age_seconds >= 3600, lsa_ok is False and become_full cannot
+      be True.
+  q3:
+    answer: Yes.
+    reasoning: >-
+      - neighbor_dead() returns last_hello_seconds >= dead_interval.
+
+      - When last_hello_seconds == dead_interval, neighbor_dead() returns True.
+
+      - determine_neighbor_status() immediately returns dead_timer_expired=True whenever
+      is_dead is True, regardless of router state or other inputs.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: '6'
+    reasoning: >-
+      - Dead timer expired (dead_timer_expired=True).
+
+      - Establishing adjacency with higher priority (establish_adjacency=True, priority_higher=True).
+
+      - Establishing adjacency with lower or equal priority (establish_adjacency=True,
+      priority_higher=False).
+
+      - Becoming full with higher priority (become_full=True, priority_higher=True).
+
+      - Becoming full with lower or equal priority (become_full=True, priority_higher=False).
+
+      - Neither establishing adjacency nor becoming full (all other fields=False).
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - become_full is only set to True when lsa_ok is True, i.e., when lsa_category
+      is not MAX_AGE.
+
+      - MAX_AGE occurs when lsa_age_seconds >= 3600.
+
+      - Therefore, become_full cannot be True when lsa_age_seconds >= 3600.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - dead_timer_expired is determined by neighbor_dead(last_hello_seconds, dead_interval),
+      which returns True if last_hello_seconds >= dead_interval.
+
+      - When last_hello_seconds equals dead_interval, the condition holds, so dead_timer_expired
+      is always True.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: 5 distinct neighbor status scenarios
+    reasoning: >-
+      - Analyzing the `determine_neighbor_status` function flow to identify all unique
+      return paths:
+        1. **Dead timer expired**: When `last_hello_seconds >= dead_interval` → returns
+      (False, False, False, True)
+        2. **Establish adjacency (Init/TwoWay)**: When current_state is INIT or TWO_WAY
+      and not dead → returns (True, False, priority_higher, False) - Note: priority_higher
+      can be True/False but this counts as 1 scenario type
+        3. **Become Full**: When state allows Full (EXCHANGE/LOADING/FULL), not dead,
+      and LSA is not MaxAge → returns (False, True, priority_higher, False)
+        4. **Full-capable but stale LSA**: When state allows Full, not dead, but LSA
+      age >= 3600 (MaxAge) → returns (False, False, False, False)
+        5. **Default case**: When in other states (DOWN, EX_START) and not dead →
+      returns (False, False, False, False) - The priority_higher flag varies within
+      scenarios but doesn't create distinct neighbor status scenarios (it's a sub-decision
+      within a scenario)
+
+      - Total distinct neighbor status scenarios: 5
+  q2:
+    answer: No, become_full=true can never occur when lsa_age_seconds >= 3600
+    reasoning: >-
+      - `become_full=true` is only set in one code path within `determine_neighbor_status`
+
+      - This occurs when: `can_be_full` is True AND `lsa_ok` is True
+
+      - `lsa_ok` is determined by: `lsa_category != LSAAgeCategory.MAX_AGE`
+
+      - In `categorize_lsa_age()`: when `age_seconds >= 3600`, the function returns
+      `LSAAgeCategory.MAX_AGE`
+
+      - Therefore: when `lsa_age_seconds >= 3600` → `lsa_category = MAX_AGE` → `lsa_ok
+      = False`
+
+      - When `lsa_ok = False`, the code enters the else branch that returns `become_full=False`
+
+      - Conclusion: `become_full=true` can never occur when `lsa_age_seconds >= 3600`
+      (MaxAge LSA)
+  q3:
+    answer: Yes, dead_timer_expired is always true when last_hello_seconds equals
+      dead_interval exactly
+    reasoning: >-
+      - The `neighbor_dead()` function determines if the neighbor is dead: `return
+      last_hello_seconds >= dead_interval`
+
+      - When `last_hello_seconds == dead_interval`, the condition `last_hello_seconds
+      >= dead_interval` evaluates to True
+
+      - In `determine_neighbor_status()`, the first check is: `is_dead = neighbor_dead(last_hello_seconds,
+      dead_interval)`
+
+      - If `is_dead` is True, the function immediately returns with `dead_timer_expired=True`
+
+      - Therefore: when `last_hello_seconds == dead_interval` → `neighbor_dead()`
+      returns True → function returns `dead_timer_expired=True`
+
+      - Conclusion: Yes, `dead_timer_expired` is always True when the values are exactly
+      equal
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:03'
+  q1:
+    answer: '6'
+    reasoning: >-
+      There are 6 distinct combinations of the boolean flags in the returned NeighborDecision
+      object:
+
+      1. Dead Neighbor: (F, F, F, T) - Occurs when dead timer expires.
+
+      2. Adjacency Formation (High Prio): (T, F, T, F) - Init/TwoWay state, local
+      priority wins.
+
+      3. Adjacency Formation (Low Prio): (T, F, F, F) - Init/TwoWay state, remote
+      priority wins.
+
+      4. Full Transition (High Prio): (F, T, T, F) - Full/Loading/Exchange, Valid
+      LSA, local priority wins.
+
+      5. Full Transition (Low Prio): (F, T, F, F) - Full/Loading/Exchange, Valid LSA,
+      remote priority wins.
+
+      6. Idle/Waiting/MaxAge: (F, F, F, F) - Occurs in ExStart/Down states, OR when
+      LSA is MaxAge.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The function 'categorize_lsa_age' returns LSAAgeCategory.MAX_AGE if age_seconds
+      >= 3600.
+
+      - In 'determine_neighbor_status', the variable 'lsa_ok' is calculated as lsa_category
+      != LSAAgeCategory.MAX_AGE.
+
+      - The state transition become_full=True requires 'if lsa_ok:' to be true.
+
+      - Therefore, if age >= 3600, lsa_ok is False, executing the else block which
+      returns become_full=False.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The function 'neighbor_dead' returns the result of the comparison 'last_hello_seconds
+      >= dead_interval'.
+
+      - If last_hello_seconds equals dead_interval, the inclusive inequality operator
+      (>=) evaluates to True.
+
+      - This triggers the first conditional block in 'determine_neighbor_status',
+      setting dead_timer_expired=True.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:28'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - Tracing through determine_neighbor_status, there are 5 distinct return paths:
+
+      1. **Dead timer expired**: When `last_hello_seconds >= dead_interval`, returns
+      (establish_adjacency=False, become_full=False, priority_higher=False, dead_timer_expired=True)
+
+      2. **Adjacency establishment phase**: When state is INIT or TWO_WAY (and not
+      dead), returns (establish_adjacency=True, become_full=False, priority_higher=varies,
+      dead_timer_expired=False)
+
+      3. **Can become Full with fresh/valid LSA**: When state is EXCHANGE, LOADING,
+      or FULL, and LSA age < 3600, returns (establish_adjacency=False, become_full=True,
+      priority_higher=varies, dead_timer_expired=False)
+
+      4. **Cannot become Full due to MaxAge LSA**: When state allows full but LSA
+      age >= 3600, returns (establish_adjacency=False, become_full=False, priority_higher=False,
+      dead_timer_expired=False)
+
+      5. **State doesn't allow adjacency or full**: When state is DOWN or EX_START
+      (and not dead), returns (establish_adjacency=False, become_full=False, priority_higher=False,
+      dead_timer_expired=False)
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - When lsa_age_seconds >= 3600, the categorize_lsa_age function returns LSAAgeCategory.MAX_AGE
+
+      - In the code path where can_be_full is True, the LSA category is checked
+
+      - lsa_ok is set to `lsa_category != LSAAgeCategory.MAX_AGE`, which evaluates
+      to False when lsa_age_seconds >= 3600
+
+      - When lsa_ok is False, the function returns a NeighborDecision with become_full=False
+
+      - Therefore, become_full=True can never occur when lsa_age_seconds >= 3600
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The neighbor_dead function checks: `return last_hello_seconds >= dead_interval`
+
+      - When last_hello_seconds equals dead_interval exactly, the condition `last_hello_seconds
+      >= dead_interval` evaluates to True
+
+      - This means is_dead will be True in determine_neighbor_status
+
+      - When is_dead is True, the function immediately returns with dead_timer_expired=True
+
+      - Therefore, when last_hello_seconds equals dead_interval exactly, dead_timer_expired
+      is always True

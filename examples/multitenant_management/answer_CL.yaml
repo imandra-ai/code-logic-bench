@@ -1,0 +1,63 @@
+model: "multitenant_management"
+q1:
+  question: "How many distinct allocation scenarios exist for GracePeriod billing status, and what are the exact numeric thresholds?"
+  answer: "13 scenarios"
+  key_thresholds:
+    usage_pct: [70, 75, 85]
+    tier_thresholds: "Basic: 60%, Professional: 75%, Enterprise: 90%"
+  why_13_scenarios: "3 tiers usage ranges (below 70, 70-75, 75-85 throttle, 85+) tenant_status combinations"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_grace_period_scenarios.json'
+q2:
+  question: "Can Basic tier EVER achieve FullyApproved status when billing_status is GracePeriod?"
+  answer: "NO - Basic never gets FullyApproved in GracePeriod (0 scenarios)"
+  fully_approved_count: 0
+  why_impossible: "apply_billing_override returns FullyApproved only for: (1) Current billing, OR (2) GracePeriod AND Enterprise tier. Basic tier with GracePeriod gets PartiallyApproved at best."
+  key_insight: "GracePeriod billing override (lines 42-51) has Enterprise exception - only Enterprise gets FullyApproved, Basic/Professional get PartiallyApproved"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_basic_grace_fully_approved.json'
+    llm_challenge: "LLMs might trace through GracePeriod�PartiallyApproved path and think it can become FullyApproved, missing that billing override determines the ceiling"
+q3:
+  question: "For Enterprise tier with Current billing status, does this ALWAYS result in FullyApproved?"
+  answer: "REFUTED - Property can be violated by throttle zone"
+  property: "(tier=Enterprise AND billing=Current AND tenant_status=Active) ==> (result = FullyApproved OR PartiallyApproved)"
+  why_refuted: "Throttle zone check (line 82) executes BEFORE billing override logic (line 91)"
+  refutation_scenario:
+    description: "Throttle zone blocks Enterprise+Current"
+    conditions:
+      - "usage_pct [75, 85] (throttle zone)"
+      - "tier = Enterprise"
+      - "billing = Current"
+      - "tenant_status = Active"
+    result: "Denied (due to throttle zone, before billing is checked)"
+    additional_edge_case:
+      description: "Even without throttle zone, excessive new usage causes PartiallyApproved"
+      conditions:
+        - "usage_pct = 50 (outside throttle zone)"
+        - "requested_amount causes new_usage_pct > 90%"
+      result: "PartiallyApproved (line 98-100: new_usage exceeds Enterprise threshold)"
+    key_insight: "Precedence matters: throttle zone tenant_status tier threshold billing override new usage check"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_enterprise_current_property.json'
+    llm_challenge: "LLMs reading code linearly see billing override (lines 38-61) and conclude Current�FullyApproved. They miss that throttle zone (lines 81-83) short-circuits BEFORE reaching billing logic."
+analysis_metadata:
+  total_grace_period_scenarios: 13
+  basic_grace_fully_approved: 0
+  property_q3_result: "REFUTED"
+  imandra_runtime: "All analyses completed successfully"
+  pattern_complexity:
+    override: "GracePeriod PartiallyApproved, BUT usagee70% Denied, EXCEPT Enterprise FullyApproved"
+    dead_zone: "usage_pct [75,85] Denied (happens FIRST, before all other checks)"
+    multiplexer: "tier determines approval threshold: Basic(60%), Professional(75%), Enterprise(90%)"
+    precedence: "throttle_zone tenant_status billing_override threshold_check"
+  why_challenging_for_llms:
+    throttle_precedence: "Throttle zone at line 82 checked before billing override at line 91 - easy to miss when reading sequentially"
+    enterprise_exception: "Enterprise gets FullyApproved in GracePeriod (line 48-49), but other tiers don't - requires careful reading of billing override match"
+    partially_vs_fully: "PartiallyApproved is distinct from FullyApproved - GracePeriod path for Basic stops at PartiallyApproved"
+    new_usage_calculation: "Both current and new usage percentages matter - new usage can trigger downgrade from FullyApproved to PartiallyApproved"
+    threshold_multiplexer: "Different tiers have different limits, making approval boundaries non-obvious"
+  demonstration_of_imandrax_power:
+    q1_enumeration: "Exhaustively finds all 13 GracePeriod scenarios"
+    q2_impossibility_proof: "Proves Basic can NEVER get FullyApproved in GracePeriod (0 scenarios)"
+    q3_counterexample: "Finds throttle zone violation of Enterprise+Current property"
+    llm_vs_imandra: "LLM would likely miss: (1) throttle zone precedence, (2) Enterprise exception in GracePeriod, (3) distinction between PartiallyApproved and FullyApproved - ImandraX finds all automatically"

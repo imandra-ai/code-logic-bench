@@ -1,0 +1,544 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: "2025-12-18 11:16:56"
+  q1:
+    answer:
+      "There are 5 distinct monitoring response scenarios, corresponding to
+      the AlertLevel enum values: Normal, Moderate, Unhealthy, Very Unhealthy, and
+      Hazardous. The exact numeric thresholds that determine these scenarios are defined
+      in the base_threshold function for each pollutant and alert level, and they
+      are the μ/m³ values used to classify the adjusted sensor reading into these
+      levels, with adjustments for weather in the weather_adjusted_threshold function."
+    reasoning: >-
+      - The classify_base_level function determines the base alert level based on
+      the adjusted reading being greater than or equal to various thresholds, leading
+      to 5 possible scenarios (the 5 AlertLevel values).
+
+      - The thresholds are retrieved from base_threshold, which lists 4 thresholds
+      per pollutant (for Moderate, Unhealthy, Very Unhealthy, and Hazardous levels),
+      determining the scenario by checking if the reading meets or exceeds these values.
+
+      - Weather adjusts these thresholds for specific conditions, but the base ones
+      are the core determinants.
+  q2:
+    answer:
+      "Yes, a sensor with status=Calibrating can trigger an emergency protocol
+      under the conditions where the sensor reading is valid, the final alert level
+      is set to Normal due to calibrating status, and at least 2 of the following
+      emergency conditions are met: weather is Foggy, drift_factor is less than 90
+      or greater than 110, or time_since_last_alert is less than 24."
+    reasoning: >-
+      - In apply_fault_escalation, when sensor_status is CALIBRATING, final_alert_level
+      is always set to NORMAL.
+
+      - Emergency trigger depends on check_emergency_conditions, which requires at
+      least 2 conditions to be true; since the alert level is NORMAL, condition1 (alert_level
+      in [HAZARDOUS, VERY_UNHEALTHY]) is false, so at least 2 of the other 3 conditions
+      must hold.
+
+      - If reading_valid is false, trigger_emergency is False, so it must be valid.
+  q3:
+    answer:
+      Yes, the safety property can be violated when the final_alert_level is
+      Hazardous, but time_since_last_alert is 24 or more (i.e., not recent, as recent
+      is defined as time_since_last_alert < 24), weather is not Foggy, and drift_factor
+      is between 90 and 110 (inclusive), resulting in only 1 emergency condition (condition1
+      true) being met.
+    reasoning: >-
+      - The check_emergency_conditions function requires at least 2 conditions for
+      trigger_emergency to be True.
+
+      - Condition1 is true if final_alert_level is Hazardous or Very Unhealthy.
+
+      - Condition4 is true if time_since_last_alert < 24.
+
+      - If condition4 is false (time_since_last_alert >= 24), condition2 is false
+      (weather != Foggy), and condition3 is false (drift_factor not out of 90-110),
+      then only condition1 is true, so count = 1, and trigger_emergency is False.
+
+      - Edge cases include: drift_factor exactly 90 or 110 (condition3 false); time_since_last_alert
+      exactly 24 (condition4 false since <24 not met); if reading invalid, alert_level
+      is Normal and not trigger_emergency; and for faulty sensors, base level hazardous
+      still leads to final hazardous if escalation not overridden.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: "2025-12-18 11:17:02"
+  q1:
+    answer: >-
+      There are 2 distinct monitoring response scenarios: (1) Invalid readings (reading_valid=False),
+      and (2) Valid readings (reading_valid=True). Within valid readings, there are
+      5 possible alert levels (NORMAL, MODERATE, UNHEALTHY, VERY_UNHEALTHY, HAZARDOUS)
+      and 2 emergency states (True/False), creating up to 10 sub-scenarios.
+
+
+      Key numeric thresholds:
+
+      - Validity: Dead zone 148-152 (raw reading) with drift 98-102; extreme drift
+      <80 or >120
+
+      - Drift adjustment: applied as (raw_reading * drift_factor) / 100
+
+      - Base thresholds (μg/m³) vary by pollutant (e.g., PM2.5: 15/35/75/150 for MODERATE/UNHEALTHY/VERY_UNHEALTHY/HAZARDOUS)
+
+      - Weather adjustments: Foggy PM2.5 (80% of base), Rainy PM2.5 (130%), Clear
+      Ozone (85%), Windy NO2 (110%)
+
+      - Drift acceptable range: 90-110
+
+      - Emergency quorum: requires 2+ conditions (Hazardous/Very Unhealthy, Foggy
+      weather, drift outside 90-110, alert within 24 hours)
+    reasoning: >-
+      - The function returns MonitoringResponse with 4 fields: final_alert_level,
+      trigger_emergency, reading_valid, adjusted_reading
+
+      - First branch: if reading is invalid (dead zone OR extreme drift), returns
+      NORMAL/False/False/0
+
+      - Second branch: if reading is valid, processes through drift adjustment, classification,
+      and fault escalation
+
+      - reading_valid can be True or False (2 states)
+
+      - For valid readings: 5 AlertLevel values × 2 emergency trigger states = 10
+      combinations
+
+      - Validity thresholds: raw_reading 148-152 AND drift_factor 98-102 (dead zone),
+      OR drift_factor <80 OR >120 (extreme)
+
+      - Drift acceptable: 90 ≤ drift_factor ≤ 110
+
+      - Weather adjustments apply specific multipliers to base thresholds
+
+      - Emergency requires count of 4 conditions ≥ 2
+
+      - Base thresholds defined per pollutant type and alert level in base_threshold
+      function
+  q2:
+    answer:
+      No, a sensor with status=Calibrating can NEVER trigger an emergency protocol
+      under any conditions.
+    reasoning: >-
+      - In apply_fault_escalation(), when status == SensorStatus.CALIBRATING, the
+      function always returns AlertLevel.NORMAL (override comment confirms this)
+
+      - In check_emergency_conditions(), condition1 checks if alert_level is HAZARDOUS
+      or VERY_UNHEALTHY
+
+      - Since Calibrating sensors always produce final_alert_level = NORMAL, condition1
+      will always be False
+
+      - Emergency trigger requires count >= 2, meaning at least 2 of 4 conditions
+      must be True
+
+      - Even if all other conditions are True (condition2=Foggy, condition3=drift
+      outside 90-110, condition4=recent alert <24h), that's only 3 conditions
+
+      - However, condition1 is always False for Calibrating sensors, so maximum count
+      is 3
+
+      - Wait, correction: if condition1 is False but conditions 2,3,4 are all True,
+      count = 3, which is >= 2
+
+      - BUT this is irrelevant because the emergency check uses final_level, which
+      is NORMAL for Calibrating sensors
+
+      - Therefore condition1 = (NORMAL in (HAZARDOUS, VERY_UNHEALTHY)) = False
+
+      - Maximum possible count with Calibrating = 0 + 1 + 1 + 1 = 3 (if foggy, bad
+      drift, recent alert)
+
+      - Actually this WOULD trigger emergency (3 >= 2), but the final_alert_level
+      passed is NORMAL
+
+      - Re-examining: emergency = check_emergency_conditions(final_level, ...) where
+      final_level = NORMAL for Calibrating
+
+      - So condition1 = False, but conditions 2,3,4 could be True, giving count =
+      3 >= 2, triggering emergency
+
+      - CORRECTION: Yes, Calibrating CAN trigger emergency if weather=FOGGY AND (drift_factor
+      < 90 OR > 110) AND time_since_last_alert < 24
+  q3:
+    answer: >-
+      YES, the safety property can be violated. Hazardous readings with recent alerts
+      will NOT trigger emergency protocol when the sensor status is CALIBRATING, because
+      Calibrating sensors always override the alert level to NORMAL, making condition1
+      false in the emergency check. Even with time_since_last_alert < 24 (recent alert),
+      the emergency requires the final_alert_level to remain Hazardous, which doesn't
+      happen with Calibrating sensors.
+
+
+      Exact violation conditions:
+
+      1. Raw reading that would classify as HAZARDOUS after drift adjustment
+
+      2. sensor_status = CALIBRATING
+
+      3. time_since_last_alert < 24 (recent alert)
+
+      4. Reading is valid (not in dead zone, drift not extreme)
+
+
+      Additional edge case: If drift_factor is exactly 90 or 110 (boundary), condition3
+      becomes False, requiring both condition2 (FOGGY) AND condition4 (recent alert)
+      to be true along with condition1 for emergency trigger.
+    reasoning: >-
+      - "Hazardous readings with recent alerts" means: base reading classifies as
+      HAZARDOUS AND time_since_last_alert < 24
+
+      - For emergency trigger: check_emergency_conditions requires count >= 2
+
+      - condition1 = alert_level in (HAZARDOUS, VERY_UNHEALTHY)
+
+      - condition4 = time_since_last_alert < 24 (this is True per the property)
+
+      - If final_alert_level = HAZARDOUS and time_since_last_alert < 24, then conditions
+      1 and 4 are both True, count >= 2, emergency triggers
+
+      - HOWEVER: apply_fault_escalation can override the alert level
+
+      - When status = CALIBRATING, final_level is ALWAYS NORMAL regardless of base_level
+
+      - So even if reading is hazardous, final_alert_level = NORMAL when Calibrating
+
+      - This makes condition1 = False, and with condition4 = True, count = 1 (unless
+      other conditions true)
+
+      - This violates the safety property: hazardous reading + recent alert but NO
+      emergency
+
+      - Edge cases: drift_factor exactly 90 or 110 (boundary of condition3), weather
+      exactly FOGGY (boundary of condition2)
+
+      - Another edge case: Faulty sensor with drift_acceptable (90-110) AND weather_favorable
+      (PM2.5+Rainy or NO2+Windy) AND base_level != HAZARDOUS will not escalate
+
+      - If base_level = VERY_UNHEALTHY, faulty sensor with favorable conditions stays
+      VERY_UNHEALTHY, condition1 still True
+
+      - But if somehow count < 2 despite condition1 and condition4, emergency won't
+      trigger
+
+      - This requires condition2 = False (not Foggy) AND condition3 = False (drift
+      in 90-110)
+
+      - So violation: VERY_UNHEALTHY + time < 24 + not Foggy + drift 90-110 → count
+      = 2, emergency triggers (no violation here)
+
+      - Main violation: CALIBRATING sensor case as described above
+- model: openai/gpt-5.2
+  timestamp: "2025-12-18 11:17:26"
+  q1:
+    answer: >-
+      11 distinct response-output scenarios (by {reading_valid, final_alert_level,
+      trigger_emergency}):
+
+      - 1 invalid-reading scenario: (reading_valid=False, final_alert_level=NORMAL,
+      trigger_emergency=False, adjusted_reading=0)
+
+      - 10 valid-reading scenarios: reading_valid=True with final_alert_level ∈ {NORMAL,
+      MODERATE, UNHEALTHY, VERY_UNHEALTHY, HAZARDOUS} × trigger_emergency ∈ {False,
+      True}.
+    reasoning: >-
+      - determine_monitoring_response has an early return on invalid readings, producing
+      exactly one fixed output tuple.
+
+      - Otherwise, the function always returns reading_valid=True and can produce
+      any of the 5 AlertLevel values after classification + fault logic.
+
+      - Emergency is a boolean decided independently by a 2-of-4 quorum check, so
+      each alert level can appear with emergency True or False.
+
+      - Numeric thresholds that govern the branching:
+        - Validity gate:
+          - Dead zone invalid iff 148 ≤ raw_reading ≤ 152 AND 98 ≤ drift_factor ≤
+      102.
+          - Extreme drift invalid iff drift_factor < 80 OR drift_factor > 120.
+        - Drift adjustment:
+          - adjusted_reading = (raw_reading * drift_factor) // 100.
+        - Base alert classification uses “≥ threshold” with weather-adjusted thresholds:
+          - PM2.5 (base): Moderate 15, Unhealthy 35, VeryUnhealthy 75, Hazardous 150.
+            - If FOGGY: Moderate 12, Unhealthy 28, VeryUnhealthy 60, Hazardous 120.  (⌊0.8×base⌋)
+            - If RAINY: Moderate 19, Unhealthy 45, VeryUnhealthy 97, Hazardous 195.
+      (⌊1.3×base⌋)
+          - NO2 (base): Moderate 25, Unhealthy 50, VeryUnhealthy 100, Hazardous 200.
+            - If WINDY: Moderate 27, Unhealthy 55, VeryUnhealthy 110, Hazardous 220.
+      (⌊1.1×base⌋)
+          - Ozone (base): Moderate 100, Unhealthy 160, VeryUnhealthy 240, Hazardous
+      300.
+            - If CLEAR: Moderate 85, Unhealthy 136, VeryUnhealthy 204, Hazardous 255.
+      (⌊0.85×base⌋)
+          - CO (no weather adjustments): Moderate 10, Unhealthy 20, VeryUnhealthy
+      40, Hazardous 60.
+          - SO2 (no weather adjustments): Moderate 20, Unhealthy 50, VeryUnhealthy
+      100, Hazardous 200.
+        - Fault/status logic thresholds:
+          - CALIBRATING forces final_alert_level = NORMAL (no numeric threshold; unconditional).
+          - FAULTY escalates one level, except may be overridden back to base_level
+      when:
+            - drift acceptable: 90 ≤ drift_factor ≤ 110, AND
+            - weather favorable: (PM2.5 AND RAINY) OR (NO2 AND WINDY), AND
+            - base_level != HAZARDOUS.
+        - Emergency quorum thresholds (need ≥2 conditions):
+          - condition1: final_alert_level ∈ {VERY_UNHEALTHY, HAZARDOUS}
+          - condition2: weather == FOGGY
+          - condition3: drift_factor < 90 OR drift_factor > 110
+          - condition4: time_since_last_alert < 24
+  q2:
+    answer:
+      "Yes. A CALIBRATING sensor can trigger an emergency, but only if the reading
+      is valid and at least two of these are true: (weather==FOGGY), (drift_factor<90
+      or >110), (time_since_last_alert<24)."
+    reasoning: >-
+      - CALIBRATING forces final_alert_level=NORMAL, so condition1 (very_unhealthy/hazardous)
+      is always False.
+
+      - Emergency still can be True because check_emergency_conditions only requires
+      2 of 4 conditions; with condition1=False it becomes “at least 2 of {foggy, drift
+      outside 90–110, recent<24}”.
+
+      - If the reading is invalid (dead zone 148–152 with drift 98–102, or drift<80/>120),
+      determine_monitoring_response returns early with trigger_emergency=False, so
+      CALIBRATING cannot trigger emergency in those invalid cases.
+  q3:
+    answer:
+      Yes—depending on what “Hazardous readings” means. If it means the *final
+      alert level* is HAZARDOUS and time_since_last_alert<24, then the property cannot
+      be violated by this code. But if it means the *measured/derived concentration*
+      is hazardous (raw/adjusted/base hazardous), then it can be violated when the
+      system suppresses/short-circuits before the emergency quorum sees a hazardous
+      alert (invalid-reading early return or CALIBRATING override), or at the 24-hour
+      boundary if “recent” is interpreted as ≤24.
+    reasoning: >-
+      - Under the strict interpretation “final_alert_level==HAZARDOUS AND time_since_last_alert<24
+      ⇒ emergency”:
+        - condition1 is True (hazardous), condition4 is True (<24), so count≥2 always
+      holds ⇒ emergency=True. No violation. - Violations occur under the common interpretation
+      “the reading itself is hazardous (i.e., adjusted_reading ≥ hazardous_threshold)
+      and there was a recent alert”:
+        1) Invalid-reading short-circuit (emergency forced False):
+           - If (148 ≤ raw_reading ≤ 152) AND (98 ≤ drift_factor ≤ 102), the function
+      returns trigger_emergency=False, even if that would correspond to hazardous
+      for some pollutant/weather after drift.
+             - Concrete edge: PM2.5 with no weather adjustment has hazardous threshold
+      150. raw_reading=150, drift_factor=100 lies in the dead zone ⇒ invalid ⇒ no
+      emergency even if time_since_last_alert<24.
+           - If drift_factor<80 or >120 (extreme drift), also returns trigger_emergency=False
+      regardless of how high raw_reading is.
+        2) CALIBRATING override (hazardous concentration but final alert forced NORMAL):
+           - Preconditions:
+             - reading_valid=True (i.e., not dead-zone and drift not extreme),
+             - sensor_status==CALIBRATING,
+             - adjusted_reading = (raw_reading*drift_factor)//100 is ≥ the weather-adjusted
+      hazardous threshold for the pollutant,
+             - time_since_last_alert < 24 (recent),
+             - AND both of these are false: weather==FOGGY and drift_factor outside
+      90–110.
+           - Then emergency quorum sees only condition4=True (recent), with condition1=False
+      (because final=NORMAL), condition2=False (not foggy), condition3=False (drift
+      within [90,110]) ⇒ count=1 ⇒ trigger_emergency=False.
+        3) Boundary-condition violation if “recent” is treated as inclusive (≤24):
+           - Code uses strict time_since_last_alert < 24.
+           - If time_since_last_alert == 24, even with final_alert_level==HAZARDOUS,
+      emergency triggers only if at least one of {weather==FOGGY, drift_factor<90
+      or >110} is also true. - Other important numeric boundaries to note:
+        - Emergency drift boundary is strict: drift_factor==90 or 110 does NOT satisfy
+      condition3.
+        - Alert classification boundaries are inclusive (≥). A reading exactly equal
+      to a threshold enters that level.
+- model: google/gemini-3-pro-preview
+  timestamp: "2025-12-18 11:17:34"
+  q1:
+    answer:
+      There are 2 distinct monitoring response scenarios (Valid and Invalid),
+      determined by specific validity thresholds.
+    reasoning: >-
+      The `is_reading_valid` function creates a binary branch in `determine_monitoring_response`,
+      resulting in two distinct response objects (one explicitly calculated, one a
+      default 'safe' failure).
+
+      The **Invalid Scenario** is triggered by two specific numeric threshold conditions:
+
+      1. **Extreme Drift**: `drift_factor < 80` OR `drift_factor > 120`.
+
+      2. **Dead Zone Logic**: A specific intersection of `raw_reading` between **148
+      and 152** (inclusive) AND `drift_factor` between **98 and 102** (inclusive).
+
+      All other combinations fall into the **Valid Scenario**, where the system proceeds
+      to calculate alerts and emergency triggers.
+  q2:
+    answer: Yes, a sensor with status=Calibrating can trigger an emergency protocol.
+    reasoning: >-
+      The `Calibrating` status overrides the `final_alert_level` to `AlertLevel.NORMAL`,
+      which prevents **Condition 1** (High Severity) of the emergency quorum from
+      being met.
+
+      However, the `check_emergency_conditions` function checks 4 independent boolean
+      conditions and requires a sum >= 2. A Calibrating sensor can still meet the
+      quorum if it satisfies **2 of the remaining 3 conditions**:
+
+      - **Condition 2**: Weather is `WeatherCondition.FOGGY`.
+
+      - **Condition 3**: `drift_factor` is valid but deviant (specifically in range
+      `[80, 89]` or `[111, 120]`).
+
+      - **Condition 4**: `time_since_last_alert < 24`.
+
+      For example, a valid input with `status=CALIBRATING`, `weather=FOGGY`, and `time_since_last_alert=10`
+      results in Emergency=True (Sum=2).
+  q3:
+    answer: Yes, the safety property can be violated.
+    reasoning: >-
+      The property 'Hazardous readings with recent alerts always trigger emergency
+      protocol' fails in two specific outcomes where a hazardous physical input yields
+      no emergency response:
+
+      1. **Calibrating Status Override**: If a sensor detects a Hazardous reading
+      (e.g., `raw_reading=1000`) and the `time_since_last_alert < 24` (Condition 4),
+      but the status is `CALIBRATING`, the alert level is forced to `NORMAL`. If the
+      weather is not Foggy and drift is normal (90-110), the emergency check sums
+      to only 1 (Condition 4 only), failing the quorum of 2.
+
+      2. **Dead Zone Invalidation**: If the sensor provides a `raw_reading` of **150**
+      (which is the exact threshold for PM2.5 Hazardous) combined with a `drift_factor`
+      of **100**, the `is_reading_valid` check returns `False` due to the 148-152/98-102
+      Dead Zone logic. The system returns a default response (`trigger_emergency=False`)
+      despite the hazardous reading and recent alert history.
+- model: anthropic/claude-opus-4.5
+  timestamp: "2026-01-09 11:13:54"
+  q1:
+    answer:
+      "There are 6 distinct monitoring response scenarios based on final_alert_level:
+      NORMAL, MODERATE, UNHEALTHY, VERY_UNHEALTHY, HAZARDOUS (with reading_valid=True),
+      plus an invalid reading scenario (reading_valid=False, returns NORMAL). The
+      numeric thresholds vary by pollutant and weather condition. Base thresholds
+      for each pollutant are: PM2.5: 15/35/75/150 μg/m³; NO2: 25/50/100/200 μg/m³;
+      Ozone: 100/160/240/300 μg/m³; CO: 10/20/40/60 μg/m³; SO2: 20/50/100/200 μg/m³
+      for Moderate/Unhealthy/VeryUnhealthy/Hazardous respectively. Weather adjustments
+      apply: PM2.5+Foggy reduces thresholds by 20% (multiplier 4/5), PM2.5+Rainy increases
+      by 30% (multiplier 13/10), Ozone+Clear reduces by 15% (multiplier 17/20), NO2+Windy
+      increases by 10% (multiplier 11/10). Validity thresholds: dead zone at raw_reading
+      148-152 with drift_factor 98-102, and extreme drift outside 80-120 range."
+    reasoning: >-
+      - The function returns a MonitoringResponse with final_alert_level being one
+      of 5 AlertLevel values: NORMAL, MODERATE, UNHEALTHY, VERY_UNHEALTHY, HAZARDOUS
+
+      - Additionally, there's an invalid reading path that returns reading_valid=False
+      with NORMAL level, making 6 distinct scenarios
+
+      - Base thresholds are defined in base_threshold() for each pollutant/level combination
+
+      - Weather adjustments modify these thresholds: PM2.5+Foggy=80%, PM2.5+Rainy=130%,
+      Ozone+Clear=85%, NO2+Windy=110%
+
+      - Validity is determined by is_reading_valid(): readings in 148-152 range with
+      drift 98-102 are invalid (dead zone), and drift outside 80-120 is invalid
+
+      - The classify_base_level function compares adjusted readings against weather-adjusted
+      thresholds to determine the alert level
+  q2:
+    answer:
+      No, a sensor with status=Calibrating can never trigger an emergency protocol.
+      The apply_fault_escalation function explicitly overrides the alert level to
+      NORMAL when sensor_status is CALIBRATING, regardless of the base_level. Since
+      emergency conditions in check_emergency_conditions require condition1 (alert_level
+      being HAZARDOUS or VERY_UNHEALTHY) as one of the quorum conditions, and a calibrating
+      sensor always produces NORMAL alert level, this condition can never be satisfied.
+      The quorum requires at least 2 of 4 conditions, and with alert_level=NORMAL,
+      condition1 is always False, leaving only conditions 2-4 (foggy weather, drift
+      outside 90-110, time_since_last_alert < 24). Even if all three of these are
+      true, the final_level passed to check_emergency_conditions is NORMAL, so the
+      emergency trigger logic still returns True but this is moot because the escalation
+      override happens before emergency check.
+    reasoning: >-
+      - In apply_fault_escalation(), when status == SensorStatus.CALIBRATING, the
+      function immediately returns AlertLevel.NORMAL regardless of base_level
+
+      - This happens unconditionally - no drift, weather, or reading value can change
+      this behavior
+
+      - The final_level is then used in check_emergency_conditions()
+
+      - condition1 in check_emergency_conditions checks if alert_level is HAZARDOUS
+      or VERY_UNHEALTHY
+
+      - Since calibrating sensors always produce NORMAL alert level, condition1 is
+      always False
+
+      - The other conditions are: condition2 (foggy), condition3 (drift outside 90-110),
+      condition4 (time < 24 hours)
+
+      - Even if conditions 2, 3, and 4 are all true (count=3), the emergency would
+      trigger based on count >= 2
+
+      - However, looking more carefully: the function DOES return True if count >=
+      2, so if weather is foggy AND drift is outside 90-110, emergency WOULD be True
+
+      - Wait, let me re-verify: the final_level=NORMAL is passed to check_emergency_conditions,
+      and if foggy + abnormal drift + recent alert, that's 3 conditions met
+
+      - Actually YES - emergency CAN be triggered even with NORMAL alert level if
+      2+ of the other 3 conditions are met
+
+      - Re-reading the code: check_emergency_conditions receives alert_level (which
+      is NORMAL for calibrating), but condition1 would be False. If condition2+condition3
+      or condition2+condition4 or condition3+condition4 are true, emergency triggers
+
+      - So a calibrating sensor CAN trigger emergency if: (foggy AND abnormal drift)
+      OR (foggy AND recent alert) OR (abnormal drift AND recent alert)
+  q3:
+    answer:
+      "Yes, the safety property 'Hazardous readings with recent alerts always
+      trigger emergency protocol' CAN be violated under specific conditions. The
+      violation occurs when: (1) The sensor has status=CALIBRATING - even if the base_level
+      calculated from the reading is HAZARDOUS, the apply_fault_escalation function
+      overrides it to NORMAL, so the final alert level is never HAZARDOUS for calibrating
+      sensors. (2) Invalid readings - if raw_reading is in dead zone (148-152 with
+      drift 98-102) or drift is extreme (<80 or >120), the reading is marked invalid
+      and returns NORMAL without triggering emergency. (3) For valid readings with
+      ACTIVE or FAULTY sensors reaching HAZARDOUS final level: if weather is NOT foggy,
+      AND drift is within 90-110 (acceptable), AND time_since_last_alert >= 24, then
+      count=1 (only condition1 is true) and emergency is NOT triggered despite HAZARDOUS
+      level. This is the key edge case where a genuinely hazardous reading with a
+      recent alert (time < 24) would need at least one more condition (foggy weather
+      OR abnormal drift) to trigger emergency - but with recent alert alone combined
+      with HAZARDOUS level, that's count=2 which DOES trigger. So the property holds
+      when time_since_last_alert < 24 and alert is HAZARDOUS, unless overridden by
+      CALIBRATING status or invalid reading."
+    reasoning: >-
+      - The safety property states: "Hazardous readings with recent alerts always
+      trigger emergency protocol"
+
+      - "Recent alerts" means time_since_last_alert < 24 (condition4 in check_emergency_conditions)
+
+      - "Hazardous readings" could mean either the raw/adjusted reading is at hazardous
+      level OR the final_alert_level is HAZARDOUS
+
+
+      Key violation scenarios:
+
+
+      1. CALIBRATING sensor: Even if raw reading would produce HAZARDOUS base_level,
+      apply_fault_escalation returns NORMAL. So final_alert_level is never HAZARDOUS
+      for calibrating sensors.
+
+
+      2. Invalid readings: If reading is in dead zone (148-152, drift 98-102) or extreme
+      drift (<80 or >120), reading_valid=False and system returns NORMAL with no emergency.
+
+
+      3. For valid readings with final_level=HAZARDOUS and time_since_last_alert <
+      24:
+         - condition1 = True (HAZARDOUS)
+         - condition4 = True (recent alert)
+         - count >= 2, so emergency = True
+         - This scenario DOES trigger emergency
+
+      4. Edge case: If we interpret "Hazardous readings" as the BASE reading being
+      hazardous (before fault escalation), then:
+         - A CALIBRATING sensor with hazardous base reading still produces NORMAL
+      final level
+         - Emergency may or may not trigger depending on other conditions
+
+      5. The property is violated when:
+         - Sensor is CALIBRATING with hazardous readings (final level forced to NORMAL)
+         - Reading is invalid due to dead zone or extreme drift
+         - These prevent emergency even with recent alerts and hazardous raw readings

@@ -1,0 +1,157 @@
+(* Lab Sample Processing Workflow *)
+
+(* Core types *)
+type sample_type = Biological | Chemical | Environmental | Unknown
+
+type contamination_level = Clean | Low | Medium | High
+
+type processing_decision = Approved | Quarantine | Rejected
+
+(* High priority bypasses contamination checks *)
+(* BUT only if user clearance is sufficient (≥4) *)
+let priority_override high_priority user_clearance =
+  high_priority && user_clearance >= 4
+
+(* Required clearance depends on sample type *)
+let required_clearance sample_type =
+  match sample_type with
+  | Biological -> 3
+  | Chemical -> 4
+  | Environmental -> 2
+  | Unknown -> 5
+
+(* Temperature ranges near boundaries are ambiguous *)
+(* Refrigerated should be 2-8°C, but 0-2°C and 8-10°C are "dead zones" *)
+let in_temperature_dead_zone temp refrigerated_sample =
+  refrigerated_sample &&
+  ((temp >= 0 && temp < 2) || (temp > 8 && temp <= 10))
+
+(* Calculate combined contamination risk *)
+let calculate_contamination sample_type location_contam equipment_contam =
+  let sample_base = match sample_type with
+    | Biological -> Medium
+    | Chemical -> High
+    | Environmental -> Low
+    | Unknown -> High
+  in
+  (* Highest level wins *)
+  if sample_base = High || location_contam = High || equipment_contam = High then High
+  else if sample_base = Medium || location_contam = Medium || equipment_contam = Medium then Medium
+  else if sample_base = Low || location_contam = Low || equipment_contam = Low then Low
+  else Clean
+
+(* Approval needs 3 out of 5 conditions *)
+let calculate_approval_score
+    user_authorized
+    equipment_available
+    temp_compliant
+    not_expired
+    low_contamination =
+  let count =
+    (if user_authorized then 1 else 0) +
+    (if equipment_available then 1 else 0) +
+    (if temp_compliant then 1 else 0) +
+    (if not_expired then 1 else 0) +
+    (if low_contamination then 1 else 0)
+  in
+  count
+
+(* Core sample processing decision *)
+let determine_processing_decision
+    (* Sample info *)
+    sample_type
+    time_since_received
+    refrigerated_sample
+    (* Environment *)
+    current_temp
+    location_contamination
+    equipment_contamination
+    (* User/system *)
+    user_clearance
+    equipment_available
+    high_priority =
+
+  (* Check temperature dead zone first *)
+  let in_dead_zone = in_temperature_dead_zone current_temp refrigerated_sample in
+
+  if in_dead_zone then
+    Quarantine  (* Dead zone → quarantine for review *)
+  else
+    (* Check priority override *)
+    let is_priority_override = priority_override high_priority user_clearance in
+
+    if is_priority_override then
+      Approved  (* High priority with clearance bypasses normal checks *)
+    else
+      (* Normal approval logic with quorum *)
+
+      (* Check individual conditions *)
+      let required_clear = required_clearance sample_type in
+      let user_authorized = user_clearance >= required_clear in
+
+      let temp_ok =
+        if refrigerated_sample then
+          current_temp >= 2 && current_temp <= 8
+        else
+          current_temp >= 18 && current_temp <= 25  (* Room temp *)
+      in
+
+      let not_expired = time_since_received <= 720 in  (* 30 days *)
+
+      let combined_contamination = calculate_contamination
+        sample_type location_contamination equipment_contamination
+      in
+      let contamination_ok = combined_contamination <> High in
+
+      (* Calculate approval score (quorum) *)
+      let score = calculate_approval_score
+        user_authorized equipment_available temp_ok not_expired contamination_ok
+      in
+
+      (* Need 3 out of 5 for approval *)
+      if score >= 3 then
+        if contamination_ok then Approved
+        else Quarantine  (* Borderline contamination *)
+      else if score >= 2 then
+        Quarantine  (* Borderline cases *)
+      else
+        Rejected
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all processing decision scenarios *)
+let all_processing_scenarios = determine_processing_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Chemical samples ever be approved with High contamination? *)
+let chemical_high_contamination_approved
+    sample_type time_since_received refrigerated_sample
+    current_temp location_contamination equipment_contamination
+    user_clearance equipment_available high_priority =
+  let result = determine_processing_decision
+    sample_type time_since_received refrigerated_sample
+    current_temp location_contamination equipment_contamination
+    user_clearance equipment_available high_priority
+  in
+  sample_type = Chemical &&
+  calculate_contamination sample_type location_contamination equipment_contamination = High &&
+  result = Approved
+[@@decomp top ()]
+
+(* Q3: Safety property - samples in temperature dead zone never directly approved *)
+verify (fun
+    sample_type time_since_received refrigerated_sample
+    current_temp location_contamination equipment_contamination
+    user_clearance equipment_available high_priority ->
+  let result = determine_processing_decision
+    sample_type time_since_received refrigerated_sample
+    current_temp location_contamination equipment_contamination
+    user_clearance equipment_available high_priority
+  in
+  let in_dead_zone = in_temperature_dead_zone current_temp refrigerated_sample in
+
+  (* Dead zone should never lead to direct approval *)
+  in_dead_zone ==> result <> Approved
+)

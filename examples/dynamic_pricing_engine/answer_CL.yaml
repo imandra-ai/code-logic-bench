@@ -1,0 +1,54 @@
+model: "dynamic_pricing_engine"
+q1:
+  question: "How many distinct pricing decision scenarios exist in determine_price?"
+  answer: "238 scenarios"
+  key_decision_points:
+    inventory_levels: 5
+    tiers: 4
+    coupon_discounts: 5
+    flash_discounts: 5
+    vip_conditions: "2 booleans (loyalty_high, orders_high)"
+    cost_category: "1 boolean (cost_high)"
+    theoretical_max: 4000
+    actual_scenarios: 238
+    reduction_factors: "dead zones, invalid stacking, out-of-stock elimination"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_pricing_scenarios.json'
+q2:
+  question: "Can a Platinum customer who qualifies for VIP status (via quorum) ever trigger margin enforcement?"
+  answer: "NO - No scenarios where Platinum VIP customers trigger margin enforcement"
+  explanation: >
+    Despite having Platinum tier and meeting VIP quorum requirements (2 of 3: Platinum, high loyalty, high orders), no scenarios produce margin enforcement. The simplified categorical model shows that margin enforcement depends on both high cost AND Large/VeryLarge total discount, but the discount aggregation logic and VIP override patterns don't create scenarios where Platinum VIPs hit this combination while remaining valid (not in dead zones).
+
+  vip_quorum_requirement: "2 of 3: [Platinum tier, loyalty_high, orders_high]"
+  margin_enforcement_requirement: "cost_high=true AND total_discount∈{Large, VeryLarge}"
+  why_no_scenarios: >
+    The interaction between VIP discount application (which escalates discount levels) and dead zone elimination (Medium+VeryLarge, Large+Large invalid) prevents the specific combination needed for margin enforcement in Platinum VIP cases.
+
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_minimum_margin_enforced.json'
+q3:
+  question: "Can the safety property 'high cost products with VeryLarge discounts always enforce minimum margin' ever be violated?"
+  answer: "PROVEN - Property always holds, no counterexamples"
+  property: "(price_valid && cost_high && total_discount=VeryLarge) ==> margin_enforced"
+  why_holds: >
+    The margin enforcement logic explicitly checks for Large or VeryLarge discount levels when cost_high=true. The property is structurally guaranteed by the check_margin_enforcement function which returns true when cost_high AND (total_discount∈{Large,VeryLarge}).
+
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_minimum_margin_safety.json'
+analysis_metadata:
+  total_regions: 238
+  imandra_runtime: "All analyses completed successfully, <10 seconds"
+  pattern_complexity:
+    multiplexer: "Inventory level changes scarcity premium/discount interpretation"
+    override: "VIP discount blocked when flash_discount=VeryLarge (conditional override)"
+    quorum: "VIP status requires 2 of 3: [Platinum, loyalty_high, orders_high]"
+    dead_zone: "Invalid stacking: Medium coupon + VeryLarge flash, Large coupon + Large flash"
+  interesting_findings:
+    - "Categorical types reduce 4000 theoretical scenarios to 238 actual (94% reduction)"
+    - "Dead zones eliminate ~10% of potential combinations"
+    - "VIP quorum means Platinum alone insufficient - needs 2/3 conditions"
+    - "VIP discount escalates categories (NoDiscount→Small, Small→Medium, etc.)"
+    - "VeryLarge flash blocks VIP bonus (conditional override)"
+    - "No margin enforcement scenarios occur in this simplified categorical model"
+    - "Safety property proven by structural guarantee in enforcement logic"

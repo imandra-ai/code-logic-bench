@@ -1,0 +1,406 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:34'
+  q1:
+    answer: 34 distinct logical decision scenarios.
+    reasoning: >-
+      - The function has two early-exit branches plus a quorum-based branch.
+
+      - Scenario 1: Visibility dead zone during Fog (450–550m) → always DELAYED.
+
+      - Scenario 2: Not in dead zone AND emergency vessel with visibility >200m →
+      always APPROVED (bypasses all other checks).
+
+      - Otherwise, the decision depends only on the 5 boolean checks (capacity_ok,
+      speed_ok, priority_ok, fuel_ok, spacing_ok).
+
+      - Those 5 booleans yield 2^5 = 32 distinct truth-table combinations (each mapping
+      to APPROVED if ≥3 true, DELAYED if exactly 2 true, else DENIED).
+
+      - Total distinct logical scenarios = 1 + 1 + 32 = 34 (even though the underlying
+      numeric inputs are unbounded).
+  q2:
+    answer: Yes, but only if Cargo meets all four non-capacity conditions (since capacity_ok
+      is false at the limit).
+    reasoning: >-
+      - In Storm: effective_capacity = max_capacity − 2.
+
+      - “At the reduced capacity limit” means current_vessel_count == effective_capacity,
+      so capacity_ok = (current_vessel_count < effective_capacity) is FALSE.
+
+      - Cargo has no emergency override and Storm is not a visibility dead-zone weather.
+
+      - Approval requires score ≥ 3 out of 5; with capacity_ok = False, the vessel
+      must satisfy 3 out of the remaining 4 (and since failing any one would drop
+      the score to 2, it must satisfy all 4 to be approved).
+
+      - Exact required conditions:
+        - speed_ok: vessel_speed <= weather_speed_limit(STORM, speed_limit) = (speed_limit
+      * 40) // 100
+        - priority_ok: vessel_priority >= vessel_priority_score(CARGO) = 1
+        - fuel_ok: fuel_level >= 30
+        - spacing_ok: visibility >= 500
+      - If any of these four fails, the best possible score is 2 → DELAYED (or lower
+      → DENIED).
+  q3:
+    answer: No. Entries cannot be directly approved in the Fog dead zone; they are
+      always DELAYED.
+    reasoning: >-
+      - The function checks in_visibility_dead_zone(visibility, weather) first.
+
+      - If weather == FOG and 450 <= visibility <= 550, it immediately returns EntryDecision.DELAYED.
+
+      - This happens before emergency_override and before the quorum scoring, so no
+      input combination can produce APPROVED while in the dead zone.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:34'
+  q1:
+    answer: 162,000 distinct lane entry decision scenarios
+    reasoning: >-
+      To calculate the number of distinct scenarios, we need to consider all possible
+      combinations of input parameters:
+
+
+      • VesselType: 4 values (CARGO, PASSENGER, EMERGENCY, MILITARY)
+
+      • vessel_speed: Continuous integer, but practically bounded (assume 0-100 knots
+      = 101 values)
+
+      • vessel_priority: Not explicitly bounded, but reasonable range 0-10 (11 values)
+
+      • fuel_level: Percentage 0-100 (101 values)
+
+      • current_vessel_count: Depends on max_capacity, assume 0-10 (11 values)
+
+      • max_capacity: Assume standard values like 5-10 (6 values)
+
+      • speed_limit: Assume standard values 10-30 knots (21 values)
+
+      • WeatherCondition: 3 values (CLEAR, FOG, STORM)
+
+      • visibility: Continuous in meters, critical thresholds are 200m, 450-550m,
+      500m; assume discrete values 0-1000m (1001 values)
+
+
+      However, for PRACTICAL distinct decision-making scenarios (considering decision-relevant
+      boundaries):
+
+      • VesselType: 4
+
+      • vessel_speed: 3 ranges (compliant/non-compliant relative to adjusted limits
+      for each weather)
+
+      • vessel_priority: 5 ranges (below/equal/above each priority score 1-4)
+
+      • fuel_level: 2 (below 30 or >= 30)
+
+      • current_vessel_count: 3 (below effective capacity, at capacity, above capacity)
+
+      • max_capacity: 3 representative values
+
+      • speed_limit: 3 representative values
+
+      • WeatherCondition: 3
+
+      • visibility: 5 critical ranges (≤200, 201-449, 450-550, 551-499, ≥500)
+
+
+      Practical calculation: 4 × 3 × 5 × 2 × 3 × 3 × 3 × 3 × 5 = 162,000 distinct
+      decision scenarios
+  q2:
+    answer: Yes, Cargo vessels CAN enter a lane at reduced capacity limit during Storm
+      conditions, but only under specific quorum conditions.
+    reasoning: >-
+      Analysis of Cargo vessel entry during Storm at reduced capacity:
+
+
+      • During STORM: weather_capacity_reduction returns 2, so effective_capacity
+      = max_capacity - 2
+
+      • At reduced capacity limit means: current_vessel_count = effective_capacity
+      - 1 (one slot available)
+
+      • For this scenario: capacity_ok = True (current_vessel_count < effective_capacity)
+
+
+      However, Cargo vessels face challenges:
+
+      • Cargo priority_score = 1 (lowest priority)
+
+      • Storm reduces speed_limit to 40% of base
+
+      • Spacing requires visibility >= 500m (unlikely in storm)
+
+
+      Entry requires 3 out of 5 conditions:
+
+      1. capacity_ok: TRUE (as analyzed above)
+
+      2. speed_ok: TRUE if vessel_speed <= (speed_limit × 40%)
+
+      3. priority_ok: TRUE if vessel_priority >= 1 (likely satisfied)
+
+      4. fuel_ok: TRUE if fuel_level >= 30
+
+      5. spacing_ok: TRUE if visibility >= 500 (unlikely during storm)
+
+
+      EXACT CONDITIONS for Cargo entry at reduced capacity during Storm:
+
+      • current_vessel_count < (max_capacity - 2)
+
+      • vessel_speed <= (speed_limit × 40 / 100)
+
+      • vessel_priority >= 1
+
+      • fuel_level >= 30
+
+      • At least 3 of these 5 must be TRUE
+
+      • visibility must NOT be in dead zone (450-550m during fog)
+
+      • visibility > 200m (or emergency override doesn't apply to Cargo)
+
+
+      Most feasible: capacity_ok + speed_ok + priority_ok = 3 → APPROVED
+  q3:
+    answer: No, vessel entries CANNOT be directly approved when visibility is in the
+      dead zone (450-550m during Fog).
+    reasoning: >-
+      Analysis of the determine_lane_entry function logic:
+
+
+      • The function checks in_visibility_dead_zone() FIRST, before any other logic
+
+      • Dead zone condition: weather == FOG AND 450 <= visibility <= 550
+
+      • When dead zone is detected, the function IMMEDIATELY returns EntryDecision.DELAYED
+
+
+      Code flow:
+
+      1. First check: if in_visibility_dead_zone(visibility, weather): return EntryDecision.DELAYED
+
+      2. Second check: if emergency_override(...): return EntryDecision.APPROVED
+
+      3. Then normal quorum-based logic
+
+
+      KEY INSIGHT: The dead zone check happens BEFORE the emergency override check
+
+      • Even EMERGENCY vessels cannot bypass the dead zone delay
+
+      • The dead zone represents borderline fog conditions where safety is unclear
+
+      • The system forces ALL vessels to wait for visibility improvement
+
+
+      EXCEPTION: None - the dead zone check is absolute and occurs before all other
+      logic
+
+
+      RESULT: During fog with visibility 450-550m, ALL vessel entries return DELAYED,
+      regardless of vessel type, priority, capacity, or any other factors
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:19:39'
+  q1:
+    answer: '5'
+    reasoning: >-
+      The function contains 5 distinct logic paths leading to a return statement,
+      representing the distinct decision scenarios:
+
+      1. Visibility is in the dead zone (FOG + 450-550m) → Returns DELAYED.
+
+      2. Emergency override conditions met (EMERGENCY type + >200m visibility + not
+      in dead zone) → Returns APPROVED.
+
+      3. Normal Quorum: Score is 3 or higher (from 5 possible conditions) → Returns
+      APPROVED.
+
+      4. Normal Quorum: Score is exactly 2 → Returns DELAYED.
+
+      5. Normal Quorum: Score is 0 or 1 → Returns DENIED.
+  q2:
+    answer: Yes, provided they satisfy at least 3 other operational conditions.
+    reasoning: >-
+      - In 'Storm' weather, the 'Dead Zone' check (which requires Fog) is false.
+
+      - 'Cargo' vessels do not trigger the emergency override, so logic proceeds to
+      the quorum scoring.
+
+      - When at the reduced capacity limit (current count == max - 2), the `capacity_ok`
+      checks fails (False).
+
+      - To achieve an APPROVED decision (score >= 3), the vessel must satisfy at least
+      3 of the remaining 4 conditions:
+        1. `speed_ok`: Speed must be <= 40% of the limit.
+        2. `priority_ok`: The input `vessel_priority` must be >= 1.
+        3. `fuel_ok`: Fuel level must be >= 30.
+        4. `spacing_ok`: Visibility must be >= 500.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The function checks `in_visibility_dead_zone` (FOG and visibility 450-550m)
+      as the very first step of execution.
+
+      - If this condition is true, the function immediately returns `EntryDecision.DELAYED`.
+
+      - This happens before the `emergency_override` check or the quorum logic, making
+      it impossible for *any* vessel (even Emergency type) to be approved in this
+      specific visibility range.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:54'
+  q1:
+    answer: '5'
+    reasoning: >-
+      - In-visibility dead zone (priority 1): DELAYED
+
+      - Emergency override (priority 2): APPROVED
+
+      - Quorum decision (normal logic):
+          - Score >= 3 (score 3,4,5): APPROVED
+          - Score = 2: DELAYED
+          - Score <= 1 (score 0,1): DENIED
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - At reduced capacity limit in STORM conditions, capacity_ok is false (since
+      current_vessel_count >= effective_capacity = max_capacity - 2)
+
+      - Approval requires meeting quorum (score >= 3 out allowing of 5 conditions:
+      capacity_ok, speed_ok, priority_ok, fuel_ok, spacing_ok)
+
+      - With capacity_ok = false, approval occurs if at least 3 of the remaining 4
+      conditions are true:
+          - speed_ok: vessel_speed <= storm-adjusted speed limit (speed_limit * 40/100)
+          - priority_ok: vessel_priority >= priority_score(Cargo) = 1
+          - fuel_ok: fuel_level >= 30
+          - spacing_ok: visibility >= 500
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - When visibility is in the dead zone (450-550m during Fog), the function directly
+      returns DELAYED before any approval checks (including emergency override)
+
+      - This ensures all vessels, even emergencies, are delayed for visibility improvement
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:42'
+  q1:
+    answer: 1,728 distinct lane entry decision scenarios exist across all combinations
+      of vessel, lane, and environment parameters.
+    reasoning: >-
+      - VesselType: 4 options (CARGO, PASSENGER, EMERGENCY, MILITARY)
+
+      - vessel_speed: Continuous integer, but for distinct logical scenarios we consider
+      relationship to adjusted speed limit (2 states: compliant or not)
+
+      - vessel_priority: Continuous integer, but relates to vessel_priority_score
+      comparison (2 states: sufficient or not)
+
+      - fuel_level: Continuous integer, but threshold at 30 (2 states: adequate >=30
+      or not)
+
+      - current_vessel_count vs max_capacity with weather reduction: 2 states (capacity
+      ok or not)
+
+      - max_capacity: Variable, but affects capacity_ok binary outcome
+
+      - speed_limit: Variable, but affects speed_ok binary outcome
+
+      - WeatherCondition: 3 options (CLEAR, FOG, STORM)
+
+      - visibility: Affects multiple conditions - emergency override (>200), dead
+      zone (450-550 during fog), spacing (>=500)
+
+
+      For a complete enumeration considering the key discrete parameters:
+
+      - VesselType: 4
+
+      - WeatherCondition: 3
+
+      - Visibility ranges that create distinct behaviors: ~6 ranges (<=200, 201-449,
+      450-550, 551-499 N/A, let's say: <=200, 201-449, 450-500, 501-550, >=551 during
+      fog; different for other weather)
+
+      - Binary conditions for speed, priority, fuel, capacity: 2^4 = 16
+
+
+      A more systematic count: 4 vessel types × 3 weather × 2 capacity states × 2
+      speed states × 2 priority states × 2 fuel states × 6 visibility ranges = 4 ×
+      3 × 16 × 6 = 1,152
+
+
+      However, considering visibility as having distinct meaningful ranges across
+      all conditions (roughly 6 ranges considering emergency threshold, dead zone,
+      and spacing threshold), the calculation is:
+
+      4 (vessels) × 3 (weather) × 2 (capacity) × 2 (speed) × 2 (priority) × 2 (fuel)
+      × 6 (visibility ranges) = 1,728 scenarios
+  q2:
+    answer: No, Cargo vessels cannot enter a lane when it's at the reduced capacity
+      limit during Storm conditions.
+    reasoning: >-
+      - During Storm conditions, weather_capacity_reduction returns 2, so effective_capacity
+      = max_capacity - 2
+
+      - "At the reduced capacity limit" means current_vessel_count >= effective_capacity
+
+      - This means capacity_ok = False (since the check is current_vessel_count <
+      effective_capacity)
+
+      - Cargo vessels have the lowest priority_score of 1, meaning priority_ok requires
+      vessel_priority >= 1
+
+      - With capacity_ok = False, the vessel needs 3 out of the remaining 4 conditions
+      to be True
+
+      - During Storm, spacing_ok requires visibility >= 500, which is possible
+
+      - However, during Storm, the speed limit is reduced to 40% of base, making speed_ok
+      harder to achieve
+
+      - Even if speed_ok, priority_ok, fuel_ok, and spacing_ok are all True (4 conditions),
+      that gives a score of 4, which is >= 3
+
+      - BUT: Cargo vessels do NOT have emergency override capability (only EMERGENCY
+      vessels do)
+
+      - So if capacity_ok = False (at or over reduced capacity), the vessel needs:
+      speed_ok + priority_ok + fuel_ok + spacing_ok = at least 3 True
+
+      - This IS theoretically possible (if 3 of these 4 are True), so Cargo vessels
+      CAN potentially enter at reduced capacity
+
+      - Wait, re-reading: "at the reduced capacity limit" - if current_vessel_count
+      equals effective_capacity exactly, then capacity_ok = False
+
+      - If score can still reach 3 with the other 4 conditions, entry is possible
+
+      - Actually, YES it's possible if: speed <= 40% of speed_limit, vessel_priority
+      >= 1, fuel_level >= 30, AND visibility >= 500 (all 4 other conditions True =
+      score of 4, or any 3 of these True = score of 3)
+  q3:
+    answer: No, vessel entries cannot be directly approved when visibility is in the
+      dead zone (450-550m during Fog).
+    reasoning: >-
+      - The in_visibility_dead_zone function returns True when weather == FOG and
+      450 <= visibility <= 550
+
+      - In determine_lane_entry, the very first check is: if in_visibility_dead_zone(visibility,
+      weather): return EntryDecision.DELAYED
+
+      - This check happens BEFORE the emergency override check
+
+      - Therefore, even emergency vessels cannot get APPROVED status when in the dead
+      zone
+
+      - The function immediately returns DELAYED without evaluating any other conditions
+
+      - This is a hard constraint that prevents any direct approval during the visibility
+      dead zone
+
+      - All vessels, regardless of type, priority, or any other parameter, will receive
+      a DELAYED decision
+
+      - The dead zone represents "borderline fog conditions where safety is unclear"
+      as noted in the docstring

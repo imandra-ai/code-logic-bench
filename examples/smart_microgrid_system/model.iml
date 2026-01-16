@@ -1,0 +1,141 @@
+(* Smart Microgrid System *)
+
+(* Core types *)
+type load_priority = Critical | Essential | NonEssential | Deferrable
+
+type system_mode = GridTied | Islanded | Emergency
+
+type energy_source_status = Abundant | Adequate | Limited | Depleted
+
+type load_shed_decision = {
+  shed_deferrable: bool;
+  shed_non_essential: bool;
+  shed_essential: bool;
+  shed_critical: bool;
+  total_shed_kw: int;
+}
+
+(* Load power levels by priority *)
+let load_power priority =
+  match priority with
+  | Critical -> 20
+  | Essential -> 40
+  | NonEssential -> 30
+  | Deferrable -> 10
+
+(* Check if source is sufficient for load *)
+let is_sufficient available_kw load_kw =
+  available_kw >= load_kw
+
+(* Calculate energy deficit *)
+let calculate_deficit available_kw total_load_kw =
+  if available_kw >= total_load_kw then 0
+  else total_load_kw - available_kw
+
+(* Determine energy status from battery SOC *)
+let classify_energy_status battery_soc renewable_kw grid_connected =
+  if renewable_kw >= 80 then Abundant
+  else if renewable_kw >= 50 then Adequate
+  else if battery_soc >= 30 || grid_connected then Limited
+  else Depleted
+
+(* Critical override: Never shed Critical in GridTied mode *)
+let critical_protected mode =
+  mode = GridTied
+
+(* Emergency mode: Can shed Essential but not Critical *)
+let emergency_allows_essential_shed mode =
+  mode = Emergency
+
+(* Core load shedding decision *)
+let determine_load_shedding
+    mode
+    battery_soc
+    renewable_kw
+    total_load_kw
+    grid_connected =
+
+  let deficit = calculate_deficit renewable_kw total_load_kw in
+
+  if deficit = 0 then
+    (* No deficit, no shedding needed *)
+    { shed_deferrable = false;
+      shed_non_essential = false;
+      shed_essential = false;
+      shed_critical = false;
+      total_shed_kw = 0 }
+  else
+    (* Energy shortage - determine what to shed *)
+    let energy_status = classify_energy_status battery_soc renewable_kw grid_connected in
+
+    (* Shed Deferrable first (always shed if deficit exists) *)
+    let deferrable_kw = load_power Deferrable in
+    let after_deferrable = deficit - deferrable_kw in
+
+    if after_deferrable <= 0 then
+      { shed_deferrable = true;
+        shed_non_essential = false;
+        shed_essential = false;
+        shed_critical = false;
+        total_shed_kw = deferrable_kw }
+    else
+      (* Shed NonEssential next *)
+      let non_essential_kw = load_power NonEssential in
+      let after_non_essential = after_deferrable - non_essential_kw in
+
+      if after_non_essential <= 0 then
+        { shed_deferrable = true;
+          shed_non_essential = true;
+          shed_essential = false;
+          shed_critical = false;
+          total_shed_kw = deferrable_kw + non_essential_kw }
+      else
+        (* Need to shed Essential - only in Emergency mode *)
+        let can_shed_essential = emergency_allows_essential_shed mode in
+
+        if can_shed_essential then
+          let essential_kw = load_power Essential in
+          let after_essential = after_non_essential - essential_kw in
+
+          if after_essential <= 0 then
+            { shed_deferrable = true;
+              shed_non_essential = true;
+              shed_essential = true;
+              shed_critical = false;
+              total_shed_kw = deferrable_kw + non_essential_kw + essential_kw }
+          else
+            (* Complete blackout - shed everything including Critical *)
+            let critical_kw = load_power Critical in
+            { shed_deferrable = true;
+              shed_non_essential = true;
+              shed_essential = true;
+              shed_critical = true;
+              total_shed_kw = deferrable_kw + non_essential_kw + essential_kw + critical_kw }
+        else
+          (* Cannot shed Essential in non-Emergency modes *)
+          { shed_deferrable = true;
+            shed_non_essential = true;
+            shed_essential = false;
+            shed_critical = false;
+            total_shed_kw = deferrable_kw + non_essential_kw }
+
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All load shedding scenarios *)
+let all_shedding_scenarios = determine_load_shedding
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Essential be shed when battery_soc >= 50? *)
+let essential_shed_high_battery mode battery_soc renewable_kw total_load_kw grid_connected =
+  let decision = determine_load_shedding mode battery_soc renewable_kw total_load_kw grid_connected in
+  battery_soc >= 50 && decision.shed_essential
+[@@decomp top ()]
+
+(* Q3: Can Critical ever be shed when renewable_kw >= 80? *)
+verify (fun mode battery_soc renewable_kw total_load_kw grid_connected ->
+  let decision = determine_load_shedding mode battery_soc renewable_kw total_load_kw grid_connected in
+  renewable_kw >= 80 ==> not decision.shed_critical
+)

@@ -1,0 +1,49 @@
+model: "flight_management_system_controller"
+q1:
+  question: "How many distinct autopilot mode decision scenarios exist?"
+  answer: "278 scenarios"
+  breakdown:
+    theoretical: "7 phases × 3 health × 6 altitude × 5 weather = 630"
+    actual: 278
+    reduction: "Dead zones, Ground/Landing phase eliminations, incompatible phase-altitude combinations"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1.json'
+q2:
+  question: "Can autopilot engage during Approach with copilot monitoring required?"
+  answer: "YES - 7 Approach scenarios require copilot monitoring"
+  example_scenario:
+    phase: "Approach"
+    conditions_requiring_monitoring: "Degraded health OR non-Clear weather"
+    exception: "Clear weather + Normal health = NO monitoring required"
+  why_counterintuitive: >
+    Approach phase has conditional monitoring requirement - MOST Approach scenarios require monitoring, but there's an exception for perfect conditions (Clear + Normal). LLMs might assume blanket rule "Approach always needs monitoring" missing the exception.
+
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2.json'
+q3:
+  question: "Can 'Failed health → AP disabled' be violated?"
+  answer: "PROVEN - Property always holds"
+  property: "(health = Failed) ==> (mode_allowed = false)"
+  why_holds: >
+    Failed health triggers emergency disconnect via quorum (condition c1), and also blocks mode in the final decision logic (health <> Failed requirement). Dead zone is checked first but doesn't allow Failed health scenarios. The control flow ensures Failed health always results in mode_allowed=false.
+
+  edge_cases_analyzed:
+    - "Dead zone + Failed: Dead zone doesn't apply to Failed health"
+    - "Perfect conditions + Failed: Even Clear weather cannot override Failed block"
+    - "Emergency disconnect: Failed health satisfies c1 in quorum"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3.json'
+analysis_metadata:
+  total_regions: 278
+  imandra_runtime: "All analyses completed < 10 seconds"
+  pattern_complexity:
+    quorum: "Emergency disconnect requires 2/4: [Failed, Approach+VeryLow, Severe/Icing, VeryLow+Degraded]"
+    override: "Approach monitoring required EXCEPT (Clear weather AND Normal health)"
+    dead_zone: "VeryLow+Descent+ModerateTurbulence, Low+Climb+Icing → invalid"
+    multiplexer: "Weather changes capability: Normal health can be Minimal (Severe), Limited (Moderate), or Full (Clear)"
+  interesting_findings:
+    - "Approach has exception to monitoring rule (perfect conditions)"
+    - "Normal system health can have MinimalCapability due to weather (multiplexing)"
+    - "Emergency disconnect quorum creates non-obvious combinations"
+    - "Dead zones represent operationally unsafe states (low altitude + specific phase + weather)"
+    - "LLMs likely to miss monitoring exception and quorum combinations"

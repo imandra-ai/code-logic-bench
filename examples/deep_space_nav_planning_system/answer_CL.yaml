@@ -1,0 +1,28 @@
+model: "deep_space_nav_planning_system"
+q1:
+  question: "How many distinct trajectory scenarios exist in determine_trajectory?"
+  answer: 38
+  explanation: >
+    The decomposition identified 38 distinct regions representing all possible trajectory scenarios. This covers combinations of: - 3 navigation states (Cruise, Approach, Emergency) - distance_to_target range (500-15000 meters) - velocity range (20-120 m/s) - 4 fuel levels (Abundant, Moderate, Low, Critical) - 2 trajectory_clear states With patterns: Dead Zone, Multiplexer (fuel->propulsion), Override (Emergency), Quorum (3-of-4)
+
+q2:
+  question: "When does Aerobrake maneuver trigger? Can it happen with Abundant fuel?"
+  answer: "YES - when distance_to_target < 1000 AND velocity > 50, regardless of fuel level"
+  explanation: >
+    Aerobrake is triggered by physics, not fuel constraints. At lines 52-53, the condition very_close (distance < 1000) AND fast (velocity > 50) forces Aerobrake maneuver. This check happens BEFORE fuel considerations, so even with Abundant fuel, if the spacecraft is too close and too fast, it must aerobrake. The propulsion is set to RCS (not fuel-dependent) because it's an emergency maneuver. LLMs often miss that Aerobrake is not a choice but a physical necessity.
+
+q3:
+  question: "Can Emergency state violate propulsion=Off safety property?"
+  answer: "PROVEN - cannot be violated"
+  explanation: >
+    The safety property holds. When nav_state = Emergency, lines 46-47 immediately return Coast maneuver with propulsion = Off, marking safe=false. This override happens BEFORE any distance, velocity, or fuel checks, ensuring Emergency always results in Off propulsion.
+
+key_thresholds:
+  - "Dead zone: distance 9800-10200, velocity 48-52"
+  - "very_close: < 1000 meters"
+  - "close: < 5000 meters"
+  - "distance_safe: > 500 meters"
+  - "fast: > 50 m/s"
+  - "velocity_safe: < 100 m/s"
+  - "Fuel->Propulsion: Abundant=Chemical, Moderate=Ion, Low=RCS, Critical=Off"
+  - "Quorum: 3 of 4 (distance_safe, velocity_safe, fuel_adequate, trajectory_clear)"

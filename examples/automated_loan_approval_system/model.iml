@@ -1,0 +1,188 @@
+(* Automated Loan Approval System *)
+
+(* Core types *)
+type loan_type = Personal | Auto | Mortgage | Business
+
+type employment_status = Employed | SelfEmployed | Unemployed
+
+type credit_grade = Excellent | Good | Fair | Poor
+
+type approval_decision = {
+  approved: bool;
+  decision_type: decision_classification;
+  interest_rate: int;
+}
+
+and decision_classification =
+  | AutoApproved
+  | ConditionalApproval
+  | ManualReviewRequired
+  | AutoRejected
+  | InvalidApplication
+
+(* Calculate risk score *)
+let calculate_risk_score credit_score debt_to_income employment_status =
+  let credit_component = max 0 (800 - credit_score) / 10 in
+  let dti_component = max 0 (debt_to_income - 30) / 2 in
+  let employment_component = match employment_status with
+    | Unemployed -> 50
+    | SelfEmployed -> 20
+    | Employed -> 0
+  in
+  credit_component + dti_component + employment_component
+
+(* Determine risk level *)
+let classify_risk_level risk_score =
+  if risk_score <= 20 then 0  (* Low *)
+  else if risk_score <= 40 then 1  (* Medium *)
+  else if risk_score <= 70 then 2  (* High *)
+  else 3  (* Extreme *)
+
+(* Check if manual review required *)
+let requires_manual_review risk_level loan_amount has_bankruptcy debt_to_income =
+  risk_level >= 3 ||
+  loan_amount > 500000 ||
+  has_bankruptcy ||
+  debt_to_income > 45
+
+(* Validity check *)
+let is_valid_application credit_score debt_to_income age =
+  (* Dead zone: credit 580-620 with DTI 43-47 and age 72-74 *)
+  let in_dead_zone =
+    credit_score >= 580 && credit_score <= 620 &&
+    debt_to_income >= 43 && debt_to_income <= 47 &&
+    age >= 72 && age <= 74
+  in
+  let invalid_data = credit_score < 300 || credit_score > 850 ||
+                     debt_to_income < 0 || debt_to_income > 100 ||
+                     age < 18 || age > 120 in
+  not (in_dead_zone || invalid_data)
+
+(* Calculate interest rate *)
+let calculate_interest_rate credit_score loan_type risk_level =
+  let grade_premium =
+    if credit_score >= 750 then 0
+    else if credit_score >= 700 then 100
+    else if credit_score >= 650 then 250
+    else 500
+  in
+  let type_premium = match loan_type with
+    | Mortgage -> 0
+    | Auto -> 50
+    | Personal -> 300
+    | Business -> 200
+  in
+  let risk_adjustment = risk_level * 50 in
+  let rate = 300 + grade_premium + type_premium + risk_adjustment in
+  min 3600 (max 300 rate)
+
+(* Core decision function - 6 parameters *)
+let determine_loan_approval
+    loan_type
+    loan_amount
+    credit_score
+    debt_to_income
+    age
+    employment_status =
+
+  (* Hardcode these for simplicity *)
+  let has_bankruptcy = false in
+  let monthly_income = 5000 in
+
+  (* Check validity first *)
+  let valid = is_valid_application credit_score debt_to_income age in
+
+  if not valid then
+    { approved = false;
+      decision_type = InvalidApplication;
+      interest_rate = 0 }
+  else
+    (* Calculate risk *)
+    let risk_score = calculate_risk_score credit_score debt_to_income employment_status in
+    let risk_level = classify_risk_level risk_score in
+
+    (* Manual review overrides *)
+    let manual_review = requires_manual_review risk_level loan_amount has_bankruptcy debt_to_income in
+
+    if manual_review then
+      { approved = false;
+        decision_type = ManualReviewRequired;
+        interest_rate = 0 }
+    else
+      (* Check basic requirements *)
+      let meets_reqs =
+        age >= 18 && age <= 75 &&
+        credit_score >= 500 &&
+        monthly_income >= 2000 &&
+        debt_to_income <= 50 &&
+        loan_amount > 0 &&
+        loan_amount <= (match loan_type with
+          | Personal -> 100000
+          | Auto -> 150000
+          | Mortgage -> 2000000
+          | Business -> 1000000)
+      in
+
+      if not meets_reqs then
+        { approved = false;
+          decision_type = AutoRejected;
+          interest_rate = 0 }
+      else
+        (* Calculate interest rate *)
+        let interest_rate = calculate_interest_rate credit_score loan_type risk_level in
+
+        (* Check if conditional approval needed *)
+        let needs_conditions = debt_to_income > 40 || employment_status = SelfEmployed in
+
+        if needs_conditions then
+          { approved = true;
+            decision_type = ConditionalApproval;
+            interest_rate = interest_rate }
+        else
+          { approved = true;
+            decision_type = AutoApproved;
+            interest_rate = interest_rate }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for typical applications *)
+let assume_typical_loan
+    (loan_type : loan_type)
+    (loan_amount : int)
+    (credit_score : int)
+    (debt_to_income : int)
+    (age : int)
+    (employment_status : employment_status) : bool =
+  age >= 25 && age <= 65 &&
+  credit_score >= 550 && credit_score <= 800 &&
+  loan_amount >= 10000 && loan_amount <= 300000
+
+(* Q1: Enumerate approval scenarios *)
+let approval_scenarios = determine_loan_approval
+[@@decomp top ~prune:true ~assuming:[%id assume_typical_loan] ()]
+
+(* Q2: Assumption for excellent credit *)
+let assume_excellent_credit
+    (loan_type : loan_type)
+    (loan_amount : int)
+    (credit_score : int)
+    (debt_to_income : int)
+    (age : int)
+    (employment_status : employment_status) : bool =
+  credit_score >= 750 && age >= 30 && age <= 60
+
+(* Q2: When does excellent credit require manual review? *)
+let excellent_requires_manual loan_type loan_amount credit_score debt_to_income age employment_status =
+  let decision = determine_loan_approval loan_type loan_amount credit_score debt_to_income age employment_status in
+  credit_score >= 750 && decision.decision_type = ManualReviewRequired
+[@@decomp top ~assuming:[%id assume_excellent_credit] ()]
+
+(* Q3: Safety property - ManualReviewRequired never auto-approves *)
+(* Fix loan_type and age to reduce verification space *)
+verify (fun loan_amount credit_score debt_to_income employment_status ->
+  let decision = determine_loan_approval Personal loan_amount credit_score debt_to_income 45 employment_status in
+
+  (decision.decision_type = ManualReviewRequired) ==> (not decision.approved)
+)

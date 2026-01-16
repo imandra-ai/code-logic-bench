@@ -1,0 +1,159 @@
+(* Semiconductor Fab Cleanroom *)
+
+(* Core types *)
+type process_step = Photolithography | Etching | Deposition | IonImplant | Metrology
+
+type contamination_class = Class1 | Class10 | Class100 | Class1000 | Contaminated
+
+type tool_status = Available | Processing | Maintenance | Failed
+
+type wafer_priority = Critical | High | Normal | Low
+
+type process_decision = {
+  approved: bool;
+  decontamination_required: bool;
+  qualification_needed: bool;
+  estimated_yield_loss_pct: int;
+}
+
+(* Contamination requirements by process step *)
+let contamination_requirement step =
+  match step with
+  | Photolithography -> Class1  (* Most sensitive *)
+  | IonImplant -> Class10
+  | Deposition -> Class100
+  | Metrology -> Class100
+  | Etching -> Class1000  (* Least sensitive *)
+
+(* Check if contamination is acceptable *)
+let contamination_acceptable chamber_contamination required_class =
+  match chamber_contamination, required_class with
+  | Class1, _ -> true  (* Class1 works for everything *)
+  | Class10, Class1 -> false
+  | Class10, _ -> true
+  | Class100, (Class1 | Class10) -> false
+  | Class100, _ -> true
+  | Class1000, (Class1 | Class10 | Class100) -> false
+  | Class1000, _ -> true
+  | Contaminated, _ -> false
+
+(* Tool qualification status based on maintenance cycles *)
+let is_tool_qualified tool_status maintenance_cycles =
+  match tool_status with
+  | Failed -> false
+  | Maintenance -> false
+  | Available -> maintenance_cycles < 100
+  | Processing -> maintenance_cycles < 120  (* Some tolerance during processing *)
+
+(* Recipe temperature limits by step *)
+let temp_limit_for_step step =
+  match step with
+  | Photolithography -> 150
+  | IonImplant -> 800
+  | Deposition -> 600
+  | Metrology -> 100
+  | Etching -> 400
+
+(* Temperature safety check *)
+let temp_safe_for_step temperature step =
+  temperature <= temp_limit_for_step step
+
+(* Priority override: Critical wafers can process in Class10 even if Class1 required *)
+let critical_override_contamination priority required_class chamber_contamination =
+  priority = Critical &&
+  required_class = Class1 &&
+  chamber_contamination = Class10
+
+(* Yield loss estimation *)
+let estimate_yield_loss chamber_contamination required_class =
+  match chamber_contamination, required_class with
+  | c, r when c = r -> 0
+  | Class10, Class1 -> 5
+  | Class100, Class10 -> 10
+  | Class100, Class1 -> 15
+  | Class1000, Class100 -> 20
+  | Class1000, Class10 -> 30
+  | Class1000, Class1 -> 40
+  | Contaminated, _ -> 100
+  | _, _ -> 25
+
+(* Core wafer processing decision *)
+let determine_process_approval
+    step
+    priority
+    chamber_contamination
+    tool_status
+    maintenance_cycles
+    temperature =
+
+  (* Check tool qualification first *)
+  let qualified = is_tool_qualified tool_status maintenance_cycles in
+
+  if not qualified then
+    { approved = false;
+      decontamination_required = false;
+      qualification_needed = true;
+      estimated_yield_loss_pct = 0 }
+  else
+    (* Check temperature safety *)
+    let temp_ok = temp_safe_for_step temperature step in
+
+    if not temp_ok then
+      { approved = false;
+        decontamination_required = false;
+        qualification_needed = false;
+        estimated_yield_loss_pct = 0 }
+    else
+      (* Check contamination *)
+      let required_class = contamination_requirement step in
+      let contam_ok = contamination_acceptable chamber_contamination required_class in
+
+      (* Critical override for contamination *)
+      let override = critical_override_contamination priority required_class chamber_contamination in
+
+      if contam_ok || override then
+        (* Approve, but may need decontamination after *)
+        let needs_decontam = not contam_ok && override in
+        let yield_loss = estimate_yield_loss chamber_contamination required_class in
+
+        { approved = true;
+          decontamination_required = needs_decontam;
+          qualification_needed = false;
+          estimated_yield_loss_pct = yield_loss }
+      else
+        (* Contamination too high, need cleaning *)
+        { approved = false;
+          decontamination_required = true;
+          qualification_needed = false;
+          estimated_yield_loss_pct = 0 }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Photolithography scenarios (most sensitive process) *)
+let assume_photolithography
+    (step : process_step)
+    (priority : wafer_priority)
+    (chamber_contamination : contamination_class)
+    (tool_status : tool_status)
+    (maintenance_cycles : int)
+    (temperature : int) : bool =
+  step = Photolithography
+
+let photolithography_scenarios step priority chamber_contamination tool_status maintenance_cycles temperature =
+  determine_process_approval step priority chamber_contamination tool_status maintenance_cycles temperature
+[@@decomp top ~prune:true ~assuming:[%id assume_photolithography] ()]
+
+(* Q2: Can processing be approved when chamber_contamination = Class100? *)
+let approved_class100 step priority chamber_contamination tool_status maintenance_cycles temperature =
+  let decision = determine_process_approval step priority chamber_contamination tool_status maintenance_cycles temperature in
+  chamber_contamination = Class100 && decision.approved
+[@@decomp top ()]
+
+(* Q3: Critical priority override property *)
+verify (fun chamber_contamination tool_status maintenance_cycles temperature ->
+  let decision = determine_process_approval Photolithography Critical chamber_contamination tool_status maintenance_cycles temperature in
+  let override_condition = chamber_contamination = Class10 in
+  (override_condition && tool_status = Available && maintenance_cycles < 100 && temperature <= 150) ==> decision.approved
+)

@@ -1,0 +1,110 @@
+model: "multi_agency_emergency_dispatch"
+q1:
+  question: "How many distinct emergency dispatch scenarios exist?"
+  answer: "7104 total scenarios"
+  state_space_breakdown: |
+    Total: 7104 scenarios (MASSIVE state space)
+    ADT combinations: 6 incident categories × 5 resources × 4 weather × 4 traffic = 480 base
+    With continuous parameters (distance, fuel, resource_ready): 480 × ~15 regions each ≈ 7104
+  key_thresholds:
+    category_priority: [4, 6, 8, 12, 16, 24]
+    minimum_fuel: [25, 35, 50]
+    fuel_dead_zone: [25, 35]
+    distance_dead_zone: [15, 20, 25]
+    response_time_limit: [30]
+    dispatch_score: [3, 4]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), critical_medical_fire: ([.[0].regions_str[] | select((.model_str.incident_type == \"Medical\" or .model_str.incident_type == \"Fire\") and (.model_str.incident_severity == \"Level4\" or .model_str.incident_severity == \"Level5\"))] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can Helicopters be dispatched in Storm weather?"
+  answer: "YES - 42 scenarios where Helicopter + Storm → Approved (SAFETY ISSUE via dead zone)"
+  safety_bug_exposed:
+    issue: "Helicopters can be dispatched in Storm via DEAD ZONE path"
+    example:
+      resource_type: "Helicopter"
+      weather: "Storm"
+      fuel_level: 25
+      distance_to_incident: 15
+      incident_category: "RoutineFire"
+      result: "dispatch_approved = true (via dead zone path)"
+  why_bug_occurs: |
+    There are THREE paths through the dispatch decision:
+    1. Dead zone path (lines 154-160): in_fuel_dead_zone → dispatch WITH backup
+    2. Override path (lines 165-171): critical_override → dispatch
+    3. Normal path (lines 176-218): quorum check
+
+    For Helicopter + Storm:
+    - Override path blocks Storm: weather_ok = (weather != Storm) = false (line 113)
+    - Normal path blocks via weather_safe: Helicopter + Storm = false (lines 186-187)
+    - BUT DEAD ZONE PATH (line 154): Just checks in_fuel_dead_zone, then ALWAYS dispatches!
+
+    Dead zone check (lines 152-160):
+    if in_dead_zone then
+      dispatch_approved = TRUE  ← No weather check here!
+
+    This bypasses ALL safety checks including weather!
+  correct_behavior: "Helicopters should NEVER dispatch in Storm (100x time multiplier = nearly grounded)"
+  fix_needed: |
+    Add weather safety check to dead zone path:
+      if in_dead_zone then
+        if resource_type = Helicopter && (weather = Storm || weather = Snow) then
+          { dispatch_approved = false; ... }
+        else
+          { dispatch_approved = true; requires_backup = true; ... }
+  key_insight: "Dead zone path needs its own safety guards - it currently bypasses ALL normal checks"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_helicopter_storm.json'
+q3:
+  question: "Does fuel dead zone always require backup?"
+  answer: "PROVEN - Dead zone ALWAYS sets requires_backup = true"
+  property: "in_fuel_dead_zone ==> result.requires_backup = true"
+  why_proven: |
+    The dead zone path (lines 154-160) hard-codes requires_backup = true:
+
+    if in_dead_zone then
+      { dispatch_approved = true;
+        requires_backup = true;  ← Always true in dead zone
+        escalation_needed = true }
+
+    Dead zone applies when: fuel ∈ [25,35] AND distance ∈ [15,25]
+    This guarantees backup resources are mobilized for marginal situations.
+  dead_zone_definition:
+    fuel_range: "25-35% (insufficient for confidence, not critical)"
+    distance_range: "15-25 units (moderate distance creating uncertainty)"
+    safety_response: "Dispatch with backup + escalation required"
+  key_insight: "Dead zone correctly requires backup, but incorrectly bypasses weather safety"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_fuel_dead_zone_backup.json'
+analysis_metadata:
+  total_scenarios: 7104
+  helicopter_storm_approved: 42
+  property_result: "PROVEN"
+  model_richness:
+    line_count: 255
+    parameter_count: 7
+    helper_functions: 10
+    match_statements: "80+ cases across compatibility and multiplier matrices"
+    adt_comb: "6×5×4×4 = 480 base × continuous params = 7104 scenarios"
+  patterns_demonstrated:
+    pattern_1_override: |
+      Critical incidents (CriticalMedical, CriticalFire) bypass fuel requirements:
+      - Allows fuel as low as 15% (vs normal 25-50%)
+      - BUT requires distance < 20 AND weather != Storm
+      - Creates 4-condition AND guard with safety constraints
+    pattern_2_multiplexer: |
+      THREE independent time multiplexers:
+      1. weather_time_multiplier(resource, weather) - 20 cases (10-100x)
+      2. traffic_time_multiplier(resource, traffic) - 20 cases (10-60x)
+      3. minimum_fuel_requirement(category) - 3 tiers (25/35/50%)
+      Response time = distance × weather_mult × traffic_mult / 100
+    pattern_3_dead_zone: "Fuel 25-35% × distance 15-25 → dispatch WITH backup (BUT bypasses weather safety!)"
+  critical_bug_found:
+    issue: "Dead zone path bypasses weather safety checks"
+    impact: "Helicopters can be dispatched in Storm (42 scenarios)"
+    weather_mult: "Helicopter + Storm = 100x time multiplier = nearly impossible"
+    root_cause: "Dead zone if-branch (lines 154-160) only checks fuel×distance, not weather"
+    severity: "HIGH - could dispatch air units in dangerous conditions"
+  design_lessons:
+    dead_zone_safety: "Fast-path decision shortcuts (like dead zone) must include ALL critical safety checks"
+    multi_path_consistency: "When multiple paths lead to approval, each needs complete validation"
+    override_vs_deadzone: "Override has weather guard (line 113), but dead zone doesn't - inconsistent"

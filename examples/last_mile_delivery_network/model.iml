@@ -1,0 +1,152 @@
+(* Last Mile Delivery Network *)
+
+(* Core types *)
+type vehicle_type = Truck | Drone | Robot
+
+type package_priority = Standard | Urgent | Emergency
+
+type weather_condition = Clear | Rain | Storm
+
+type assignment_decision = Assigned | Waitlist | Rejected
+
+(* Emergency packages can be assigned despite lower battery *)
+(* BUT only if battery is above critical threshold (15%) *)
+let emergency_override priority battery_level =
+  priority = Emergency && battery_level > 15
+
+(* Vehicle operability depends on type and weather *)
+let vehicle_weather_compatible vehicle_type weather =
+  match vehicle_type, weather with
+  | Truck, _ -> true  (* Trucks work in all weather *)
+  | Drone, Storm -> false  (* Drones grounded in storm *)
+  | Drone, _ -> true
+  | Robot, Storm -> false  (* Robots restricted in storm *)
+  | Robot, _ -> true
+
+(* Battery levels 20-30% are ambiguous for assignment *)
+(* Different vehicles have different "nervous" battery ranges *)
+let in_battery_dead_zone vehicle_type battery_level =
+  match vehicle_type with
+  | Truck -> battery_level >= 20 && battery_level <= 25
+  | Drone -> battery_level >= 25 && battery_level <= 35  (* Drones need more margin *)
+  | Robot -> battery_level >= 15 && battery_level <= 20
+
+(* Calculate distance category *)
+let distance_suitable vehicle_type distance =
+  match vehicle_type with
+  | Truck -> distance <= 200  (* Long range *)
+  | Drone -> distance <= 30   (* Short range *)
+  | Robot -> distance <= 50   (* Medium range *)
+
+(* Assignment requires 4 out of 6 conditions *)
+let calculate_assignment_score
+    weather_ok
+    battery_sufficient
+    capacity_ok
+    distance_ok
+    priority_acceptable
+    not_overloaded =
+  let count =
+    (if weather_ok then 1 else 0) +
+    (if battery_sufficient then 1 else 0) +
+    (if capacity_ok then 1 else 0) +
+    (if distance_ok then 1 else 0) +
+    (if priority_acceptable then 1 else 0) +
+    (if not_overloaded then 1 else 0)
+  in
+  count
+
+(* Core vehicle assignment decision *)
+let determine_vehicle_assignment
+    (* Vehicle characteristics *)
+    vehicle_type
+    battery_level
+    current_load
+    capacity
+    (* Package characteristics *)
+    package_weight
+    distance
+    priority
+    (* Environment *)
+    weather =
+
+  (* Check battery dead zone first *)
+  let in_dead_zone = in_battery_dead_zone vehicle_type battery_level in
+
+  if in_dead_zone then
+    Waitlist  (* Dead zone → wait for recharge or alternative *)
+  else
+    (* Check emergency override *)
+    let is_emergency_override = emergency_override priority battery_level in
+
+    if is_emergency_override then
+      Assigned  (* Emergency bypasses normal checks *)
+    else
+      (* Normal assignment logic with quorum *)
+
+      (* Check individual conditions *)
+      let weather_ok = vehicle_weather_compatible vehicle_type weather in
+
+      let battery_ok = match vehicle_type with
+        | Truck -> battery_level >= 25
+        | Drone -> battery_level >= 35
+        | Robot -> battery_level >= 20
+      in
+
+      let capacity_ok = current_load + package_weight <= capacity in
+
+      let distance_ok = distance_suitable vehicle_type distance in
+
+      let priority_ok = match priority with
+        | Emergency -> true  (* Already handled by override *)
+        | Urgent -> battery_level >= 40  (* Urgent needs good battery *)
+        | Standard -> true
+      in
+
+      let not_overloaded = current_load < (capacity * 80 / 100) in  (* < 80% capacity *)
+
+      (* Calculate assignment score (quorum) *)
+      let score = calculate_assignment_score
+        weather_ok battery_ok capacity_ok distance_ok priority_ok not_overloaded
+      in
+
+      (* Need 4 out of 6 conditions for assignment *)
+      if score >= 4 then
+        Assigned
+      else if score >= 3 then
+        Waitlist  (* Borderline cases *)
+      else
+        Rejected
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all vehicle assignment scenarios *)
+let all_assignment_scenarios = determine_vehicle_assignment
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Drones be assigned in Storm weather? *)
+let drone_storm_assignment
+    vehicle_type battery_level current_load capacity
+    package_weight distance priority weather =
+  let result = determine_vehicle_assignment
+    vehicle_type battery_level current_load capacity
+    package_weight distance priority weather
+  in
+  vehicle_type = Drone && weather = Storm && result = Assigned
+[@@decomp top ()]
+
+(* Q3: Safety property - vehicles in battery dead zone never get direct assignment *)
+verify (fun
+    vehicle_type battery_level current_load capacity
+    package_weight distance priority weather ->
+  let result = determine_vehicle_assignment
+    vehicle_type battery_level current_load capacity
+    package_weight distance priority weather
+  in
+  let in_dead_zone = in_battery_dead_zone vehicle_type battery_level in
+
+  (* Dead zone should never lead to direct assignment *)
+  in_dead_zone ==> result <> Assigned
+)

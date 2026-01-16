@@ -1,0 +1,71 @@
+model: "smart_waste_management_scheduler"
+q1:
+  question: "How many collection scenarios exist for Hazardous waste bins using Hazardous_Only or Multi_Type trucks?"
+  answer: "42 scenarios"
+  key_thresholds:
+    fill_pct_threshold: 75
+    emergency_override: 90
+    fuel_safety: 20
+    approval_threshold: 50
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_hazardous.json'
+    use_of_assuming: "waste = Hazardous && truck_cap ∈ {Hazardous_Only, Multi_Type}"
+q2:
+  question: "Can a collection ever be approved (approved=true) when fuel_level < 20? If yes, under what conditions?"
+  answer: "YES - 2 scenarios where approval happens with fuel < 20"
+  approved_conditions:
+    scenario: "Hazardous waste at fill_pct >= 90%"
+    reason: "Emergency override activates BEFORE fuel check"
+  explanation: |
+    Control flow precedence matters:
+    1. Check truck compatibility
+    2. Check emergency override (Hazardous >= 90%) → IF TRUE, approve immediately
+    3. Check fuel level (>= 20) → only checked if NOT emergency
+
+    Emergency path bypasses fuel safety check!
+  example:
+    fill_pct: 90
+    waste: "Hazardous"
+    fuel_level: 19
+    truck_cap: "Hazardous_Only"
+    result: "approved = true (emergency override)"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_low_fuel.json'
+q3:
+  question: "For Organic waste at exactly 80% fill (threshold boundary), does approval always occur when fuel_level >= 20 and weather is Sunny?"
+  answer: "REFUTED - Property can be violated"
+  property: "(fill_pct=80 && fuel_level>=20 && weather=Sunny && truck_can_collect) ==> approved"
+  counterexample:
+    fill_pct: 80
+    waste: "Organic"
+    days_since_empty: -7737
+    truck_cap: "Multi_Type"
+    fuel_level: 20
+    weather: "Sunny"
+    result: "approved = false"
+  why_refuted: |
+    At fill_pct=80 (exact threshold), score calculation:
+    - base = 80 + (days_since_empty * 5) + 30
+    - If days_since_empty is negative (e.g., -7737), base becomes negative
+    - Even after threshold escalation (*2), final score < 50 (approval threshold)
+  root_cause: "Model doesn't constrain days_since_empty to be non-negative!"
+  model_bug: "days_since_empty can be negative, breaking priority calculation"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_threshold.json'
+analysis_metadata:
+  total_scenarios_q1: 42
+  low_fuel_approval_count_q2: 2
+  property_result_q3: "REFUTED"
+  use_of_decomp_features:
+    q1_assuming: "Restricts to safety-critical Hazardous waste with capable trucks"
+    q2_filtering: "Tests emergency override vs fuel check precedence"
+    q3_boundary: "Tests exact threshold with Organic waste"
+  complexity_insights:
+    - "Q1: ~assuming reduces to 42 focused scenarios (Hazardous × 2 capable trucks × weather × fuel × days × fill)"
+    - "Q2: Emergency override creates counterintuitive approval with low fuel (2 scenarios)"
+    - "Q3: REFUTED due to unconstrained days_since_empty (can be negative)"
+  discovered_issue:
+    location: "Q3 counterexample"
+    issue: "days_since_empty has no non-negativity constraint"
+    impact: "Negative values break priority calculation, causing false rejections"
+    fix_needed: "Add constraint: days_since_empty >= 0"

@@ -1,0 +1,101 @@
+(* Satellite Constellation Controller *)
+
+(* Core types *)
+type system_mode = Normal | DebrisAvoidance | PowerSave
+
+type link_status = Active | Degraded | Lost
+
+type maneuver_decision = {
+  approved: bool;
+  use_electric: bool;
+  use_chemical: bool;
+  use_rcs: bool;
+  requires_ground_approval: bool;
+}
+
+(* Battery level categorization *)
+let categorize_battery battery_pct =
+  if battery_pct >= 75 then 3  (* Full *)
+  else if battery_pct >= 50 then 2  (* Good *)
+  else if battery_pct >= 25 then 1  (* Low *)
+  else 0  (* Critical *)
+
+(* Emergency override *)
+let is_emergency_maneuver mode =
+  mode = DebrisAvoidance
+
+(* Ground approval needed *)
+let needs_ground_approval link_status fuel_pct =
+  (link_status = Lost || link_status = Degraded) && fuel_pct < 20
+
+(* Core maneuver decision *)
+let determine_maneuver_approval
+    mode
+    battery_pct
+    link_status
+    fuel_remaining_pct =
+
+  let emergency = is_emergency_maneuver mode in
+
+  if emergency then
+    (* Emergency: always use RCS *)
+    let needs_approval = needs_ground_approval link_status fuel_remaining_pct in
+    { approved = true;
+      use_electric = false;
+      use_chemical = false;
+      use_rcs = true;
+      requires_ground_approval = needs_approval }
+  else
+    let battery_level = categorize_battery battery_pct in
+
+    if battery_level = 0 then
+      (* Critical battery: reject *)
+      { approved = false;
+        use_electric = false;
+        use_chemical = false;
+        use_rcs = false;
+        requires_ground_approval = false }
+    else if battery_level >= 3 then
+      (* Full battery: use Electric (most efficient) *)
+      let needs_approval = needs_ground_approval link_status fuel_remaining_pct in
+      { approved = true;
+        use_electric = true;
+        use_chemical = false;
+        use_rcs = false;
+        requires_ground_approval = needs_approval }
+    else if battery_level >= 2 then
+      (* Good battery: use Chemical *)
+      let needs_approval = needs_ground_approval link_status fuel_remaining_pct in
+      { approved = true;
+        use_electric = false;
+        use_chemical = true;
+        use_rcs = false;
+        requires_ground_approval = needs_approval }
+    else
+      (* Low battery: use RCS *)
+      let needs_approval = needs_ground_approval link_status fuel_remaining_pct in
+      { approved = true;
+        use_electric = false;
+        use_chemical = false;
+        use_rcs = true;
+        requires_ground_approval = needs_approval }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All maneuver scenarios *)
+let all_maneuver_scenarios = determine_maneuver_approval
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can Electric be used when battery < 75? *)
+let electric_low_battery mode battery_pct link_status fuel_remaining_pct =
+  let decision = determine_maneuver_approval mode battery_pct link_status fuel_remaining_pct in
+  battery_pct < 75 && decision.use_electric
+[@@decomp top ()]
+
+(* Q3: DebrisAvoidance always approved *)
+verify (fun battery_pct link_status fuel_remaining_pct ->
+  let decision = determine_maneuver_approval DebrisAvoidance battery_pct link_status fuel_remaining_pct in
+  decision.approved
+)

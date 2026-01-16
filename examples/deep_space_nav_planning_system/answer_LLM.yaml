@@ -1,0 +1,389 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:25'
+  q1:
+    answer: 'There are 6 distinct trajectory decision scenarios. The numeric thresholds
+      are: distance_to_target thresholds (500, 1000, 5000, 9800, 10200), velocity
+      thresholds (48, 50, 52, 100), and quorum threshold (3 out of 4 safety conditions).'
+    reasoning: >-
+      - Scenario 1: Orbital dead zone (9800 <= distance <= 10200 AND 48 <= velocity
+      <= 52) → COAST, OFF, False
+
+      - Scenario 2: Emergency state → COAST, OFF, False
+
+      - Scenario 3: Very close AND fast (distance < 1000 AND velocity > 50) → AEROBRAKE,
+      RCS, False
+
+      - Scenario 4: Quorum met AND close (distance < 5000) → BURN, fuel-based propulsion,
+      True
+
+      - Scenario 5: Quorum met AND not close (distance >= 5000) → COAST, ION, True
+
+      - Scenario 6: Quorum not met → COAST, OFF, False
+
+      - Distance thresholds: 500 (distance_safe), 1000 (very_close), 5000 (close),
+      9800-10200 (dead zone)
+
+      - Velocity thresholds: 48-52 (dead zone), 50 (fast), 100 (velocity_safe)
+
+      - Quorum: >= 3 out of 4 safety conditions must be true
+  q2:
+    answer: Aerobrake is triggered when distance_to_target < 1000 AND velocity > 50
+      (and not in dead zone or emergency). Yes, it can happen with Abundant fuel because
+      fuel level is not checked before the Aerobrake decision.
+    reasoning: >-
+      - Aerobrake condition: very_close (distance < 1000) AND fast (velocity > 50)
+
+      - This check happens after dead zone and emergency checks but BEFORE any fuel
+      level consideration
+
+      - The code does not filter based on fuel_level for the Aerobrake decision
+
+      - Example scenario: nav_state=CRUISE, distance=999, velocity=51, fuel_level=ABUNDANT,
+      trajectory_clear=True
+
+      - This would trigger: very_close=True (999<1000), fast=True (51>50), resulting
+      in AEROBRAKE maneuver
+
+      - The propulsion is hardcoded to RCS regardless of fuel level
+
+      - Therefore, Aerobrake can definitely occur with Abundant fuel
+  q3:
+    answer: No, this safety property can NEVER be violated. Emergency navigation state
+      always results in propulsion Off.
+    reasoning: >-
+      - The emergency state check occurs early in the function (second check after
+      dead zone)
+
+      - Code: if nav_state == NavState.EMERGENCY: return TrajectoryDecision(maneuver=ManeuverType.COAST,
+      propulsion=PropulsionMode.OFF, safe=False)
+
+      - This is an unconditional immediate return when nav_state is EMERGENCY
+
+      - No other code paths are executed when emergency state is detected
+
+      - The function returns COAST maneuver with propulsion=OFF and safe=False
+
+      - There are no conditions or branches that could override this behavior
+
+      - Even if in dead zone AND emergency (both would trigger OFF), emergency check
+      comes second and would still return OFF
+
+      - Therefore, emergency state ALWAYS results in propulsion Off - the property
+      cannot be violated
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:26'
+  q1:
+    answer: '6'
+    reasoning: >-
+      - The determine_trajectory function has 6 distinct return statements, each representing
+      a unique decision scenario based on the conditional branches.
+
+      - These are triggered by the following conditions in order: dead zone check,
+      emergency state check, very close and fast check, quorum check with subconditions
+      for close/not close maneuver selection, and quorum not met fallback.
+  q2:
+    answer: Aerobrake maneuver is triggered when distance_to_target < 1000 and velocity
+      > 50, provided that the state is not in orbital dead zone (not 9800 <= distance_to_target
+      <= 10200 and 48 <= velocity <= 52) and navigation state is not EMERGENCY. Yes,
+      it can happen with Abundant fuel level.
+    reasoning: >-
+      - The condition is explicitly checked as: if very_close (distance_to_target
+      < 1000) and fast (velocity > 50), then return AEROBRAKE, RCS, False.
+
+      - This branch occurs after dead zone and emergency checks, and propulsion is
+      set to RCS regardless of fuel level.
+
+      - Since the maneuver selection is independent of fuel_level, it occurs with
+      any fuel level, including ABUNDANT.
+  q3:
+    answer: No, the safety property cannot be violated.
+    reasoning: >-
+      - The code ensures that when nav_state == NavState.EMERGENCY, it immediately
+      returns (maneuver=ManeuverType.COAST, propulsion=PropulsionMode.OFF, safe=False),
+      skipping all other conditions.
+
+      - Even in the orbital dead zone scenario (checked first), the output is propulsion=OFF,
+      which aligns with the property.
+
+      - No other code paths can lead to propulsion being anything but OFF when the
+      navigation state is EMERGENCY.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:28'
+  q1:
+    answer: 6 distinct decision scenarios (i.e., 6 distinct return outcomes).
+    reasoning: >-
+      - The function has six mutually exclusive return branches:
+        - (1) Orbital dead zone → COAST + OFF + safe=False.
+        - (2) EMERGENCY nav_state → COAST + OFF + safe=False.
+        - (3) Very close & fast → AEROBRAKE + RCS + safe=False.
+        - (4) Safety quorum met & close → BURN + fuel-mapped propulsion + safe=True.
+        - (5) Safety quorum met & not close → COAST + ION + safe=True.
+        - (6) Safety quorum not met → COAST + OFF + safe=False.
+      - Numeric thresholds/inequalities that define these scenarios:
+        - Orbital dead zone: 9800 ≤ distance_to_target ≤ 10200 AND 48 ≤ velocity ≤
+      52.
+        - close: distance_to_target < 5000.
+        - very_close: distance_to_target < 1000.
+        - fast: velocity > 50.
+        - Safety quorum inputs:
+          - distance_safe: distance_to_target > 500.
+          - velocity_safe: velocity < 100.
+          - Quorum rule: at least 3 of {distance_safe, velocity_safe, fuel_adequate,
+      trajectory_clear} must be True (count ≥ 3). - Note: fuel_adequate is categorical
+      (fuel_level != CRITICAL), not a numeric threshold.
+  q2:
+    answer: Aerobrake triggers when distance_to_target < 1000 AND velocity > 50, provided
+      nav_state is not EMERGENCY (since EMERGENCY returns earlier). Yes, it can happen
+      with ABUNDANT fuel.
+    reasoning: >-
+      - Aerobrake check occurs after:
+        - the orbital dead zone early return, and
+        - the EMERGENCY early return.
+      - Exact Aerobrake condition tested:
+        - very_close = (distance_to_target < 1000)
+        - fast = (velocity > 50)
+        - If very_close and fast: return AEROBRAKE with propulsion=RCS and safe=False.
+      - Fuel level is not referenced in this branch, so ABUNDANT fuel does not prevent
+      Aerobrake (it still uses RCS in this branch).
+
+      - Aerobrake cannot coincide with the dead zone because dead zone requires distance
+      9800–10200, which contradicts distance < 1000.
+  q3:
+    answer: No. Within determine_trajectory, NavState.EMERGENCY always returns propulsion=OFF,
+      so the property cannot be violated.
+    reasoning: >-
+      - The function explicitly checks `if nav_state == NavState.EMERGENCY:` and immediately
+      returns propulsion=PropulsionMode.OFF.
+
+      - The only check before this is the dead zone check, which also returns propulsion=OFF.
+
+      - Therefore, for all inputs with nav_state=EMERGENCY, every possible executed
+      return path sets propulsion to OFF (no later branch can override it).
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:20:41'
+  q1:
+    answer: >-
+      There are 6 distinct trajectory decision scenarios in the determine_trajectory
+      function.
+
+
+      The scenarios are:
+
+      1.  **Orbital Dead Zone**: Returns (COAST, OFF, Unsafe).
+
+      2.  **Emergency State**: Returns (COAST, OFF, Unsafe).
+
+      3.  **Aerobrake Maneuver**: Returns (AEROBRAKE, RCS, Unsafe).
+
+      4.  **Approach Burn (Quorum Met)**: Returns (BURN, [Fuel-Dependent], Safe).
+
+      5.  **Cruise Coast (Quorum Met)**: Returns (COAST, ION, Safe).
+
+      6.  **Safety Failure (Quorum Not Met)**: Returns (COAST, OFF, Unsafe).
+
+
+      The exact numeric thresholds determining these scenarios are:
+
+      *   **Distance**: 500, 1000, 5000, 9800, 10200
+
+      *   **Velocity**: 48, 50, 52, 100
+
+      *   **Quorum Count**: 3 (number of passing safety checks)
+    reasoning: >-
+      The logic flow creates 6 distinct paths leading to return statements (or logical
+      branches within the quorum block).
+
+      *   **Dead Zone**: Distance 9800-10200 AND Velocity 48-52.
+
+      *   **Emergency**: nav_state is EMERGENCY (and not in Dead Zone).
+
+      *   **Aerobrake**: Distance < 1000 AND Velocity > 50 (and not in above).
+
+      *   **Quorum Met (Close)**: Distance < 5000 AND (Sum of safety booleans >= 3).
+      Safety variable thresholds are Distance > 500, Velocity < 100.
+
+      *   **Quorum Met (Far)**: Distance >= 5000 AND (Sum of safety booleans >= 3).
+
+      *   **Quorum Fail**: Sum of safety booleans < 3.
+  q2:
+    answer: >-
+      The Aerobrake maneuver triggers under the exact conditions:
+
+      1.  The `nav_state` is **NOT** `EMERGENCY`.
+
+      2.  `distance_to_target` is **< 1000**.
+
+      3.  `velocity` is **> 50**.
+
+
+      Yes, this maneuver can trigger with **Abundant** fuel.
+    reasoning: >-
+      *   The `Aerobrake` logic is located after the `Dead Zone` and `Emergency` checks,
+      requiring those to be passed (false).
+
+      *   The `Dead Zone` check (distance 9800-10200) is implicitly satisfied (i.e.,
+      not in dead zone) because `distance_to_target` must be < 1000.
+
+      *   The specific conditions `very_close` (< 1000) and `fast` (> 50) must both
+      be true.
+
+      *   The code logic checks for Aerobrake **before** evaluating the safety quorum
+      or checking fuel levels. The propulsion is hardcoded to `PropulsionMode.RCS`
+      in this block, regardless of the `fuel_level` input (even if `ABUNDANT`).
+  q3:
+    answer: No, the safety property cannot be violated.
+    reasoning: >-
+      *   The function evaluates the `nav_state == NavState.EMERGENCY` condition at
+      the very beginning of the logic flow, immediately following the Dead Zone check.
+
+      *   If `nav_state` is `EMERGENCY`, the code immediately returns a decision with
+      `propulsion=PropulsionMode.OFF`.
+
+      *   The only check preceding the Emergency check is the Orbital Dead Zone check.
+      However, if that condition is met, it **also** returns `propulsion=PropulsionMode.OFF`.
+
+      *   Therefore, there is no execution path where `nav_state` is `EMERGENCY` that
+      results in any propulsion mode other than `OFF`.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:39'
+  q1:
+    answer: >-
+      There are 6 distinct trajectory decision scenarios in determine_trajectory:
+
+
+      1. **Orbital Dead Zone** - Returns (COAST, OFF, False)
+
+      2. **Emergency State** - Returns (COAST, OFF, False)
+
+      3. **Very Close & Fast** - Returns (AEROBRAKE, RCS, False)
+
+      4. **Safety Quorum Met & Close** - Returns (BURN, fuel-based propulsion, True)
+
+      5. **Safety Quorum Met & Not Close** - Returns (COAST, ION, True)
+
+      6. **Safety Quorum Not Met** - Returns (COAST, OFF, False)
+
+
+      Numeric thresholds:
+
+      - Orbital Dead Zone: 9800 ≤ distance_to_target ≤ 10200 AND 48 ≤ velocity ≤ 52
+
+      - Very Close: distance_to_target < 1000
+
+      - Close: distance_to_target < 5000
+
+      - Fast: velocity > 50
+
+      - Distance Safe: distance_to_target > 500
+
+      - Velocity Safe: velocity < 100
+
+      - Safety Quorum: requires ≥ 3 out of 4 conditions (distance_safe, velocity_safe,
+      fuel_adequate, trajectory_clear)
+    reasoning: >-
+      - The function has multiple decision branches that lead to 6 distinct return
+      statements
+
+      - First branch: Orbital dead zone check with thresholds 9800 ≤ distance ≤ 10200
+      AND 48 ≤ velocity ≤ 52
+
+      - Second branch: Emergency nav_state check
+
+      - Third branch: very_close (distance < 1000) AND fast (velocity > 50) triggers
+      Aerobrake
+
+      - Fourth/Fifth branches: Safety quorum met with close (distance < 5000) vs not
+      close
+
+      - Sixth branch: Safety quorum not met (fallback)
+
+      - Safety quorum uses thresholds: distance_safe (> 500), velocity_safe (< 100),
+      and requires count >= 3 of 4 conditions
+  q2:
+    answer: >-
+      The Aerobrake maneuver is triggered under these exact conditions:
+
+      1. NOT in orbital dead zone (NOT (9800 ≤ distance ≤ 10200 AND 48 ≤ velocity
+      ≤ 52))
+
+      2. NOT in Emergency nav_state
+
+      3. distance_to_target < 1000 (very_close)
+
+      4. velocity > 50 (fast)
+
+
+      YES, it can happen with Abundant fuel. The fuel level is not checked before
+      the Aerobrake decision is made. The Aerobrake maneuver only depends on distance
+      and velocity conditions, and uses a hardcoded PropulsionMode.RCS regardless
+      of fuel level.
+    reasoning: >-
+      - Aerobrake is returned in only one place in the code: when very_close AND fast
+
+      - very_close = distance_to_target < 1000
+
+      - fast = velocity > 50
+
+      - This check happens AFTER the dead zone check and emergency state check
+
+      - The fuel_level parameter is NOT evaluated before returning the Aerobrake decision
+
+      - The Aerobrake return statement hardcodes PropulsionMode.RCS regardless of
+      fuel level
+
+      - Therefore, fuel level (including Abundant) has no bearing on whether Aerobrake
+      is triggered
+
+      - Example: nav_state=CRUISE, distance=500, velocity=60, fuel_level=ABUNDANT,
+      trajectory_clear=True would trigger Aerobrake
+  q3:
+    answer: >-
+      YES, the safety property 'Emergency navigation state should always result in
+      propulsion Off' CAN be violated.
+
+
+      This occurs when the spacecraft is in the orbital dead zone while also in Emergency
+      state:
+
+      - nav_state = Emergency
+
+      - 9800 ≤ distance_to_target ≤ 10200
+
+      - 48 ≤ velocity ≤ 52
+
+
+      Wait - actually examining the code more carefully: NO, the property CANNOT be
+      violated.
+
+
+      When in the orbital dead zone, the return is (COAST, OFF, False) - propulsion
+      is OFF.
+
+      When in Emergency state (and not in dead zone), the return is (COAST, OFF, False)
+      - propulsion is OFF.
+
+
+      In BOTH cases where Emergency could apply, the propulsion is OFF. The dead zone
+      check returns OFF, and the Emergency check also returns OFF. So the property
+      holds.
+    reasoning: >-
+      - The safety property states: "Emergency navigation state should always result
+      in propulsion Off"
+
+      - Looking at the code flow:
+        1. First check: orbital dead zone - returns (COAST, OFF, False)
+        2. Second check: Emergency state - returns (COAST, OFF, False)
+      - If nav_state is Emergency AND in dead zone: dead zone check triggers first,
+      returns propulsion=OFF
+
+      - If nav_state is Emergency AND not in dead zone: Emergency check triggers,
+      returns propulsion=OFF
+
+      - In both scenarios where nav_state=Emergency, the propulsion returned is OFF
+
+      - The dead zone condition doesn't check nav_state, but it returns OFF anyway
+
+      - Therefore the property "Emergency navigation state should always result in
+      propulsion Off" is NEVER violated
+
+      - All paths where nav_state=Emergency lead to propulsion=OFF

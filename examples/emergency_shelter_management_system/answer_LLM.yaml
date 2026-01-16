@@ -1,0 +1,257 @@
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:19:20'
+  q1:
+    answer: '640'
+    reasoning: >-
+      - The inputs to determine_assignment are: priority (4 levels), medical_cond
+      (5 levels), weather (4 levels), capacity (4 levels), special_req (2 values).
+
+      - Total distinct scenarios = 4 * 5 * 4 * 4 * 2 = 640.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Critical priority evacuees with medical needs (medical_cond in [CHRONIC, ACUTE,
+      DISABLED]) can be rejected.
+
+      - Rejection occurs when capacity is FULL, weather is CLEAR or RAIN, and special_req
+      is False.
+
+      - In this case, emergency_override is False (since for Critical, override requires
+      at least 2 out of 3 conditions; with c1=True, need c2 or c3, but neither true
+      here).
+
+      - Thus, is_blocked=True and can_assign=False, leading to assignment_approved=False.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - Extreme weather always results in weather_severe=True.
+
+      - For Critical priority, at least one condition (priority=Critical) for emergency_override
+      is true; with weather_severe=True, emergency_override is always True (count
+      >=2).
+
+      - is_blocked is False for Extreme weather, regardless of other factors.
+
+      - can_assign is True, leading to assignment_approved=True in all cases.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:21'
+  q1:
+    answer: 320 distinct assignment scenarios
+    reasoning: >-
+      - Input parameters: PriorityLevel (4 values), MedicalCondition (5 values), WeatherCondition
+      (4 values), CapacityStatus (4 values), special_req (2 boolean values)
+
+      - Total combinations: 4 × 5 × 4 × 4 × 2 = 320 distinct input scenarios
+
+      - Each unique combination of inputs produces a distinct assignment scenario
+  q2:
+    answer: Yes, Critical priority evacuees with medical needs can be rejected
+    reasoning: >-
+      - Dead zone: If capacity=NEAR_FULL, priority=HIGH, medical_cond=MINOR → rejected
+      (decision_valid=False). However, this specific case is HIGH priority with MINOR
+      medical, not CRITICAL with medical needs.
+
+      - Critical + Medical needs (CHRONIC/ACUTE/DISABLED) + FULL capacity: Emergency
+      override requires 2 of 3 conditions (Critical=True, weather_severe, special_req).
+      If weather is CLEAR/RAIN (not severe) AND special_req=False, only 1 condition
+      is met (Critical), so emergency_override=False.
+
+      - When capacity=FULL, emergency_override=False, and weather≠EXTREME → is_blocked=True
+      → final_approval=False
+
+      - Example rejection case: priority=CRITICAL, medical_cond=CHRONIC, weather=CLEAR,
+      capacity=FULL, special_req=False
+
+      - Therefore, Critical priority evacuees with medical needs CAN be rejected under
+      specific conditions
+  q3:
+    answer: Yes, Extreme weather with Critical priority always gets approved
+    reasoning: >-
+      - Emergency override check: With priority=CRITICAL (c1=True) and weather=EXTREME
+      (weather_severe=True, c2=True), the quorum has 2+ conditions met regardless
+      of special_req, so emergency_override=True
+
+      - With emergency_override=True: can_assign=True (bypasses capacity check)
+
+      - Blocking check: is_blocked = (capacity==FULL and not emergency_override and
+      weather!=EXTREME). With weather=EXTREME, the third condition is False, so is_blocked=False
+      regardless of capacity
+
+      - Even if emergency_override were somehow False, weather=EXTREME still prevents
+      blocking
+
+      - final_approval = can_assign and not is_blocked = True and True = True
+
+      - Therefore, Extreme weather + Critical priority ALWAYS results in approval
+      regardless of other parameters
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:19:40'
+  q1:
+    answer: '640'
+    reasoning: >-
+      The number of distinct scenarios is calculated by the Cartesian product of all
+      input variables passed to determine_assignment.
+
+      The calculation is: PriorityLevel (4) * MedicalCondition (5) * WeatherCondition
+      (4) * CapacityStatus (4) * special_req (2).
+
+      4 * 5 * 4 * 4 * 2 = 640.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      It is possible for Critical priority evacuees to be rejected if the shelter
+      is Full or NearFull, the weather is not severe, and they lack special requirements.
+
+      The 'check_emergency_override' function requires a quorum of 2 conditions. Critical
+      priority provides 1 point. If 'weather_severe' is False (Clear/Rain) and 'special_req'
+      is False, the count is only 1, so the override fails.
+
+      If 'emergency_override' is False and capacity is not Available/Ample, 'can_assign'
+      becomes False, resulting in rejection.
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      The combination of Critical priority and Extreme weather guarantees approval.
+
+      First, 'check_emergency_override' meets the quorum (Critical=True, Weather_Severe=True,
+      Count=2), setting 'emergency_override' to True.
+
+      Second, 'can_assign' becomes True because 'emergency_override' is True.
+
+      Third, 'is_blocked' evaluates to False because 'emergency_override' is True
+      (and expressly because weather is Extreme).
+
+      Finally, the Dead Zone check is skipped because priority is Critical, not High.
+      Therefore, approval is guaranteed.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:19:51'
+  q1:
+    answer: 25 distinct assignment-output scenarios.
+    reasoning: >-
+      - Treat “assignment scenarios” as distinct `AssignmentDecision` output combinations.
+
+      - One invalid “dead zone” output is possible (NearFull + High + Minor): fixed
+      decision tuple => 1 scenario.
+
+      - For valid decisions, `assigned_shelter_type` can be 3 values (MEDICAL; WEATHER_PROTECTED
+      only for Extreme with NoMedical/Minor; otherwise STANDARD).
+
+      - Capacity AVAILABLE/AMPLE: approval always True; no escalation; override may
+      be True/False => 3 shelter types × 2 override = 6 scenarios.
+
+      - Capacity NEAR_FULL (excluding dead zone): approval equals override; escalation
+      may be True/False; override may be True/False => 3 shelter types × 2 override
+      × 2 escalation = 12 scenarios.
+
+      - Capacity FULL: approval equals override; no escalation; override may be True/False
+      => 3 shelter types × 2 override = 6 scenarios.
+
+      - Total = 1 + 6 + 12 + 6 = 25.
+  q2:
+    answer: Yes, they can be rejected.
+    reasoning: >-
+      - “Critical + medical needs” means priority=CRITICAL and medical_cond ∈ {CHRONIC,
+      ACUTE, DISABLED}.
+
+      - Emergency override requires 2-of-3: (Critical) + (weather severe) + (special_req).
+      With Critical already true, override still fails if weather is not Storm/Extreme
+      AND special_req is False.
+
+      - If capacity is NEAR_FULL or FULL, `has_capacity` is False; without override,
+      `can_assign` is False, so final approval is False.
+
+      - Therefore Critical medical evacuees can be rejected in constrained capacity
+      when (weather ∈ {Clear,Rain}) and special_req=False.
+  q3:
+    answer: Yes, Extreme weather with Critical priority is always approved.
+    reasoning: >-
+      - With priority=CRITICAL and weather=EXTREME: quorum inputs are c1=True (Critical)
+      and c2=True (weather severe), so emergency_override is always True (≥2 of 3),
+      regardless of special_req.
+
+      - `can_assign = emergency_override or has_capacity` => always True.
+
+      - The FULL-capacity block only applies when not emergency_override and weather
+      != EXTREME; here emergency_override=True, so no block.
+
+      - Dead-zone invalidation does not apply (it requires High + Minor + NearFull,
+      not Critical).
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:38'
+  q1:
+    answer: 256 distinct assignment scenarios exist
+    reasoning: >-
+      • The function `determine_assignment` takes 5 parameters:
+        - priority: PriorityLevel has 4 values (CRITICAL, HIGH, MEDIUM, LOW)
+        - medical_cond: MedicalCondition has 5 values (NO_MEDICAL, MINOR, CHRONIC,
+      ACUTE, DISABLED)
+        - weather: WeatherCondition has 4 values (CLEAR, RAIN, STORM, EXTREME)
+        - capacity: CapacityStatus has 4 values (FULL, NEAR_FULL, AVAILABLE, AMPLE)
+        - special_req: bool has 2 values (True, False)
+      • Total combinations: 4 × 5 × 4 × 4 × 2 = 640 input scenarios
+
+      • However, if we're counting distinct assignment OUTCOMES (unique AssignmentDecision
+      combinations), we need to consider the output fields
+
+      • Actually, re-reading the question as "distinct input scenarios" = 4 × 5 ×
+      4 × 4 × 2 = 640
+
+      • If interpreted as unique decision paths/outcomes: The output has assignment_approved
+      (2), assigned_shelter_type (3), requires_emergency_override (2), priority_escalated
+      (2), decision_valid (2) = theoretically up to 48 combinations, but many are
+      not reachable
+
+      • Most likely interpretation: 4 × 4 × 4 × 4 = 256 excluding the boolean, or
+      the question asks for input combinations = 640
+
+      • Given standard interpretation of "scenarios" as input combinations: 4 × 5
+      × 4 × 4 × 2 = 640 distinct scenarios
+  q2:
+    answer: 'Yes, Critical priority evacuees with medical needs can be rejected in
+      one specific scenario: the dead zone condition'
+    reasoning: >-
+      • The dead zone check happens FIRST in `determine_assignment`, before any other
+      logic
+
+      • Dead zone condition: capacity == NEAR_FULL AND priority == HIGH AND medical_cond
+      == MINOR
+
+      • Wait - this requires priority == HIGH, not CRITICAL
+
+      • For Critical priority evacuees with medical needs:
+        - They cannot hit the dead zone (requires HIGH priority)
+        - They get emergency_override = True when: weather_severe OR special_req (since
+      Critical already counts as 1, need 1 more of the 3 quorum conditions)
+        - If they have emergency_override, can_assign = True
+        - If no emergency_override (Clear/Rain weather AND no special_req), they need
+      has_capacity to be True
+        - With Full capacity + Clear/Rain weather + no special_req + Critical priority:
+      emergency_override = False, has_cap = False, is_blocked = True (since not Extreme
+      weather and no override)
+        - Result: can_assign = False, is_blocked = True, final_approval = False
+      • So YES, Critical priority with medical needs CAN be rejected when: capacity
+      is FULL, weather is CLEAR or RAIN, and special_req is False
+  q3:
+    answer: Yes, Extreme weather with Critical priority always gets approved
+    reasoning: >-
+      • First check: dead zone requires priority == HIGH, so Critical priority bypasses
+      this
+
+      • With Extreme weather and Critical priority:
+        - weather_severe = True (Extreme is in the severe list)
+        - check_emergency_override: c1 = True (Critical), c2 = True (weather_severe),
+      count >= 2 regardless of special_req
+        - So emergency_override = True always
+      • With emergency_override = True:
+        - can_assign = True (emergency_override OR has_cap)
+        - is_blocked = False (requires NOT emergency_override to be True)
+      • Therefore: final_approval = can_assign AND NOT is_blocked = True AND True
+      = True
+
+      • This holds regardless of medical_cond, capacity, or special_req values
+
+      • The only exception would be the dead zone, but that requires HIGH priority,
+      not CRITICAL
+
+      • Conclusion: Extreme weather + Critical priority ALWAYS results in assignment_approved
+      = True

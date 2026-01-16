@@ -1,0 +1,118 @@
+(* Autonomous Highway Merge Control *)
+
+(* Core types *)
+type vehicle_type = Autonomous | Human_Driven | Emergency_Vehicle
+
+type weather = Clear | Rainy | Adverse
+
+type merge_command = Execute_Merge | Abort_Merge | Emergency_Brake | Adjust_Speed
+
+type merge_decision = {
+  command: merge_command;
+  safe_to_merge: bool;
+}
+
+(* Base gap threshold by vehicle type (meters) *)
+let base_gap_threshold v_type =
+  match v_type with
+  | Autonomous -> 30
+  | Human_Driven -> 45
+  | Emergency_Vehicle -> 25
+
+(* Weather affects gap requirements *)
+let weather_gap_multiplier weather =
+  match weather with
+  | Clear -> 10  (* 1.0x *)
+  | Rainy -> 13  (* 1.3x *)
+  | Adverse -> 17  (* 1.7x *)
+
+let adjusted_gap_threshold v_type weather =
+  let base = base_gap_threshold v_type in
+  (base * weather_gap_multiplier weather) / 10
+
+(* Dead zone - ambiguous gap/rate combinations *)
+let in_dead_zone gap_size closing_rate =
+  gap_size >= 48 && gap_size <= 52 && closing_rate >= 18 && closing_rate <= 22
+
+(* need 2 out of 3 safety conditions *)
+let safety_quorum_met gap_size threshold closing_rate speed_matched =
+  let c1 = gap_size >= threshold in
+  let c2 = closing_rate < 15 in
+  let c3 = speed_matched in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0)
+  in
+  count >= 2
+
+(* Core decision logic *)
+let determine_merge_decision
+    v_type
+    weather
+    gap_size
+    closing_rate
+    speed_matched
+    emergency_present =
+
+  (* Dead zone check first *)
+  if in_dead_zone gap_size closing_rate then
+    { command = Adjust_Speed; safe_to_merge = false }
+  else
+    let threshold = adjusted_gap_threshold v_type weather in
+
+    (* Critical gap check *)
+    let critical = closing_rate > 30 in
+
+    if critical then
+      { command = Emergency_Brake; safe_to_merge = false }
+    else
+      (* Check safety quorum *)
+      let quorum = safety_quorum_met gap_size threshold closing_rate speed_matched in
+
+      (* emergency vehicles override normal merge *)
+      if emergency_present && v_type <> Emergency_Vehicle then
+        { command = Abort_Merge; safe_to_merge = false }
+      else if quorum then
+        (* Safe to merge *)
+        if gap_size >= threshold + 10 then
+          { command = Execute_Merge; safe_to_merge = true }
+        else
+          { command = Adjust_Speed; safe_to_merge = false }
+      else
+        (* Quorum not met *)
+        { command = Abort_Merge; safe_to_merge = false }
+
+(* Analysis
+====================
+ *)
+
+(* Assumption: reasonable input ranges for feasible decomposition *)
+let assume_reasonable_inputs
+    (v_type : vehicle_type)
+    (weather : weather)
+    (gap_size : int)
+    (closing_rate : int)
+    (speed_matched : bool)
+    (emergency_present : bool) : bool =
+  gap_size >= 25 && gap_size <= 65 &&
+  closing_rate >= 10 && closing_rate <= 35
+
+(* Q1: Enumerate all distinct merge decision scenarios *)
+let merge_scenarios = determine_merge_decision
+[@@decomp top ~prune:true ~assuming:[%id assume_reasonable_inputs] ()]
+
+(* Q2: When does Emergency_Brake trigger? *)
+let triggers_emergency_brake v_type weather gap_size closing_rate speed_matched emergency_present =
+  let decision = determine_merge_decision v_type weather gap_size closing_rate speed_matched emergency_present in
+  decision.command = Emergency_Brake
+[@@decomp top ~assuming:[%id assume_reasonable_inputs] ()]
+
+(* Q3: Safety property - Emergency present should prevent non-emergency merges *)
+verify (fun v_type weather gap_size closing_rate speed_matched emergency_present ->
+  let decision = determine_merge_decision v_type weather gap_size closing_rate speed_matched emergency_present in
+
+  (assume_reasonable_inputs v_type weather gap_size closing_rate speed_matched emergency_present &&
+   v_type <> Emergency_Vehicle && emergency_present) ==> (decision.command <> Execute_Merge)
+)

@@ -1,0 +1,162 @@
+(* Dynamic Pricing Engine (Heavily Simplified for Decomp) *)
+
+(* Core types - using enums instead of unbounded integers *)
+type customer_tier = Bronze | Silver | Gold | Platinum
+
+type inventory_level = OutOfStock | CriticalLow | Low | Normal | High
+
+type discount_level = NoDiscount | Small | Medium | Large | VeryLarge
+
+type vip_status = NotVIP | VIP
+
+type pricing_decision = {
+  final_price_category: price_category;
+  margin_enforced: bool;
+  price_valid: bool;
+}
+
+and price_category = ZeroPrice | BelowCost | AtMinMargin | ProfitablePrice
+
+(* Base tier discounts *)
+let tier_discount tier =
+  match tier with
+  | Bronze -> NoDiscount
+  | Silver -> Small
+  | Gold -> Medium
+  | Platinum -> Large
+
+(* Scarcity adjustment *)
+let scarcity_adjustment inventory =
+  match inventory with
+  | OutOfStock -> -100  (* Invalid *)
+  | CriticalLow -> 15  (* Premium *)
+  | Low -> 8
+  | Normal -> 0
+  | High -> -5  (* Clearance discount *)
+
+(* Discount stacking rules*)
+let is_invalid_stacking coupon_disc flash_disc =
+  (* Cannot stack Medium coupon with VeryLarge flash *)
+  (coupon_disc = Medium && flash_disc = VeryLarge) ||
+  (* Cannot stack Large coupon with Large flash *)
+  (coupon_disc = Large && flash_disc = Large)
+
+(* VIP eligibility*)
+let determine_vip_status tier loyalty_high orders_high =
+  let c1 = (tier = Platinum) in
+  let c2 = loyalty_high in
+  let c3 = orders_high in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0)
+  in
+  if count >= 2 then VIP else NotVIP
+
+(* Calculate total discount level *)
+let combine_discounts tier_disc coupon_disc flash_disc vip_status flash_disc_level =
+  (* VIP gets extra discount EXCEPT when flash is VeryLarge *)
+  let vip_applies = (vip_status = VIP && flash_disc_level <> VeryLarge) in
+
+  (* Combine discount levels - simplified logic *)
+  let base_total = match tier_disc, coupon_disc, flash_disc with
+    | NoDiscount, NoDiscount, NoDiscount -> NoDiscount
+    | Small, NoDiscount, NoDiscount -> Small
+    | Medium, Small, NoDiscount -> Medium
+    | Large, Medium, Small -> VeryLarge
+    | _, _, VeryLarge -> VeryLarge
+    | _, Large, _ -> VeryLarge
+    | _, Medium, Medium -> Large
+    | _, _, _ -> Medium  (* Default aggregation *)
+  in
+
+  if vip_applies then
+    match base_total with
+    | NoDiscount -> Small
+    | Small -> Medium
+    | Medium -> Large
+    | Large -> VeryLarge
+    | VeryLarge -> VeryLarge
+  else base_total
+
+(* Determine if minimum margin must override*)
+let check_margin_enforcement cost_high total_discount =
+  (* High cost + high discount = margin enforcement needed *)
+  match total_discount with
+  | VeryLarge -> cost_high  (* Always enforce if cost is high *)
+  | Large -> cost_high
+  | _ -> false
+
+(* Categorize final price *)
+let categorize_price margin_enforced cost_high inventory =
+  if inventory = OutOfStock then ZeroPrice
+  else if margin_enforced && cost_high then AtMinMargin
+  else if margin_enforced then BelowCost
+  else ProfitablePrice
+
+(* Core decision function *)
+let determine_price
+    inventory
+    tier
+    coupon_disc
+    flash_disc
+    loyalty_high
+    orders_high
+    cost_high =
+
+  (* Check stacking validity *)
+  let invalid_stack = is_invalid_stacking coupon_disc flash_disc in
+
+  if invalid_stack then
+    { final_price_category = ZeroPrice;
+      margin_enforced = false;
+      price_valid = false }
+  else if inventory = OutOfStock then
+    { final_price_category = ZeroPrice;
+      margin_enforced = false;
+      price_valid = false }
+  else
+    (* Determine VIP status *)
+    let vip_status = determine_vip_status tier loyalty_high orders_high in
+
+    (* Get tier discount *)
+    let tier_disc = tier_discount tier in
+
+    (* Combine all discounts *)
+    let total_disc = combine_discounts tier_disc coupon_disc flash_disc vip_status flash_disc in
+
+    (* Check if margin enforcement needed *)
+    let margin_enforced = check_margin_enforcement cost_high total_disc in
+
+    (* Categorize price *)
+    let price_cat = categorize_price margin_enforced cost_high inventory in
+
+    { final_price_category = price_cat;
+      margin_enforced = margin_enforced;
+      price_valid = true }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all distinct pricing scenarios *)
+let pricing_scenarios = determine_price
+[@@decomp top ~prune:true ()]
+
+(* Q2: When does Platinum VIP with high discounts hit margin enforcement? *)
+let platinum_vip_margin_enforced inventory tier coupon_disc flash_disc loyalty_high orders_high cost_high =
+  let decision = determine_price inventory tier coupon_disc flash_disc loyalty_high orders_high cost_high in
+  tier = Platinum &&
+  determine_vip_status tier loyalty_high orders_high = VIP &&
+  decision.margin_enforced
+[@@decomp top ()]
+
+(* Q3: Safety - high cost products with VeryLarge discounts always enforce margin *)
+verify (fun inventory tier coupon_disc flash_disc loyalty_high orders_high cost_high ->
+  let decision = determine_price inventory tier coupon_disc flash_disc loyalty_high orders_high cost_high in
+  let total_disc = combine_discounts (tier_discount tier) coupon_disc flash_disc
+                     (determine_vip_status tier loyalty_high orders_high) flash_disc in
+
+  (decision.price_valid && cost_high && total_disc = VeryLarge) ==> decision.margin_enforced
+)

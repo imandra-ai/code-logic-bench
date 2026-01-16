@@ -1,0 +1,130 @@
+(* Options Market Maker *)
+
+(* Core types *)
+type option_type = Call | Put
+
+type moneyness = DeepITM | ITM | ATM | OTM | DeepOTM
+
+type volatility_regime = Low | Normal | High | Extreme
+
+type quote_decision = {
+  provide_quote: bool;
+  widen_spread: bool;
+  reduce_size: bool;
+  halt_quoting: bool;
+}
+
+(* Classify moneyness *)
+let classify_moneyness underlying_price strike option_type =
+  let ratio = (underlying_price * 100) / strike in  (* Percent of strike *)
+  match option_type with
+  | Call ->
+      if ratio >= 120 then DeepITM
+      else if ratio >= 105 then ITM
+      else if ratio >= 95 then ATM
+      else if ratio >= 80 then OTM
+      else DeepOTM
+  | Put ->
+      if ratio <= 80 then DeepITM
+      else if ratio <= 95 then ITM
+      else if ratio <= 105 then ATM
+      else if ratio <= 120 then OTM
+      else DeepOTM
+
+(* Classify volatility *)
+let classify_volatility vol_bps =
+  if vol_bps < 1500 then Low      (* < 15% *)
+  else if vol_bps < 3000 then Normal  (* 15-30% *)
+  else if vol_bps < 5000 then High    (* 30-50% *)
+  else Extreme                         (* > 50% *)
+
+(* Check risk limits *)
+let delta_within_limits delta_pct max_delta_pct =
+  delta_pct <= max_delta_pct && delta_pct >= -max_delta_pct
+
+(* Days to expiry risk *)
+let expiry_risk_high days_to_expiry =
+  days_to_expiry <= 7  (* <= 1 week *)
+
+(* Check inventory limits *)
+let inventory_at_limit position_count max_position =
+  position_count >= max_position
+
+(* Core quoting decision *)
+let determine_quote_decision
+    option_type
+    underlying_price
+    strike
+    vol_bps
+    days_to_expiry
+    delta_pct
+    max_delta_pct
+    position_count
+    max_position =
+
+  (* Classify conditions *)
+  let moneyness = classify_moneyness underlying_price strike option_type in
+  let vol_regime = classify_volatility vol_bps in
+
+  (* Check inventory limits first *)
+  let at_limit = inventory_at_limit position_count max_position in
+
+  if at_limit then
+    { provide_quote = false;
+      widen_spread = false;
+      reduce_size = false;
+      halt_quoting = true }
+  else
+    (* Check delta risk *)
+    let delta_ok = delta_within_limits delta_pct max_delta_pct in
+
+    if not delta_ok then
+      { provide_quote = false;
+        widen_spread = false;
+        reduce_size = false;
+        halt_quoting = true }
+    else
+      (* Check volatility and expiry *)
+      let high_vol = (vol_regime = Extreme) in
+      let expiry_soon = expiry_risk_high days_to_expiry in
+
+      if high_vol && expiry_soon then
+        (* Too risky: halt *)
+        { provide_quote = false;
+          widen_spread = false;
+          reduce_size = false;
+          halt_quoting = true }
+      else if high_vol || expiry_soon then
+        (* Risky: quote but widen spread *)
+        { provide_quote = true;
+          widen_spread = true;
+          reduce_size = true;
+          halt_quoting = false }
+      else
+        (* Normal quoting *)
+        let wide_spread = (moneyness = DeepITM || moneyness = DeepOTM) in
+        { provide_quote = true;
+          widen_spread = wide_spread;
+          reduce_size = false;
+          halt_quoting = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All quoting scenarios *)
+let all_quote_scenarios = determine_quote_decision
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can quoting continue when delta_pct > max_delta_pct? *)
+let quote_exceeds_delta option_type underlying_price strike vol_bps days_to_expiry delta_pct max_delta_pct position_count max_position =
+  let decision = determine_quote_decision option_type underlying_price strike vol_bps days_to_expiry delta_pct max_delta_pct position_count max_position in
+  delta_pct > max_delta_pct && decision.provide_quote
+[@@decomp top ()]
+
+(* Q3: Extreme vol + expiry soon property *)
+verify (fun option_type underlying_price strike days_to_expiry delta_pct max_delta_pct position_count max_position ->
+  let decision = determine_quote_decision option_type underlying_price strike 5000 days_to_expiry delta_pct max_delta_pct position_count max_position in
+  let expiry_soon = days_to_expiry <= 7 in
+  (expiry_soon && delta_pct <= max_delta_pct && position_count < max_position) ==> not decision.provide_quote
+)

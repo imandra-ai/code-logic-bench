@@ -1,0 +1,298 @@
+(* Procedural Quest Generator *)
+
+(* Core types *)
+type quest_type =
+  | MainStory
+  | SideQuest
+  | FetchQuest
+  | CombatEncounter
+  | PuzzleQuest
+
+type character_faction =
+  | PlayerAlliance
+  | NeutralGuild
+  | RivalFaction
+  | HostileEmpire
+
+type player_class =
+  | Warrior
+  | Mage
+  | Rogue
+  | Cleric
+
+type quest_availability =
+  | FullyAvailable       (* Quest can be started immediately *)
+  | ConditionalUnlock    (* Quest unlocked but needs resource check *)
+  | HiddenQuestline      (* Special hidden content *)
+  | TemporarilyLocked    (* Prerequisites not met *)
+  | PermanentlyBlocked   (* Cannot be accessed *)
+
+(* Faction multiplies reputation requirements differently by quest type *)
+let faction_reputation_threshold faction quest_type base_reputation =
+  match faction, quest_type with
+  (* PlayerAlliance is lenient for MainStory, strict for side content *)
+  | PlayerAlliance, MainStory -> base_reputation / 2
+  | PlayerAlliance, SideQuest -> base_reputation
+  | PlayerAlliance, CombatEncounter -> (base_reputation * 3) / 2
+  | PlayerAlliance, _ -> base_reputation
+
+  (* RivalFaction inverts - harder for MainStory, easier for Combat *)
+  | RivalFaction, MainStory -> base_reputation * 2
+  | RivalFaction, CombatEncounter -> base_reputation / 2
+  | RivalFaction, PuzzleQuest -> (base_reputation * 3) / 2
+  | RivalFaction, _ -> base_reputation
+
+  (* HostileEmpire requires extreme reputation except for special cases *)
+  | HostileEmpire, FetchQuest -> base_reputation * 3
+  | HostileEmpire, _ -> base_reputation * 4
+
+  | NeutralGuild, _ -> base_reputation
+
+(* Player class changes how difficulty is interpreted *)
+let class_appropriate_difficulty player_class quest_type difficulty =
+  match player_class, quest_type with
+  (* Warrior excels at combat, struggles with puzzles *)
+  | Warrior, CombatEncounter -> difficulty <= 10
+  | Warrior, PuzzleQuest -> difficulty <= 3
+
+  (* Mage excels at puzzles and magic quests *)
+  | Mage, PuzzleQuest -> difficulty <= 10
+  | Mage, MainStory -> difficulty <= 8
+  | Mage, CombatEncounter -> difficulty <= 5
+
+  (* Rogue excels at fetch and side quests *)
+  | Rogue, FetchQuest -> difficulty <= 10
+  | Rogue, SideQuest -> difficulty <= 8
+  | Rogue, MainStory -> difficulty <= 6
+
+  (* Cleric balanced but weaker at combat *)
+  | Cleric, CombatEncounter -> difficulty <= 5
+  | Cleric, _ -> difficulty <= 7
+
+  | _ -> difficulty <= 6
+
+(* Calculate reputation cost based on multiple factors *)
+let calculate_reputation_cost faction quest_type base_cost player_level =
+  let base = faction_reputation_threshold faction quest_type base_cost in
+  (* Player level reduces reputation requirement... BUT *)
+  let level_discount = player_level / 5 in
+  let adjusted = base - level_discount in
+
+  (* EXCEPT when it creates negative/zero (exploitable bug zone*)
+  if adjusted <= 2 then 100  (* Anti-exploit: revert to high cost *)
+  else adjusted
+
+(* Complex quorum check with weighted conditions *)
+let check_quest_unlock_quorum
+    has_prerequisite
+    reputation_sufficient
+    difficulty_appropriate
+    resource_check
+    time_of_day_ok
+    faction_standing =
+
+  (* Weight different conditions *)
+  let prerequisite_weight = if has_prerequisite then 2 else 0 in
+  let reputation_weight = if reputation_sufficient then 2 else 0 in
+  let difficulty_weight = if difficulty_appropriate then 1 else 0 in
+  let resource_weight = if resource_check then 1 else 0 in
+  let time_weight = if time_of_day_ok then 1 else 0 in
+  let faction_weight = match faction_standing with
+    | PlayerAlliance -> 2
+    | NeutralGuild -> 1
+    | RivalFaction -> 0
+    | HostileEmpire -> -1
+  in
+
+  let total_weight =
+    prerequisite_weight + reputation_weight + difficulty_weight +
+    resource_weight + time_weight + faction_weight
+  in
+
+  (* Need at least 5 weighted points *)
+  total_weight >= 5
+
+(* Override logic with multiple nested exceptions *)
+let apply_faction_override
+    faction
+    quest_type
+    player_reputation
+    player_level
+    completed_faction_quests
+    player_class =
+
+  match faction with
+  | PlayerAlliance ->
+      (* Alliance always allows quests... *)
+      FullyAvailable
+
+  | NeutralGuild ->
+      (* Neutral allows most quests... *)
+      if quest_type = MainStory && completed_faction_quests < 3 then
+        TemporarilyLocked  (* Must prove yourself first *)
+      else
+        FullyAvailable
+
+  | RivalFaction ->
+      (* Rivals block quests... *)
+      (* ...BUT if you have high reputation, you can access their content... *)
+      if player_reputation >= 80 && completed_faction_quests >= 5 then
+        (* ...which unlocks hidden questlines... *)
+        (* ...EXCEPT Warriors are never trusted by rivals due to combat history... *)
+        if player_class = Warrior then
+          PermanentlyBlocked
+        (* ...AND EXCEPT Rogues can access hidden quests only if MainStory or SideQuest... *)
+        else if player_class = Rogue && (quest_type = MainStory || quest_type = SideQuest) then
+          HiddenQuestline
+        (* ...BUT Mages and Clerics get conditional unlock for non-combat quests... *)
+        else if quest_type <> CombatEncounter then
+          ConditionalUnlock
+        else
+          TemporarilyLocked
+      else
+        TemporarilyLocked
+
+  | HostileEmpire ->
+      (* Empire blocks everything... *)
+      (* ...BUT if you've completed 10+ faction quests AND have extreme reputation... *)
+      if completed_faction_quests >= 10 && player_reputation >= 90 then
+        (* ...you unlock hidden imperial questline... *)
+        (* ...EXCEPT FetchQuests are seen as beneath them and permanently blocked... *)
+        if quest_type = FetchQuest then
+          PermanentlyBlocked
+        (* ...AND PuzzleQuests require additional player_level check... *)
+        else if quest_type = PuzzleQuest && player_level < 8 then
+          TemporarilyLocked
+        else
+          HiddenQuestline
+      else
+        PermanentlyBlocked
+
+(* Dead zone for reputation/level combinations that cause overflow *)
+let in_reputation_overflow_zone player_reputation player_level faction_quest_count =
+  (* When reputation is high, level is moderate, and faction quests are in specific range,
+     the reputation cost calculation creates an anti-exploit block *)
+  let reputation_high = player_reputation >= 85 && player_reputation <= 95 in
+  let level_moderate = player_level >= 4 && player_level <= 6 in
+  let quest_count_exploitable = faction_quest_count >= 8 && faction_quest_count <= 12 in
+
+  reputation_high && level_moderate && quest_count_exploitable
+
+(* Core decision function *)
+let determine_quest_availability
+    faction
+    quest_type
+    player_class
+    player_level
+    player_reputation
+    quest_difficulty
+    has_prerequisite
+    completed_faction_quests
+    player_gold
+    current_hour =
+
+  (* Check for reputation overflow exploit zone first *)
+  if in_reputation_overflow_zone player_reputation player_level completed_faction_quests then
+    PermanentlyBlocked
+  else
+    (* Apply faction override logic *)
+    let faction_result = apply_faction_override
+      faction quest_type player_reputation player_level
+      completed_faction_quests player_class
+    in
+
+    match faction_result with
+    | PermanentlyBlocked -> PermanentlyBlocked
+    | HiddenQuestline -> HiddenQuestline  (* Short-circuit: hidden content always wins *)
+    | TemporarilyLocked -> TemporarilyLocked
+    | ConditionalUnlock ->
+        (* Need additional checks *)
+        let gold_sufficient = player_gold >= (quest_difficulty * 50) in
+        if gold_sufficient then ConditionalUnlock
+        else TemporarilyLocked
+    | FullyAvailable ->
+        (* Check difficulty appropriateness *)
+        let difficulty_ok = class_appropriate_difficulty player_class quest_type quest_difficulty in
+
+        if not difficulty_ok then TemporarilyLocked
+        else
+          (* Calculate reputation requirement (with dead zone check) *)
+          let reputation_needed = calculate_reputation_cost faction quest_type 60 player_level in
+          let reputation_sufficient = player_reputation >= reputation_needed in
+
+          (* Check time of day (some quests only available at night: 20-24 or 0-4) *)
+          let time_ok =
+            if quest_type = PuzzleQuest || quest_type = MainStory then true
+            else (current_hour >= 20 || current_hour <= 4)
+          in
+
+          (* Resource check *)
+          let resource_ok = player_gold >= 50 in
+
+          (* Weighted quorum check *)
+          let meets_quorum = check_quest_unlock_quorum
+            has_prerequisite
+            reputation_sufficient
+            difficulty_ok
+            resource_ok
+            time_ok
+            faction
+          in
+
+          if meets_quorum then FullyAvailable
+          else TemporarilyLocked
+
+(* Analysis
+====================
+ *)
+
+(* Q1: For RivalFaction quests, how many distinct availability scenarios exist? *)
+let assume_rival_faction
+    (faction : character_faction)
+    (quest_type : quest_type)
+    (player_class : player_class)
+    (player_level : int)
+    (player_reputation : int)
+    (quest_difficulty : int)
+    (has_prerequisite : bool)
+    (completed_faction_quests : int)
+    (player_gold : int)
+    (current_hour : int) : bool =
+  faction = RivalFaction
+
+let rival_faction_scenarios
+    faction quest_type player_class player_level player_reputation
+    quest_difficulty has_prerequisite completed_faction_quests
+    player_gold current_hour =
+  determine_quest_availability
+    faction quest_type player_class player_level player_reputation
+    quest_difficulty has_prerequisite completed_faction_quests
+    player_gold current_hour
+[@@decomp top ~prune:true ~assuming:[%id assume_rival_faction] ()]
+
+(* Q2: Can HostileEmpire ever offer FetchQuests? *)
+let hostile_empire_fetch
+    faction quest_type player_class player_level player_reputation
+    quest_difficulty has_prerequisite completed_faction_quests
+    player_gold current_hour =
+  let result = determine_quest_availability
+    faction quest_type player_class player_level player_reputation
+    quest_difficulty has_prerequisite completed_faction_quests
+    player_gold current_hour
+  in
+  faction = HostileEmpire && quest_type = FetchQuest &&
+  (result = FullyAvailable || result = ConditionalUnlock || result = HiddenQuestline)
+[@@decomp top ()]
+
+(* Q3: Does high reputation (≥90) with HostileEmpire always allow HiddenQuestline access for non-FetchQuest types? *)
+verify (fun quest_type player_class player_level completed_faction_quests
+           quest_difficulty has_prerequisite player_gold current_hour ->
+  let result = determine_quest_availability
+    HostileEmpire quest_type player_class player_level 90
+    quest_difficulty has_prerequisite completed_faction_quests
+    player_gold current_hour
+  in
+  (* If reputation=90, completed≥10, and not FetchQuest, should get HiddenQuestline *)
+  (completed_faction_quests >= 10 && quest_type <> FetchQuest) ==>
+    (result = HiddenQuestline || result = ConditionalUnlock || result = FullyAvailable)
+)

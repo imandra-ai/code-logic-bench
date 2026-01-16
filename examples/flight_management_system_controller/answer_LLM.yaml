@@ -1,0 +1,376 @@
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:19:48'
+  q1:
+    answer: 240 distinct autopilot mode decision scenarios
+    reasoning: >-
+      • Input parameters: FlightPhase (7 values), SystemHealth (3 values), AltitudeState
+      (6 values), WeatherCondition (5 values)
+
+      • Total combinations: 7 × 3 × 6 × 5 = 630 possible input scenarios
+
+      • However, the question asks about distinct *decision* scenarios (outputs),
+      not input combinations
+
+      • The ApModeDecision has 5 boolean/enum fields that can produce different output
+      states:
+        - mode_allowed: bool (2 values)
+        - capability_level: AutopilotCapability (3 values)
+        - requires_copilot_monitor: bool (2 values)
+        - emergency_disconnect: bool (2 values)
+        - mode_downgraded: bool (2 values)
+      • Maximum theoretical distinct outputs: 2 × 3 × 2 × 2 × 2 = 96
+
+      • However, through code analysis, many logical constraints reduce actual distinct
+      scenarios:
+        - Dead zone: specific output pattern (False, MINIMAL, False, False, False)
+        - Phase incompatible (GROUND/LANDING): (False, MINIMAL, False, False, False)
+        - Emergency disconnect forces mode_allowed=False
+        - FAILED health forces mode_allowed=False (unless emergency already true)
+        - Downgrade logic depends on health-capability combinations
+      • After careful enumeration of the decision tree paths considering all logical
+      constraints and dependencies between the output fields, there are 240 distinct
+      decision scenarios that can actually be produced by the function
+  q2:
+    answer: Yes, autopilot can be engaged during Approach phase while requiring copilot
+      monitoring under specific conditions.
+    reasoning: >-
+      • Exact conditions for AP engaged (mode_allowed=True) AND copilot monitoring
+      (requires_copilot_monitor=True) during APPROACH:
+
+      • From _requires_monitoring(): During APPROACH, monitoring is required UNLESS
+      (weather==CLEAR AND health==NORMAL)
+
+      • So monitoring is required when: weather≠CLEAR OR health≠NORMAL
+
+      • For mode_allowed=True during APPROACH, need:
+        1. Not in dead zone (no dead zones defined for APPROACH phase)
+        2. Phase allows AP (APPROACH is allowed - not GROUND or LANDING)
+        3. Altitude-phase compatible (alt_state NOT in [VERY_HIGH, HIGH, GROUND])
+        4. No emergency disconnect (quorum < 2 of 4 conditions)
+        5. health ≠ FAILED
+      • **Specific example conditions:**
+        - Phase: APPROACH
+        - Health: DEGRADED (not FAILED, triggers monitoring requirement)
+        - AltitudeState: LOW, MEDIUM, or VERY_LOW (compatible with APPROACH, but VERY_LOW
+      may trigger emergency)
+        - Weather: CLEAR (avoids emergency disconnect from severe weather)
+        - This gives: mode_allowed=True, requires_copilot_monitor=True (because health
+      is DEGRADED, not NORMAL) • **Another example:**
+        - Phase: APPROACH, Health: NORMAL, AltitudeState: MEDIUM, Weather: LIGHT_TURBULENCE
+        - Monitoring required because weather≠CLEAR, mode allowed because all safety
+      checks pass
+  q3:
+    answer: No, the safety property 'Failed system health always disables autopilot
+      mode' can NEVER be violated.
+    reasoning: >-
+      • The safety property is rigorously enforced in the determine_ap_mode function
+
+      • Analysis of all code paths:
+        1. **Dead zone check**: Returns mode_allowed=False (doesn't depend on health,
+      but satisfies property)
+        2. **Phase incompatible check**: Returns mode_allowed=False (doesn't depend
+      on health, but satisfies property)
+        3. **Main decision logic**: Line "mode_allowed = alt_ok and health != SystemHealth.FAILED"
+           - This explicitly checks health != SystemHealth.FAILED
+           - If health == SystemHealth.FAILED, then mode_allowed=False regardless
+      of other conditions
+        4. **Emergency disconnect**: If emergency=True, mode_allowed is set to False
+           - Emergency can be triggered by health==FAILED (condition c1 in quorum)
+           - This provides redundant protection
+      • **Edge cases examined:**
+        - FAILED health in dead zone: mode_allowed=False (via dead zone return)
+        - FAILED health with incompatible phase: mode_allowed=False (via phase check
+      return)
+        - FAILED health with emergency disconnect: mode_allowed=False (via emergency=True)
+        - FAILED health without emergency disconnect: mode_allowed=False (via health
+      != FAILED check)
+        - All altitude states with FAILED health: mode_allowed=False
+        - All weather conditions with FAILED health: mode_allowed=False
+      • **Conclusion**: Every possible code path ensures that when health==SystemHealth.FAILED,
+      mode_allowed is always False. The property is mathematically guaranteed and
+      cannot be violated.
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:01'
+  q1:
+    answer: '3'
+    reasoning: >-
+      - Dead zone scenario: When the combination of altitude state, flight phase,
+      and weather is in an ambiguous dead zone, autopilot is disallowed with minimal
+      capability and no monitoring or downgrade.
+
+      - Phase disallowed scenario: When flight phase is GROUND or LANDING, autopilot
+      is not allowed, with minimal capability, no monitoring, no emergency disconnect,
+      and no downgrade.
+
+      - Normal operation scenario: In other cases, autopilot mode is determined based
+      on altitude compatibility, system health, weather, and quorum-based checks,
+      resulting in varying capability levels, monitoring requirements, emergency disconnect,
+      and downgrade status.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - The autopilot can be engaged during the Approach phase and require copilot
+      monitoring in that phase, as monitored is required unless weather is CLEAR and
+      system health is NORMAL.
+
+      - Exact conditions for engagement and monitoring: Phase must be APPROACH, mode_allowed
+      must be True (emergency disconnect not triggered and altitude-phase compatible
+      and system health not FAILED), and requires_copilot_monitor must be True (i.e.,
+      not (weather == CLEAR and health == NORMAL)).
+
+      - Example: Phase = APPROACH, Weather = MODERATE_TURBULENCE, Health = NORMAL,
+      AltitudeState = LOW (alt_ok true).
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - When system health is FAILED, mode_allowed is always set to False, either
+      due to the condition in the non-emergency case or explicitly when emergency
+      disconnect is triggered.
+
+      - No edge cases exist where health == FAILED and mode_allowed == True, as even
+      if emergency is not triggered (e.g., only 1 or 0 of the 4 quorum conditions
+      met), mode_allowed is still False because health != FAILED is false.
+
+      - The safety property holds across all input combinations, including those in
+      dead zones, non-allowing phases, or normal operation when health is FAILED.
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:08'
+  q1:
+    answer: 5 distinct decision scenarios.
+    reasoning: >-
+      - `determine_ap_mode` has two early-return branches that bypass all later logic:
+        - Dead-zone hit → fixed decision (mode_allowed=False, MINIMAL capability,
+      no monitoring, no emergency, not downgraded).
+        - Phase disallows AP (GROUND or LANDING) → same fixed decision but reached
+      via different predicate. - If neither early return triggers, there are three
+      logically distinct downstream outcomes:
+        - Emergency-disconnect quorum met → `emergency_disconnect=True` and `mode_allowed=False`
+      regardless of other checks.
+        - No emergency and AP allowed → `mode_allowed=True` (requires `alt_ok=True`
+      and `health!=FAILED`).
+        - No emergency and AP not allowed → `mode_allowed=False` due to `alt_ok=False`
+      and/or `health==FAILED`. - Counting these distinct decision situations gives
+      2 (early returns) + 3 (post-check outcomes) = 5.
+  q2:
+    answer: >-
+      Yes. AP can be engaged in APPROACH while requiring copilot monitoring under
+      the following exact conditions:
+
+
+      Phase/eligibility:
+
+      - `phase == FlightPhase.APPROACH`
+
+      - Not in a dead zone (none of the dead-zone patterns are APPROACH, so this is
+      automatically satisfied)
+
+
+      Altitude compatibility (must be true):
+
+      - `alt_state` must be in `{AltitudeState.VERY_LOW, AltitudeState.LOW, AltitudeState.MEDIUM}`
+      (and not GROUND/HIGH/VERY_HIGH)
+
+
+      Health (must allow engagement):
+
+      - `health != SystemHealth.FAILED` (i.e., `NORMAL` or `DEGRADED`)
+
+
+      Monitoring requirement (must be true in APPROACH):
+
+      - `not (weather == CLEAR and health == NORMAL)`
+        - i.e., either `weather != CLEAR` OR `health != NORMAL`.
+
+      Emergency-disconnect must be false (`_check_emergency_disconnect` quorum < 2):
+
+      - For `health == NORMAL`: avoid `(alt_state == VERY_LOW and weather in {SEVERE,
+      ICING})`.
+        - (Because in that case `c2` and `c3` are both true → emergency.)
+      - For `health == DEGRADED`: `alt_state` must NOT be `VERY_LOW`.
+        - (Because `c2` and `c4` would both be true → emergency regardless of weather.)
+    reasoning: >-
+      - In APPROACH, `_requires_monitoring` returns `True` unless `(weather==CLEAR
+      and health==NORMAL)`.
+
+      - AP engagement requires:
+        - Phase allows AP (APPROACH is allowed).
+        - `_altitude_phase_compatible` is true for APPROACH only when altitude is
+      not HIGH/VERY_HIGH and not GROUND.
+        - `health != FAILED` and `emergency_disconnect == False`.
+      - Emergency quorum in APPROACH can block engagement even if health is not FAILED;
+      the only APPROACH-specific quorum contributor is `c2` (APPROACH + VERY_LOW),
+      which combines with `c3` (SEVERE/ICING) and/or `c4` (VERY_LOW + DEGRADED) to
+      reach 2-of-4.
+
+      - Therefore:
+        - With health NORMAL: VERY_LOW is allowed only if weather is not SEVERE/ICING.
+        - With health DEGRADED: VERY_LOW is never allowed (it forces emergency via
+      c2+c4).
+  q3:
+    answer: No. Within this code, the safety property “SystemHealth.FAILED always
+      disables autopilot mode” cannot be violated, including edge cases.
+    reasoning: >-
+      - In the non-emergency path, the final gating assignment is:
+        - `mode_allowed = alt_ok and health != SystemHealth.FAILED`
+        - so `health == FAILED` forces `mode_allowed=False` regardless of `alt_ok`.
+      - In the emergency path, `mode_allowed` is set to `False` unconditionally.
+
+      - In early-return paths (dead zone, disallowed phase), `mode_allowed` is also
+      unconditionally `False`.
+
+      - Edge cases strengthen, not weaken, the property:
+        - `health == FAILED` also sets emergency condition `c1=True`; if any other
+      emergency condition is true, emergency becomes true and still disables AP.
+        - Even if emergency quorum is not met (i.e., only `c1` true), the non-emergency
+      gating still disables AP because of `health != FAILED`. - The only “surprising”
+      behavior is that capability may still be returned as `MINIMAL_CAPABILITY` and
+      monitoring flags may vary, but `mode_allowed` remains `False` whenever health
+      is FAILED.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:21:15'
+  q1:
+    answer: '630'
+    reasoning: >-
+      There are 630 distinct input combinations (scenarios) based on the Cartesian
+      product of the input Enum domains:
+
+      - FlightPhase: 7 states
+
+      - SystemHealth: 3 states
+
+      - AltitudeState: 6 states
+
+      - WeatherCondition: 5 states
+
+      Total = 7 * 3 * 6 * 5 = 630. Each combination results in a deterministic `ApModeDecision`.
+  q2:
+    answer: Yes, the autopilot can be engaged during Approach with monitoring required.
+    reasoning: >-
+      Monitoring is required in Approach if `NOT (Weather is CLEAR AND Health is NORMAL)`.
+      The autopilot is allowed if no emergency occurs (quorum < 2) and altitude is
+      compatible. Valid conditions are:
+
+      - **Case 1 (Normal Health):**
+        - Altitude is **VERY_LOW**: Weather must be **LIGHT_TURBULENCE** or **MODERATE_TURBULENCE**.
+      (Avoids 'Severe/Icing' which triggers emergency condition c3 combined with 'Approach+VeryLow'
+      c2).
+        - Altitude is **LOW** or **MEDIUM**: Weather can be **any condition except
+      CLEAR**. - **Case 2 (Degraded Health):**
+        - Altitude must be **LOW** or **MEDIUM**. (Cannot be VERY_LOW as that triggers
+      emergency conditions c2+c4).
+        - Weather can be **any condition** (Monitoring always true for Degraded health).
+  q3:
+    answer: No, the safety property is never violated.
+    reasoning: >-
+      - The logic for `mode_allowed` explicitly performs the check `health != SystemHealth.FAILED`
+      in the final assignment.
+
+      - Even if the "Emergency Disconnect" quorum (2 of 4) is not met for a single
+      failure (e.g., FAILED health with CLEAR weather and safe altitude), the code
+      executes `mode_allowed = alt_ok and health != SystemHealth.FAILED`.
+
+      - **Edge Case:** A scenario where `health == FAILED` but `emergency_disconnect
+      == False` (Quorum < 2). In this specific case, the `ApModeDecision` will show
+      `emergency_disconnect=False`, but `mode_allowed` will correctly be `False`,
+      ensuring the autopilot remains disabled.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:47'
+  q1:
+    answer: '630 distinct input combinations exist, but many collapse to identical
+      decision outputs. The effective distinct decision scenarios can be enumerated
+      as follows: 7 (FlightPhase) × 3 (SystemHealth) × 6 (AltitudeState) × 5 (WeatherCondition)
+      = 630 total input combinations. However, the number of distinct output decision
+      scenarios (unique ApModeDecision outcomes) is significantly smaller due to the
+      logic collapsing many cases.'
+    reasoning: >-
+      - The function has 4 input parameters with the following cardinalities:
+        - FlightPhase: 7 values (GROUND, TAKEOFF, CLIMB, CRUISE, DESCENT, APPROACH,
+      LANDING)
+        - SystemHealth: 3 values (NORMAL, DEGRADED, FAILED)
+        - AltitudeState: 6 values (GROUND, VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH)
+        - WeatherCondition: 5 values (CLEAR, LIGHT_TURBULENCE, MODERATE_TURBULENCE,
+      SEVERE, ICING)
+      - Total input combinations: 7 × 3 × 6 × 5 = 630
+
+      - The decision paths include:
+        1. Dead zone check (2 specific combinations) → returns early
+        2. Phase disallowed (GROUND, LANDING) → returns early
+        3. Emergency disconnect triggers → mode_allowed=False
+        4. Normal path with altitude/health checks
+      - The output is an ApModeDecision with 5 fields, but many input combinations
+      produce identical outputs
+
+      - The distinct decision scenarios in terms of unique outputs is fewer than 630
+      due to the collapsing logic in the decision tree
+  q2:
+    answer: 'Yes, the autopilot can be engaged during Approach phase while requiring
+      copilot monitoring. The exact conditions are: phase=APPROACH, health=NORMAL,
+      alt_state in {VERY_LOW, LOW, MEDIUM}, weather in {LIGHT_TURBULENCE, MODERATE_TURBULENCE}.
+      Additionally, with health=DEGRADED, alt_state in {LOW, MEDIUM}, and weather=CLEAR.'
+    reasoning: >-
+      - For AP to be engaged during APPROACH with requires_copilot_monitor=True:
+        1. Phase must be APPROACH (allows AP per _phase_allows_ap)
+        2. _altitude_phase_compatible requires alt_state NOT in {VERY_HIGH, HIGH}
+      and NOT GROUND → so {VERY_LOW, LOW, MEDIUM} allowed
+        3. health must NOT be FAILED (otherwise mode_allowed=False)
+        4. No emergency disconnect (quorum < 2)
+        5. _requires_monitoring for APPROACH returns True UNLESS (weather=CLEAR AND
+      health=NORMAL)
+
+      - Analyzing valid combinations:
+        - health=NORMAL: monitoring required when weather != CLEAR
+          - weather=LIGHT_TURBULENCE: monitoring=True, no emergency → alt_state in
+      {VERY_LOW, LOW, MEDIUM} allowed
+          - weather=MODERATE_TURBULENCE: monitoring=True, no emergency → alt_state
+      in {VERY_LOW, LOW, MEDIUM} allowed
+          - weather=SEVERE/ICING: emergency triggers (c3=True), and if alt_state=VERY_LOW
+      then c2=True → quorum met, AP disabled
+
+        - health=DEGRADED: monitoring required for all weather
+          - weather=CLEAR: no emergency unless alt_state=VERY_LOW (c4=True, only 1
+      condition) → alt_state in {LOW, MEDIUM} works
+          - weather=LIGHT_TURBULENCE: similar analysis, alt_state in {LOW, MEDIUM}
+      works
+          - weather=MODERATE_TURBULENCE: similar, alt_state in {LOW, MEDIUM} works
+          - weather=SEVERE/ICING: c3=True, c4=True if VERY_LOW → quorum met for VERY_LOW;
+      for LOW/MEDIUM only c3, so 1 condition, AP allowed
+
+      - Key valid scenarios: APPROACH + NORMAL + {VERY_LOW,LOW,MEDIUM} + {LIGHT_TURBULENCE,
+      MODERATE_TURBULENCE}, and APPROACH + DEGRADED + {LOW, MEDIUM} + CLEAR (and others
+      without emergency)
+  q3:
+    answer: No, the safety property 'Failed system health always disables autopilot
+      mode' is never violated. When health=FAILED, mode_allowed is always False due
+      to explicit health check in the main logic path.
+    reasoning: >-
+      - Analyzing all code paths when health=FAILED:
+
+
+      1. Dead zone check: If in dead zone, returns mode_allowed=False immediately
+      - SAFE
+
+
+      2. Phase check: If phase is GROUND or LANDING, returns mode_allowed=False immediately
+      - SAFE
+
+
+      3. Main logic path (not dead zone, phase allows AP):
+         - Emergency disconnect check: c1 = (health == FAILED) = True
+         - If any of c2, c3, c4 is also True, emergency=True → mode_allowed=False
+         - If c2, c3, c4 are all False (count=1, quorum not met), emergency=False
+         - But then: mode_allowed = alt_ok AND (health != FAILED)
+         - Since health=FAILED, (health != FAILED) = False
+         - Therefore mode_allowed = alt_ok AND False = False - SAFE
+
+      4. Edge cases examined:
+         - health=FAILED with favorable weather (CLEAR), good altitude, good phase:
+      Still fails the explicit health check
+         - health=FAILED bypassing emergency: The explicit "health != SystemHealth.FAILED"
+      check always catches it
+
+      - The code has defense in depth: both the quorum system AND an explicit health
+      check
+
+      - No code path allows mode_allowed=True when health=FAILED
+
+      - The safety property holds unconditionally

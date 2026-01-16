@@ -1,0 +1,94 @@
+model: "market_maker"
+q1:
+  question: "How many distinct quoting decision scenarios exist?"
+  answer: "583 total scenarios: 223 FullSize, 302 ReducedSize, 58 NoQuote"
+  state_space_breakdown: |
+    Total: 583 scenarios
+    FullSize: 223 (38%) - Aggressive quoting with good conditions
+    ReducedSize: 302 (52%) - Conservative quoting (majority)
+    NoQuote: 58 (10%) - Risk too high
+  key_thresholds:
+    position_pct: [70, 85, 95, 100]
+    spread_bps: [10, 25, 50]
+    consecutive_adverse: [3]
+    market_depth: [300]
+    momentum: [50]
+    quote_score: [2, 4]
+  metadata:
+    extraction: 'jq "{total_scenarios: (.[0].regions_str | length), fullsize_count: ([.[0].regions_str[] | select(.invariant_str == \"FullSize\")] | length), reduced_count: ([.[0].regions_str[] | select(.invariant_str == \"ReducedSize\")] | length), noquote_count: ([.[0].regions_str[] | select(.invariant_str == \"NoQuote\")] | length)}" decomp_q1_all_scenarios.json'
+q2:
+  question: "Can we quote FullSize with consecutive adverse selection (≥3)?"
+  answer: "YES - 67 scenarios where consecutive_adverse ≥ 3 AND FullSize"
+  override_pattern_demonstrated:
+    mechanism: "high_volatility_override (volatility=High + position<80%) bypasses quorum"
+    example:
+      consecutive_adverse: 3
+      volatility_regime: "High"
+      position: 0
+      max_position: 0
+      position_pct: 0
+      result: "FullSize (via override path)"
+  explanation: |
+    Adverse selection detection: consecutive_adverse >= 3 → no_adverse = false
+    This reduces quorum score by 1, typically preventing FullSize.
+
+    BUT: high_volatility_override bypasses quorum entirely:
+    - volatility_regime = High
+    - position_pct < 80
+    → FullSize immediately (lines 77-78)
+
+    This allows aggressive liquidity provision during high volatility periods
+    even when experiencing adverse selection losses.
+  key_insight: "Override pattern prioritizes market-making opportunity over short-term risk signals"
+  edge_case_found:
+    issue: "max_position = 0 case"
+    behavior: "position_percentage(0, 0) = 0 (if branch)"
+    result: "position_pct = 0 < 80 → override activates"
+    note: "Special case handled correctly, not a bug"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_fullsize_adverse.json'
+q3:
+  question: "Can we quote FullSize in position dead zone?"
+  answer: "PROVEN - Dead zone positions NEVER quote FullSize"
+  property: "in_position_dead_zone ==> result != FullSize"
+  why_proven: |
+    The position dead zone check has highest precedence (line 67-69):
+
+    if in_dead_zone then
+      ReducedSize
+    else
+      ... (* override and quorum *)
+
+    Dead zone applies when position_pct ∈ [85, 95].
+    This forces ReducedSize quoting before any other logic runs,
+    including the high volatility override.
+  dead_zone_definition:
+    range: "85-95% of max_position"
+    rationale: "Too risky for full size, but not extreme enough to stop entirely"
+    safety_response: "Quote at ReducedSize to limit additional risk"
+  graduated_risk_control:
+    position_0_70_pct: "FullSize possible (via quorum or override)"
+    position_85_95_pct: "ReducedSize only (dead zone)"
+    position_100_pct_plus: "NoQuote (hard limit, line 72-73)"
+  key_insight: "Dead zone provides intermediate risk level between full activity and shutdown"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_position_dead_zone_safety.json'
+analysis_metadata:
+  total_scenarios: 583
+  fullsize_with_adverse: 67
+  property_result: "PROVEN"
+  patterns_demonstrated:
+    pattern_1_override: "High volatility override allows aggressive quoting despite adverse selection"
+    pattern_2_multiplexer: "Minimum spread: Low(10bps), Medium(25bps), High(50bps)"
+    pattern_3_dead_zone: "Position 85-95% forces ReducedSize (graduated control)"
+    pattern_6_quorum: "4/6 conditions for FullSize"
+  model_insights:
+    - "583 scenarios with ReducedSize as modal outcome (52%)"
+    - "Conservative default: Most scenarios result in size reduction"
+    - "67 scenarios show override allows FullSize despite adverse selection"
+    - "Dead zone provides smooth degradation (not binary on/off)"
+    - "10% NoQuote rate shows hard position limit enforcement"
+  design_lessons:
+    graduated_risk_management: "Dead zone (85-95%) → ReducedSize, then hard limit (100%) → NoQuote"
+    override_for_opportunity: "High volatility override prioritizes liquidity provision"
+    quorum_conservatism: "Need 4/6 conditions (67% threshold) ensures safety"

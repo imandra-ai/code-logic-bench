@@ -1,0 +1,193 @@
+(* Adaptive Quiz Engine *)
+
+(* Core types *)
+type difficulty_level = Easy | Medium | Hard | Expert
+
+type answer_result = Correct | Incorrect | Partial | Timeout
+
+type progression_decision = {
+  new_difficulty: difficulty_level;
+  intervention_needed: bool;
+  confidence_change: int;
+  valid_progression: bool;
+  emergency_reset: bool;
+}
+
+(* Convert difficulty to int for arithmetic *)
+let difficulty_to_int = function
+  | Easy -> 1
+  | Medium -> 2
+  | Hard -> 3
+  | Expert -> 4
+
+let int_to_difficulty = function
+  | 1 -> Easy
+  | 2 -> Medium
+  | 3 -> Hard
+  | _ -> Expert
+
+(* Base confidence change from result *)
+let base_confidence_change result confidence_level =
+  match result with
+  | Correct -> if confidence_level >= 8 then 5 else 3
+  | Partial -> 1
+  | Incorrect -> if confidence_level <= 3 then -2 else -4
+  | Timeout -> -6
+
+(* Calculate new confidence score *)
+let apply_confidence_change current_confidence change =
+  max 0 (min 100 (current_confidence + change))
+
+(* Difficulty progression rules *)
+let should_increase_difficulty current_streak response_time avg_time confidence_level result =
+  match result with
+  | Correct ->
+      current_streak >= 3 &&
+      response_time < (avg_time * 80 / 100) &&
+      confidence_level >= 7
+  | _ -> false
+
+let should_decrease_difficulty current_streak response_time avg_time result =
+  match result with
+  | Incorrect -> current_streak = 0 && response_time > (avg_time * 150 / 100)
+  | Timeout -> true
+  | _ -> false
+
+(* Determine if emergency reset needed *)
+let needs_emergency_reset current_confidence total_answered correct_answered =
+  total_answered >= 10 &&
+  (correct_answered * 100 / total_answered < 20 ||
+   current_confidence < 15)
+
+(* Check intervention criteria *)
+let check_intervention_conditions
+    total_answered
+    correct_answered
+    current_streak
+    current_confidence =
+  let c1 = total_answered >= 5 && (correct_answered * 100 / total_answered < 40) in
+  let c2 = current_streak = 0 && total_answered >= 5 in
+  let c3 = current_confidence < 30 in
+  let c4 = total_answered >= 8 && (correct_answered * 100 / total_answered < 25) in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count >= 2
+
+(* Validity check *)
+let is_valid_progression total_answered correct_answered current_streak =
+  (* Dead zone: 5-7 questions with exactly 2-3 correct and streak 0 creates ambiguous state *)
+  let in_dead_zone =
+    total_answered >= 5 && total_answered <= 7 &&
+    correct_answered >= 2 && correct_answered <= 3 &&
+    current_streak = 0
+  in
+  (* Also invalid if numbers don't make sense *)
+  let invalid_data = correct_answered > total_answered || current_streak < 0 in
+
+  not (in_dead_zone || invalid_data)
+
+(* Core decision function *)
+let determine_student_progression
+    current_difficulty
+    current_streak
+    total_answered
+    correct_answered
+    current_confidence
+    response_time
+    avg_response_time
+    result
+    confidence_level =
+
+  (* Check validity first *)
+  let valid = is_valid_progression total_answered correct_answered current_streak in
+
+  if not valid then
+    { new_difficulty = Easy;
+      intervention_needed = true;
+      confidence_change = 0;
+      valid_progression = false;
+      emergency_reset = false }
+  else
+    (* Check for emergency reset *)
+    let emergency = needs_emergency_reset current_confidence total_answered correct_answered in
+
+    (* If emergency, override everything and reset to Easy *)
+    if emergency then
+      { new_difficulty = Easy;
+        intervention_needed = true;
+        confidence_change = 20;  (* Boost to encourage *)
+        valid_progression = true;
+        emergency_reset = true }
+    else
+      (* Normal progression logic *)
+      let base_change = base_confidence_change result confidence_level in
+      let new_confidence = apply_confidence_change current_confidence base_change in
+
+      (* Determine difficulty adjustment *)
+      let current_diff_int = difficulty_to_int current_difficulty in
+      let should_increase = should_increase_difficulty current_streak response_time avg_response_time confidence_level result in
+      let should_decrease = should_decrease_difficulty current_streak response_time avg_response_time result in
+
+      let new_diff_int =
+        if should_increase then min 4 (current_diff_int + 1)
+        else if should_decrease then max 1 (current_diff_int - 1)
+        else current_diff_int
+      in
+      let new_difficulty = int_to_difficulty new_diff_int in
+
+      (* Update correct count for intervention check *)
+      let new_correct = match result with
+        | Correct | Partial -> correct_answered + 1
+        | _ -> correct_answered
+      in
+      let new_total = total_answered + 1 in
+
+      (* Check if intervention needed (quorum) *)
+      let intervention = check_intervention_conditions new_total new_correct 0 new_confidence in
+
+      { new_difficulty = new_difficulty;
+        intervention_needed = intervention;
+        confidence_change = base_change;
+        valid_progression = true;
+        emergency_reset = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all distinct progression scenarios *)
+let progression_scenarios = determine_student_progression
+[@@decomp top ~prune:true ()]
+
+(* Q2: When does emergency reset trigger? *)
+let triggers_emergency_reset
+    current_difficulty
+    current_streak
+    total_answered
+    correct_answered
+    current_confidence
+    response_time
+    avg_response_time
+    result
+    confidence_level =
+  let decision = determine_student_progression
+    current_difficulty current_streak total_answered correct_answered
+    current_confidence response_time avg_response_time result confidence_level in
+  decision.emergency_reset
+[@@decomp top ()]
+
+(* Q3: Safety property - Emergency reset always sets difficulty to Easy and enables intervention *)
+verify (fun current_difficulty current_streak total_answered correct_answered
+           current_confidence response_time avg_response_time result confidence_level ->
+  let decision = determine_student_progression
+    current_difficulty current_streak total_answered correct_answered
+    current_confidence response_time avg_response_time result confidence_level in
+
+  decision.emergency_reset ==>
+    (decision.new_difficulty = Easy && decision.intervention_needed)
+)

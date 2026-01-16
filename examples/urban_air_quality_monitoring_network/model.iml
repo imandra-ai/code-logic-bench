@@ -1,0 +1,179 @@
+(* Urban Air Quality Monitoring Network *)
+
+(* Core types *)
+type pollutant_type = PM25 | NO2 | Ozone | CO | SO2
+
+type sensor_status = Active | Faulty | Calibrating
+
+type alert_level = Normal | Moderate | Unhealthy | VeryUnhealthy | Hazardous
+
+type weather_condition = Clear | Cloudy | Rainy | Windy | Foggy
+
+type monitoring_response = {
+  final_alert_level: alert_level;
+  trigger_emergency: bool;
+  reading_valid: bool;
+  adjusted_reading: int;
+}
+
+(* WHO Air Quality Guidelines - Base thresholds (μg/m³) *)
+let base_threshold pollutant level =
+  match pollutant, level with
+  | PM25, Moderate -> 15
+  | PM25, Unhealthy -> 35
+  | PM25, VeryUnhealthy -> 75
+  | PM25, Hazardous -> 150
+  | NO2, Moderate -> 25
+  | NO2, Unhealthy -> 50
+  | NO2, VeryUnhealthy -> 100
+  | NO2, Hazardous -> 200
+  | Ozone, Moderate -> 100
+  | Ozone, Unhealthy -> 160
+  | Ozone, VeryUnhealthy -> 240
+  | Ozone, Hazardous -> 300
+  | CO, Moderate -> 10
+  | CO, Unhealthy -> 20
+  | CO, VeryUnhealthy -> 40
+  | CO, Hazardous -> 60
+  | SO2, Moderate -> 20
+  | SO2, Unhealthy -> 50
+  | SO2, VeryUnhealthy -> 100
+  | SO2, Hazardous -> 200
+  | _, Normal -> 0
+
+(* Weather changes threshold interpretation *)
+let weather_adjusted_threshold pollutant level weather =
+  let base = base_threshold pollutant level in
+  match pollutant, weather with
+  | PM25, Foggy -> (base * 4) / 5  (* 20% stricter *)
+  | PM25, Rainy -> (base * 13) / 10 (* 30% relaxed *)
+  | Ozone, Clear -> (base * 17) / 20 (* 15% stricter *)
+  | NO2, Windy -> (base * 11) / 10 (* 10% relaxed *)
+  | _ -> base
+
+(* Apply drift adjustment to reading *)
+let apply_drift raw_reading drift_factor =
+  (raw_reading * drift_factor) / 100
+
+(* Classify base alert level from reading *)
+let classify_base_level reading pollutant weather =
+  let hazardous_threshold = weather_adjusted_threshold pollutant Hazardous weather in
+  let very_unhealthy_threshold = weather_adjusted_threshold pollutant VeryUnhealthy weather in
+  let unhealthy_threshold = weather_adjusted_threshold pollutant Unhealthy weather in
+  let moderate_threshold = weather_adjusted_threshold pollutant Moderate weather in
+
+  if reading >= hazardous_threshold then Hazardous
+  else if reading >= very_unhealthy_threshold then VeryUnhealthy
+  else if reading >= unhealthy_threshold then Unhealthy
+  else if reading >= moderate_threshold then Moderate
+  else Normal
+
+(* Fault escalation with exceptions *)
+let apply_fault_escalation base_level drift_factor weather pollutant status =
+  match status with
+  | Active -> base_level
+  | Calibrating -> Normal  (* Override: Calibrating sensors always report Normal *)
+  | Faulty ->
+    (* Faulty sensors escalate severity... *)
+    let escalated = match base_level with
+      | Normal -> Moderate
+      | Moderate -> Unhealthy
+      | Unhealthy -> VeryUnhealthy
+      | VeryUnhealthy -> Hazardous
+      | Hazardous -> Hazardous
+    in
+    (* ...BUT if drift is acceptable AND weather is favorable, override the escalation *)
+    let drift_acceptable = drift_factor >= 90 && drift_factor <= 110 in
+    let weather_favorable =
+      (pollutant = PM25 && weather = Rainy) ||
+      (pollutant = NO2 && weather = Windy)
+    in
+    (* ...EXCEPT if already at Hazardous, always escalate *)
+    if base_level = Hazardous then escalated
+    else if drift_acceptable && weather_favorable then base_level
+    else escalated
+
+(* Emergency requires 2+ conditions *)
+let check_emergency_conditions alert_level weather drift_factor time_since_last_alert =
+  let condition1 = (alert_level = Hazardous || alert_level = VeryUnhealthy) in
+  let condition2 = (weather = Foggy) in
+  let condition3 = (drift_factor < 90 || drift_factor > 110) in
+  let condition4 = (time_since_last_alert < 24) in
+
+  let count =
+    (if condition1 then 1 else 0) +
+    (if condition2 then 1 else 0) +
+    (if condition3 then 1 else 0) +
+    (if condition4 then 1 else 0)
+  in
+  count >= 2
+
+(* Invalid reading boundaries *)
+let is_reading_valid raw_reading drift_factor =
+  (* Dead zone: readings in 148-152 range with drift 98-102 are ambiguous *)
+  let in_dead_zone =
+    raw_reading >= 148 && raw_reading <= 152 &&
+    drift_factor >= 98 && drift_factor <= 102
+  in
+  (* Also invalid if drift is extreme *)
+  let extreme_drift = drift_factor < 80 || drift_factor > 120 in
+
+  not (in_dead_zone || extreme_drift)
+
+(* Core decision function *)
+let determine_monitoring_response
+    raw_reading
+    pollutant
+    sensor_status
+    drift_factor
+    weather
+    time_since_last_alert =
+
+  (* Check validity first *)
+  let valid = is_reading_valid raw_reading drift_factor in
+
+  if not valid then
+    { final_alert_level = Normal;
+      trigger_emergency = false;
+      reading_valid = false;
+      adjusted_reading = 0 }
+  else
+    (* Apply drift adjustment *)
+    let adjusted = apply_drift raw_reading drift_factor in
+
+    (* Classify base level with weather adjustment *)
+    let base_level = classify_base_level adjusted pollutant weather in
+
+    (* Apply fault escalation with override logic *)
+    let final_level = apply_fault_escalation base_level drift_factor weather pollutant sensor_status in
+
+    (* Check emergency quorum *)
+    let emergency = check_emergency_conditions final_level weather drift_factor time_since_last_alert in
+
+    { final_alert_level = final_level;
+      trigger_emergency = emergency;
+      reading_valid = true;
+      adjusted_reading = adjusted }
+
+(* Analysis
+====================
+ *)
+
+(* Decomposition target: enumerate all distinct monitoring scenarios *)
+let response_scenarios = determine_monitoring_response
+[@@decomp top ~prune:true ()]
+
+(* Q2: When does emergency protocol trigger? *)
+let triggers_emergency raw_reading pollutant sensor_status drift_factor weather time_since_last_alert =
+  let response = determine_monitoring_response raw_reading pollutant sensor_status drift_factor weather time_since_last_alert in
+  response.trigger_emergency
+[@@decomp top ()]
+
+(* Q3: Safety property - Hazardous readings always trigger emergency when recent alerts exist *)
+verify (fun raw_reading pollutant sensor_status drift_factor weather time_since_last_alert ->
+  let response = determine_monitoring_response raw_reading pollutant sensor_status drift_factor weather time_since_last_alert in
+  let recent_alert = time_since_last_alert < 24 in
+  let hazardous_reading = response.final_alert_level = Hazardous in
+
+  (response.reading_valid && hazardous_reading && recent_alert) ==> response.trigger_emergency
+)

@@ -1,0 +1,166 @@
+(* Smart Warehouse Auto Controller *)
+
+(* Core types *)
+type robot_type = PickingRobot | TransportRobot | SortingRobot | InspectionRobot
+
+type item_type = Fragile | Heavy | Standard | Hazardous | Frozen | Perishable
+
+type task_priority = Critical | High | Normal | Low
+
+type zone_safety = Safe | Caution | Hazard | Emergency
+
+type assignment_decision = {
+  approved: bool;
+  estimated_duration: int;  (* minutes *)
+  requires_supervision: bool;
+  priority_boost: int;
+}
+
+(* Robot-item compatibility matrix *)
+let robot_handles_item robot_type item_type =
+  match robot_type, item_type with
+  | PickingRobot, (Standard | Fragile) -> true
+  | TransportRobot, (Standard | Heavy | Hazardous) -> true
+  | SortingRobot, (Standard | Fragile | Heavy) -> true
+  | InspectionRobot, _ -> true
+  | _ -> false
+
+(* Base task duration by item type *)
+let base_duration item_type =
+  match item_type with
+  | Fragile -> 30
+  | Heavy -> 50
+  | Hazardous -> 40
+  | Frozen -> 20
+  | Perishable -> 20
+  | Standard -> 10
+
+(* Priority score by level *)
+let priority_value priority =
+  match priority with
+  | Critical -> 100
+  | High -> 75
+  | Normal -> 50
+  | Low -> 25
+
+(* Zone safety affects task approval *)
+let zone_allows_task zone_safety item_type =
+  match zone_safety, item_type with
+  | Emergency, _ -> false  (* No tasks in emergency *)
+  | Hazard, Hazardous -> false  (* Can't handle Hazardous in Hazard zone *)
+  | Hazard, _ -> false  (* Actually, no tasks at all in Hazard *)
+  | _, _ -> true
+
+(* Check if robot has adequate battery *)
+let has_sufficient_battery battery_level item_type =
+  let min_battery = match item_type with
+    | Heavy -> 40
+    | Hazardous -> 50  (* Safety margin for Hazardous *)
+    | _ -> 20
+  in
+  battery_level >= min_battery
+
+(* Efficiency affects duration *)
+let apply_efficiency_factor duration efficiency =
+  (* efficiency: 0-100, lower efficiency increases duration *)
+  let factor = (100 - efficiency) / 10 in
+  duration + (duration * factor / 10)
+
+(* Critical override: Critical tasks always approved if capable *)
+let is_critical_override priority robot_type item_type battery_level =
+  priority = Critical &&
+  robot_handles_item robot_type item_type &&
+  battery_level >= 15  (* Emergency minimum *)
+
+(* Core assignment decision *)
+let determine_task_assignment
+    robot_type
+    item_type
+    priority
+    battery_level
+    efficiency
+    zone_safety
+    humans_in_zone =
+
+  (* Check critical override first *)
+  let critical = is_critical_override priority robot_type item_type battery_level in
+
+  if critical then
+    (* Critical override: approve immediately *)
+    let base_dur = base_duration item_type in
+    let adj_dur = apply_efficiency_factor base_dur efficiency in
+    { approved = true;
+      estimated_duration = adj_dur;
+      requires_supervision = (item_type = Hazardous || item_type = Heavy);
+      priority_boost = 100 }
+  else
+    (* Normal flow: check all constraints *)
+    let capable = robot_handles_item robot_type item_type in
+
+    if not capable then
+      { approved = false;
+        estimated_duration = 0;
+        requires_supervision = false;
+        priority_boost = 0 }
+    else
+      let zone_ok = zone_allows_task zone_safety item_type in
+
+      if not zone_ok then
+        { approved = false;
+          estimated_duration = 0;
+          requires_supervision = false;
+          priority_boost = 0 }
+      else
+        let battery_ok = has_sufficient_battery battery_level item_type in
+
+        if not battery_ok then
+          { approved = false;
+            estimated_duration = 0;
+            requires_supervision = false;
+            priority_boost = 0 }
+        else
+          (* All checks passed, approve *)
+          let base_dur = base_duration item_type in
+          let adj_dur = apply_efficiency_factor base_dur efficiency in
+
+          (* Hazardous/Heavy items need supervision if no humans *)
+          let needs_super = (item_type = Hazardous || item_type = Heavy) && humans_in_zone = 0 in
+
+          (* Calculate priority boost *)
+          let prio_val = priority_value priority in
+
+          { approved = true;
+            estimated_duration = adj_dur;
+            requires_supervision = needs_super;
+            priority_boost = prio_val }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for Hazardous items *)
+let assume_hazardous
+    (robot_type : robot_type)
+    (item_type : item_type)
+    (priority : task_priority)
+    (battery_level : int)
+    (efficiency : int)
+    (zone_safety : zone_safety)
+    (humans_in_zone : int) : bool =
+  item_type = Hazardous
+
+let hazardous_scenarios robot_type item_type priority battery_level efficiency zone_safety humans_in_zone =
+  determine_task_assignment robot_type item_type priority battery_level efficiency zone_safety humans_in_zone
+[@@decomp top ~prune:true ~assuming:[%id assume_hazardous] ()]
+
+(* Q2: Can tasks be approved with low battery? *)
+let approved_low_battery robot_type item_type priority battery_level efficiency zone_safety humans_in_zone =
+  let decision = determine_task_assignment robot_type item_type priority battery_level efficiency zone_safety humans_in_zone in
+  battery_level < 20 && decision.approved
+[@@decomp top ()]
+
+(* Q3: Heavy items with TransportRobot and humans present *)
+verify (fun priority battery_level efficiency zone_safety humans_in_zone ->
+  let decision = determine_task_assignment TransportRobot Heavy priority battery_level efficiency zone_safety humans_in_zone in
+  (decision.approved && humans_in_zone > 0) ==> not decision.requires_supervision
+)

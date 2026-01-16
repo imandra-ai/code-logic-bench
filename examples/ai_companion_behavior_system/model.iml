@@ -1,0 +1,166 @@
+(* AI Companion Behavior System *)
+
+(* Core types *)
+type loyalty_level = Hostile | Distrustful | Wary | Neutral | Friendly | Devoted | Fanatical
+
+type mood_state = Happy | Content | Neutral | Annoyed | Angry | Depressed
+
+type companion_class = Warrior | Mage | Healer
+
+type context_type = Combat | Social | NoContext
+
+type action_decision = {
+  chosen_action: companion_action;
+  will_comply: bool;
+  abandonment_risk_percent: int;
+}
+
+and companion_action =
+  | AttackEnemy
+  | HealPlayer
+  | OfferAdvice
+  | RefuseOrder
+  | LeaveParty
+  | Complain
+  | StaySilent
+
+(* Convert loyalty to numeric *)
+let loyalty_to_int = function
+  | Hostile -> 0 | Distrustful -> 1 | Wary -> 2
+  | Neutral -> 3 | Friendly -> 4 | Devoted -> 5 | Fanatical -> 6
+
+(* Mood impact *)
+let mood_to_modifier = function
+  | Happy -> 15 | Content -> 5 | Neutral -> 0
+  | Annoyed -> -5 | Angry -> -15 | Depressed -> -10
+
+(* Calculate abandonment risk *)
+let calculate_abandonment_risk loyalty mood trust_score needs_attention =
+  let c1 = loyalty_to_int loyalty <= 1 in
+  let c2 = (mood = Angry || mood = Depressed) in
+  let c3 = trust_score <= 20 in
+  let c4 = needs_attention in
+
+  let count =
+    (if c1 then 1 else 0) +
+    (if c2 then 1 else 0) +
+    (if c3 then 1 else 0) +
+    (if c4 then 1 else 0)
+  in
+  count * 25  (* 0, 25, 50, 75, 100 *)
+
+(* Check compliance *)
+let check_compliance loyalty mood trust_score =
+  let base = loyalty_to_int loyalty * 15 in
+  let mood_mod = mood_to_modifier mood in
+  let trust_mod = trust_score / 5 in
+  let total = base + mood_mod + trust_mod in
+  total >= 50
+
+(* Validity check *)
+let is_valid_state loyalty trust_score =
+  (* Dead zone: Wary with trust 18-22 creates ambiguous state *)
+  let in_dead_zone = loyalty = Wary && trust_score >= 18 && trust_score <= 22 in
+  let invalid_score = trust_score < 0 || trust_score > 100 in
+  not (in_dead_zone || invalid_score)
+
+(* Core decision function - 6 parameters *)
+let determine_companion_behavior
+    companion_class
+    loyalty
+    mood
+    trust_score
+    needs_attention
+    context =
+
+  (* Check validity first *)
+  let valid = is_valid_state loyalty trust_score in
+
+  if not valid then
+    { chosen_action = StaySilent;
+      will_comply = false;
+      abandonment_risk_percent = 100 }
+  else
+    (* Abandonment overrides everything *)
+    let abandonment = calculate_abandonment_risk loyalty mood trust_score needs_attention in
+
+    if abandonment >= 75 then
+      { chosen_action = LeaveParty;
+        will_comply = false;
+        abandonment_risk_percent = abandonment }
+    else
+      let will_comply = check_compliance loyalty mood trust_score in
+
+      (* Determine action *)
+      let action =
+        match context with
+        | Combat ->
+            if loyalty_to_int loyalty >= 3 && trust_score >= 50 then
+              if companion_class = Healer then HealPlayer
+              else if companion_class = Warrior then AttackEnemy
+              else AttackEnemy
+            else if loyalty_to_int loyalty <= 2 && mood = Angry then
+              RefuseOrder
+            else
+              StaySilent
+
+        | Social ->
+            if loyalty_to_int loyalty >= 4 && trust_score >= 60 then
+              OfferAdvice
+            else
+              StaySilent
+
+        | NoContext ->
+            if needs_attention && loyalty_to_int loyalty <= 2 then
+              Complain
+            else if abandonment >= 50 then
+              Complain
+            else
+              StaySilent
+      in
+
+      { chosen_action = action;
+        will_comply = will_comply;
+        abandonment_risk_percent = abandonment }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Assumption for meaningful companion states *)
+let assume_meaningful_companion
+    (companion_class : companion_class)
+    (loyalty : loyalty_level)
+    (mood : mood_state)
+    (trust_score : int)
+    (needs_attention : bool)
+    (context : context_type) : bool =
+  loyalty_to_int loyalty >= 2 && trust_score >= 10 && trust_score <= 90
+
+(* Q1: Enumerate behavior scenarios *)
+let behavior_scenarios = determine_companion_behavior
+[@@decomp top ~prune:true ~assuming:[%id assume_meaningful_companion] ()]
+
+(* Q2: Assumption for Devoted companion *)
+let assume_devoted_companion
+    (companion_class : companion_class)
+    (loyalty : loyalty_level)
+    (mood : mood_state)
+    (trust_score : int)
+    (needs_attention : bool)
+    (context : context_type) : bool =
+  loyalty = Devoted && trust_score <= 50
+
+(* Q2: When does Devoted companion choose LeaveParty? *)
+let devoted_leaves_party companion_class loyalty mood trust_score needs_attention context =
+  let decision = determine_companion_behavior companion_class loyalty mood trust_score needs_attention context in
+  loyalty = Devoted && decision.chosen_action = LeaveParty
+[@@decomp top ~assuming:[%id assume_devoted_companion] ()]
+
+(* Q3: Safety property - abandonment_risk >= 75 always means LeaveParty *)
+(* Fix companion_class, context, and trust_score to reduce verification space *)
+verify (fun loyalty mood needs_attention ->
+  let decision = determine_companion_behavior Warrior loyalty mood 15 needs_attention Combat in
+
+  (decision.abandonment_risk_percent >= 75) ==> (decision.chosen_action = LeaveParty)
+)

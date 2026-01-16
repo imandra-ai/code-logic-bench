@@ -1,0 +1,124 @@
+(* Multi-Factor Authentication *)
+
+(* Core types *)
+type auth_factor = Password | TOTP | Biometric | TrustedDevice
+
+type user_status = Active | Locked | Suspended
+
+type device_trust = Unknown | Registered | Trusted | Compromised
+
+type auth_decision = {
+  granted: bool;
+  requires_additional_factor: bool;
+  lock_account: bool;
+  step_up_auth_needed: bool;
+}
+
+(* Check if user can authenticate *)
+let user_can_auth user_status =
+  user_status = Active
+
+(* Device trust affects requirements *)
+let device_trusted device_trust =
+  device_trust = Trusted
+
+(* Check if lockout should occur *)
+let should_lock_account failed_attempts max_attempts =
+  failed_attempts >= max_attempts
+
+(* Require step-up auth for sensitive operations *)
+let needs_step_up high_value_operation auth_level =
+  high_value_operation && auth_level < 2
+
+(* Core authentication decision *)
+let determine_auth_result
+    user_status
+    device_trust
+    password_correct
+    totp_correct
+    failed_attempts
+    max_failed_attempts
+    requires_mfa
+    high_value_operation =
+
+  (* Check if user is locked *)
+  if user_status = Locked then
+    { granted = false;
+      requires_additional_factor = false;
+      lock_account = true;
+      step_up_auth_needed = false }
+  else if user_status = Suspended then
+    { granted = false;
+      requires_additional_factor = false;
+      lock_account = false;
+      step_up_auth_needed = false }
+  else
+    (* User is Active - check authentication *)
+    let can_auth = user_can_auth user_status in
+
+    if not can_auth then
+      { granted = false;
+        requires_additional_factor = false;
+        lock_account = false;
+        step_up_auth_needed = false }
+    else
+      (* Check password first *)
+      if not password_correct then
+        let should_lock = should_lock_account (failed_attempts + 1) max_failed_attempts in
+        { granted = false;
+          requires_additional_factor = false;
+          lock_account = should_lock;
+          step_up_auth_needed = false }
+      else
+        (* Password correct - check if MFA required *)
+        if requires_mfa then
+          (* MFA required *)
+          if not totp_correct then
+            { granted = false;
+              requires_additional_factor = true;
+              lock_account = false;
+              step_up_auth_needed = false }
+          else
+            (* MFA passed - check step-up for high-value ops *)
+            let needs_stepup = needs_step_up high_value_operation 2 in
+            { granted = true;
+              requires_additional_factor = false;
+              lock_account = false;
+              step_up_auth_needed = needs_stepup }
+        else
+          (* MFA not required *)
+          let trusted = device_trusted device_trust in
+
+          if trusted then
+            (* Trusted device: allow with password only *)
+            let needs_stepup = needs_step_up high_value_operation 1 in
+            { granted = true;
+              requires_additional_factor = false;
+              lock_account = false;
+              step_up_auth_needed = needs_stepup }
+          else
+            (* Untrusted device: require additional factor *)
+            { granted = false;
+              requires_additional_factor = true;
+              lock_account = false;
+              step_up_auth_needed = false }
+
+(* Analysis
+====================
+ *)
+
+(* Q1: All auth scenarios *)
+let all_auth_scenarios = determine_auth_result
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can auth be granted without TOTP when requires_mfa=true? *)
+let granted_no_totp user_status device_trust password_correct totp_correct failed_attempts max_failed_attempts requires_mfa high_value_operation =
+  let decision = determine_auth_result user_status device_trust password_correct totp_correct failed_attempts max_failed_attempts requires_mfa high_value_operation in
+  requires_mfa && not totp_correct && decision.granted
+[@@decomp top ()]
+
+(* Q3: Lock account property *)
+verify (fun device_trust password_correct totp_correct max_failed_attempts requires_mfa high_value_operation ->
+  let decision = determine_auth_result Active device_trust password_correct totp_correct max_failed_attempts max_failed_attempts requires_mfa high_value_operation in
+  decision.lock_account
+)

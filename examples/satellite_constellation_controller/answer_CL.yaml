@@ -1,0 +1,33 @@
+model: "satellite_constellation_controller"
+q1:
+  question: "How many distinct maneuver approval scenarios exist across all system modes and conditions?"
+  answer: "13 scenarios"
+  key_thresholds:
+    battery_levels: [25, 50, 75]
+    fuel_threshold: 20
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_maneuvers.json'
+q2:
+  question: "Can the Electric thruster ever be selected when battery_pct < 75 (not Full battery)?"
+  answer: "NO - Electric strictly requires battery >= 75 (0 scenarios)"
+  explanation: |
+    Electric thruster selected only when battery_level >= 3 (Full category).
+    Full category defined as battery_pct >= 75.
+    Below 75%, system selects Chemical (50-74%) or RCS (25-49%).
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_electric_low_battery.json'
+q3:
+  question: "For DebrisAvoidance mode, is maneuver approval always granted regardless of battery or communication status?"
+  answer: "PROVEN - DebrisAvoidance always approves"
+  property: "mode = DebrisAvoidance ==> approved"
+  why_proven: "Emergency override (line 38-47) always approves DebrisAvoidance with RCS, bypassing all other checks"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_debris_override.json'
+analysis_metadata:
+  total_scenarios_q1: 13
+  electric_low_battery_q2: 0
+  property_result_q3: "PROVEN"
+  complexity_insights:
+    - "Q1: 13 scenarios (3 modes × battery categories × link status × fuel ranges)"
+    - "Q2: Electric has strict battery requirement (≥75%), no exceptions"
+    - "Q3: DebrisAvoidance emergency override proven to always approve"

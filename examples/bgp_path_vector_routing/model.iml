@@ -1,0 +1,132 @@
+(* BGP Path Vector Routing *)
+type origin_type = IGP | EGP | Incomplete
+
+type med_mode = AlwaysCompare | OnlySameAS | NeverCompare
+
+type selection_result = Route1 | Route2 | Tie
+
+(* Convert origin to int for comparison *)
+let origin_to_int origin =
+  match origin with
+  | IGP -> 0
+  | EGP -> 1
+  | Incomplete -> 2
+
+(* Emergency flag trumps local_pref, BUT only if MED < 100 *)
+let emergency_overrides emergency med =
+  emergency && med < 100
+
+(* Whether to compare MED depends on mode and if same AS *)
+let should_compare_med mode same_as =
+  match mode with
+  | AlwaysCompare -> true
+  | OnlySameAS -> same_as
+  | NeverCompare -> false
+
+(* AS paths 250-254 with MED 95-105 are ambiguous *)
+let in_dead_zone as_path med =
+  as_path >= 250 && as_path <= 254 && med >= 95 && med <= 105
+
+(* Core BGP route selection - compares two routes *)
+let select_best_route
+    (* Route 1 attributes *)
+    r1_local_pref
+    r1_as_path
+    r1_origin
+    r1_med
+    r1_emergency
+    (* Route 2 attributes *)
+    r2_local_pref
+    r2_as_path
+    r2_origin
+    r2_med
+    r2_emergency
+    (* Context *)
+    same_as
+    med_mode =
+
+  (* Check dead zones first - routes in dead zone are invalid *)
+  let r1_dead = in_dead_zone r1_as_path r1_med in
+  let r2_dead = in_dead_zone r2_as_path r2_med in
+
+  (* Check basic viability *)
+  let r1_valid = r1_local_pref >= 50 && r1_as_path <= 255 && not r1_dead in
+  let r2_valid = r2_local_pref >= 50 && r2_as_path <= 255 && not r2_dead in
+
+  if not r1_valid && not r2_valid then Tie
+  else if not r1_valid then Route2
+  else if not r2_valid then Route1
+  else
+    (* Both valid - apply BGP selection algorithm *)
+
+    (* Emergency override checked FIRST *)
+    let r1_emerg = emergency_overrides r1_emergency r1_med in
+    let r2_emerg = emergency_overrides r2_emergency r2_med in
+
+    if r1_emerg && not r2_emerg then Route1
+    else if r2_emerg && not r1_emerg then Route2
+    else
+      (* Step 1: Local preference (higher wins) *)
+      if r1_local_pref > r2_local_pref then Route1
+      else if r2_local_pref > r1_local_pref then Route2
+      else
+        (* Step 2: AS path length (shorter wins) *)
+        if r1_as_path < r2_as_path then Route1
+        else if r2_as_path < r1_as_path then Route2
+        else
+          (* Step 3: Origin type (IGP > EGP > Incomplete) *)
+          let r1_o = origin_to_int r1_origin in
+          let r2_o = origin_to_int r2_origin in
+
+          if r1_o < r2_o then Route1
+          else if r2_o < r1_o then Route2
+          else
+            (* Step 4: MED (depends on mode) *)
+            let compare_med = should_compare_med med_mode same_as in
+
+            if compare_med then
+              if r1_med < r2_med then Route1
+              else if r2_med < r1_med then Route2
+              else Tie
+            else
+              Tie
+
+(* Analysis
+====================
+ *)
+
+(* Q1: Enumerate all route selection scenarios *)
+let all_route_selection_scenarios = select_best_route
+[@@decomp top ~prune:true ()]
+
+(* Q2: Can emergency override beat higher local_pref? *)
+let emergency_beats_higher_pref
+    r1_local_pref r1_as_path r1_origin r1_med r1_emergency
+    r2_local_pref r2_as_path r2_origin r2_med r2_emergency
+    same_as med_mode =
+  let result = select_best_route
+    r1_local_pref r1_as_path r1_origin r1_med r1_emergency
+    r2_local_pref r2_as_path r2_origin r2_med r2_emergency
+    same_as med_mode
+  in
+  (* Route2 has higher local_pref but Route1 wins via emergency override *)
+  r2_local_pref > r1_local_pref && result = Route1
+[@@decomp top ()]
+
+(* Q3: Safety property - routes in dead zone are never selected *)
+verify (fun
+    r1_local_pref r1_as_path r1_origin r1_med r1_emergency
+    r2_local_pref r2_as_path r2_origin r2_med r2_emergency
+    same_as med_mode ->
+  let result = select_best_route
+    r1_local_pref r1_as_path r1_origin r1_med r1_emergency
+    r2_local_pref r2_as_path r2_origin r2_med r2_emergency
+    same_as med_mode
+  in
+  let r1_in_dead = in_dead_zone r1_as_path r1_med in
+  let r2_in_dead = in_dead_zone r2_as_path r2_med in
+
+  (* Dead zone routes should never win *)
+  (r1_in_dead ==> result <> Route1) &&
+  (r2_in_dead ==> result <> Route2)
+)

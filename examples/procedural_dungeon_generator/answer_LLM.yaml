@@ -1,0 +1,262 @@
+- model: openai/gpt-5.2
+  timestamp: '2025-12-18 11:20:07'
+  q1:
+    answer: 15 distinct scenarios (unique rule-sets), even though there are 24 (room_type,
+      difficulty) combinations.
+    reasoning: >-
+      - A “scenario” is determined by the effective validation rules: min distance,
+      any special checks (Boss sequence + max distance), and max count.
+
+      - ENTRANCE, BOSS, and SECRET have difficulty-independent max limits, so each
+      contributes 1 scenario across all difficulties.
+        - ENTRANCE: min_dist=0, max_count=1.
+        - SECRET: min_dist=5, max_count=2.
+        - BOSS: min_dist=8, max_count=1, plus max_dist=15 and combat prerequisite.
+      - COMBAT, TREASURE, and PUZZLE have difficulty-dependent max limits, so each
+      contributes 4 scenarios (one per difficulty tier).
+        - COMBAT: max_count ∈ {3,5,7,10}.
+        - TREASURE: max_count ∈ {2,3,4,5}.
+        - PUZZLE: max_count ∈ {1,2,3,4}.
+      - Total distinct scenarios = 1 (Entrance) + 1 (Boss) + 1 (Secret) + 4 (Combat)
+      + 4 (Treasure) + 4 (Puzzle) = 15.
+  q2:
+    answer: No. A Boss room placement at distance_from_entrance < 8 can never be approved.
+    reasoning: >-
+      - Boss rooms have a minimum distance constraint of 8 via _min_distance_from_entrance(RoomType.BOSS)
+      = 8.
+
+      - determine_room_placement checks sequence first, then “too close”.
+        - If existing_combat_count < 3, the result is INVALID_SEQUENCE (returned before
+      the distance check).
+        - If existing_combat_count >= 3, the distance check runs and distance < 8
+      returns TOO_CLOSE. - Therefore distance_from_entrance < 8 always yields a non-APPROVED
+      result (INVALID_SEQUENCE or TOO_CLOSE).
+  q3:
+    answer: No. It is approved only if no Boss has already been placed (existing_room_count
+      < 1).
+    reasoning: >-
+      - With distance ∈ [8,15], the Boss is neither TOO_CLOSE (min is 8) nor TOO_FAR
+      (max is 15).
+
+      - With existing_combat_count >= 3, the Boss sequence prerequisite is satisfied.
+
+      - However, Boss max count is fixed at 1 (independent of difficulty). If existing_room_count
+      >= 1, determine_room_placement returns REJECTED.
+
+      - So approval occurs iff existing_room_count == 0 under those distance/combat
+      conditions.
+- model: anthropic/claude-sonnet-4.5
+  timestamp: '2025-12-18 11:20:15'
+  q1:
+    answer: 96 distinct room placement scenarios
+    reasoning: >-
+      - Room types: 6 (ENTRANCE, COMBAT, TREASURE, BOSS, PUZZLE, SECRET)
+
+      - Difficulty tiers: 4 (EASY, MEDIUM, HARD, EXTREME)
+
+      - Total combinations: 6 room types × 4 difficulty tiers = 24 distinct scenarios
+
+      - However, some room types (BOSS, SECRET, ENTRANCE) have fixed count limits
+      regardless of difficulty, meaning they have effectively the same behavior across
+      difficulties
+
+      - But the question asks for "distinct scenarios" which are defined by the combination
+      of room_type and difficulty_tier parameters
+
+      - Actually, reconsidering: each (room_type, difficulty) pair represents a distinct
+      scenario in terms of input parameters
+
+      - Total: 6 × 4 = 24 distinct scenarios based on the two categorical parameters
+
+      - Wait, re-reading more carefully: the function takes 5 parameters that define
+      scenarios. The distinct scenarios would be based on all possible valid combinations
+      of inputs
+
+      - Given the complexity and continuous nature of some parameters (distance, counts),
+      if we interpret "scenarios" as unique (room_type, difficulty) combinations that
+      have distinct validation rules: 6 × 4 = 24
+
+      - Actually, upon deeper analysis, BOSS, SECRET, and ENTRANCE have the same max_count
+      across all difficulties, so functionally: COMBAT (4 variations) + TREASURE (4
+      variations) + PUZZLE (4 variations) + BOSS (1 variation × 4 = 4) + SECRET (1
+      variation × 4 = 4) + ENTRANCE (1 variation × 4 = 4) = 24 total
+
+      - Final answer: 24 distinct room placement scenarios
+  q2:
+    answer: No, a Boss room can never be placed at distance_from_entrance < 8
+    reasoning: >-
+      - The _min_distance_from_entrance(RoomType.BOSS) returns 8
+
+      - In determine_room_placement(), the first check after sequence validation is:
+      if _is_too_close(distance_from_entrance, room_type)
+
+      - _is_too_close() returns True if distance < min_dist (which is 8 for BOSS)
+
+      - If distance < 8, the function returns PlacementResult.TOO_CLOSE before any
+      other checks
+
+      - This check happens regardless of any other conditions (difficulty, combat
+      count, existing room count)
+
+      - Therefore, there are NO conditions under which a Boss room can be placed at
+      distance_from_entrance < 8
+
+      - The minimum distance constraint is absolute and enforced before all other
+      validations
+  q3:
+    answer: No, it does not always result in Approved placement
+    reasoning: >-
+      - For Boss room placement with distance ∈ [8,15] and existing_combat_count >=
+      3:
+
+      - Sequence check passes (combat_count >= 3 satisfies _sequence_valid for BOSS)
+
+      - Distance check passes (distance >= 8, so not TOO_CLOSE; distance <= 15, so
+      not TOO_FAR)
+
+      - HOWEVER, the room count limit check can still fail
+
+      - _max_count_for_type(RoomType.BOSS, difficulty) returns 1 for any difficulty
+
+      - If existing_room_count >= 1 (i.e., if existing_room_count is 1 or more), the
+      condition "existing_room_count >= max_allowed" is True
+
+      - This returns PlacementResult.REJECTED
+
+      - Therefore, even with perfect distance and combat prerequisites, if a Boss
+      room already exists (existing_room_count >= 1), placement will be REJECTED
+
+      - Only when existing_room_count = 0 AND distance ∈ [8,15] AND existing_combat_count
+      >= 3 will result in APPROVED
+
+      - The answer is NO because existing_room_count also matters
+- model: x-ai/grok-code-fast-1
+  timestamp: '2025-12-18 11:20:38'
+  q1:
+    answer: '80'
+    reasoning: >-
+      - There are 6 room types (ENTRANCE, COMBAT, TREASURE, BOSS, PUZZLE, SECRET)
+      and 4 difficulty tiers (EASY, MEDIUM, HARD, EXTREME), totaling 24 combinations.
+
+      - For BOSS rooms, across all difficulty tiers, there are 5 possible PlacementResult
+      outcomes: APPROVED, TOO_CLOSE, TOO_FAR, INVALID_SEQUENCE, REJECTED.
+
+      - For the other 5 room types (ENTRANCE, COMBAT, TREASURE, PUZZLE, SECRET), across
+      all difficulty tiers, there are 3 possible PlacementResult outcomes each: APPROVED,
+      TOO_CLOSE, REJECTED.
+
+      - The total number of distinct scenarios is calculated as (5 scenarios per tier
+      for BOSS × 4 tiers) + (3 scenarios per tier for each of the other 5 types ×
+      4 tiers) = (20) + (60) = 80.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The _min_distance_from_entrance for BOSS is 8.
+
+      - If distance_from_entrance < 8, the function returns TOO_CLOSE.
+
+      - There are no conditions or overrides that allow BOSS placement at distances
+      < 8.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - For BOSS placement, the function checks: sequence validity (combat_count >=
+      3), distance not too close (>=8), distance not too far (<=15), and existing_room_count
+      < max (which is 1).
+
+      - Even if distance is in [8,15] and existing_combat_count >= 3, if existing_room_count
+      >= 1, it returns REJECTED.
+
+      - Therefore, it does not always result in APPROVED.
+- model: google/gemini-3-pro-preview
+  timestamp: '2025-12-18 11:21:02'
+  q1:
+    answer: '24'
+    reasoning: >-
+      - The model defines 6 distinct `RoomType` enum members (ENTRANCE, COMBAT, TREASURE,
+      BOSS, PUZZLE, SECRET).
+
+      - The model defines 4 distinct `DifficultyTier` enum members (EASY, MEDIUM,
+      HARD, EXTREME).
+
+      - A placement scenario is defined by the combination of these two configuration
+      parameters passed to the function, resulting in a Cartesian product of 6 * 4
+      = 24 scenarios.
+  q2:
+    answer: 'No'
+    reasoning: >-
+      - The function `_min_distance_from_entrance` explicitly defines the minimum
+      distance for `RoomType.BOSS` as 8.
+
+      - The `determine_room_placement` function calls `_is_too_close`, which returns
+      `True` if `distance_from_entrance` is less than the minimum distance (8).
+
+      - When `_is_too_close` evaluates to `True`, the function returns `PlacementResult.TOO_CLOSE`,
+      preventing the placement from being `APPROVED`.
+  q3:
+    answer: 'No'
+    reasoning: >-
+      - The function validates room limits by comparing `existing_room_count` to `_max_count_for_type`.
+
+      - For `RoomType.BOSS`, the `_max_count_for_type` function forces a hard limit
+      of 1, ignoring difficulty tiers.
+
+      - If the parameter `existing_room_count` is 1 or greater, the function returns
+      `PlacementResult.REJECTED`, even if the distance and combat count conditions
+      are met. Therefore, approval is not guaranteed.
+- model: anthropic/claude-opus-4.5
+  timestamp: '2026-01-09 11:13:29'
+  q1:
+    answer: 24 distinct room placement scenarios exist across all room types and difficulty
+      tiers.
+    reasoning: >-
+      - There are 6 room types: ENTRANCE, COMBAT, TREASURE, BOSS, PUZZLE, SECRET
+
+      - There are 4 difficulty tiers: EASY, MEDIUM, HARD, EXTREME
+
+      - Each room type can be combined with each difficulty tier
+
+      - Total combinations: 6 room types × 4 difficulty tiers = 24 distinct scenarios
+
+      - Note: While some room types (BOSS, SECRET, ENTRANCE) have fixed limits regardless
+      of difficulty, they still represent distinct input scenarios when combined with
+      different difficulty tiers
+  q2:
+    answer: No, a Boss room can never be placed at distance_from_entrance < 8.
+    reasoning: >-
+      - The _min_distance_from_entrance function explicitly sets the minimum distance
+      for BOSS rooms to 8
+
+      - The _is_too_close function checks if distance < min_dist (i.e., distance <
+      8 for Boss)
+
+      - In determine_room_placement, the distance check comes after sequence validity
+      check
+
+      - If distance_from_entrance < 8 for a Boss room, _is_too_close returns True
+
+      - This causes determine_room_placement to return PlacementResult.TOO_CLOSE
+
+      - There are no conditional branches or exceptions that bypass this check for
+      Boss rooms
+
+      - Therefore, Boss rooms can NEVER be placed at distance < 8 regardless of any
+      other parameters
+  q3:
+    answer: No, having distance ∈ [8,15] and existing_combat_count >= 3 does not always
+      result in Approved placement for Boss rooms.
+    reasoning: >-
+      - For Boss room placement to be APPROVED, ALL of the following must be satisfied:
+        1. Sequence validity: existing_combat_count >= 3 (satisfied by the condition)
+        2. Distance not too close: distance >= 8 (satisfied by distance ∈ [8,15])
+        3. Distance not too far: distance <= 15 (satisfied by distance ∈ [8,15])
+        4. Room count limit: existing_room_count < max_allowed
+      - For Boss rooms, _max_count_for_type returns 1 (fixed, regardless of difficulty)
+
+      - If existing_room_count >= 1 (i.e., a Boss room already exists), the function
+      returns PlacementResult.REJECTED
+
+      - Therefore, even with distance ∈ [8,15] and existing_combat_count >= 3, if
+      existing_room_count >= 1, placement is REJECTED
+
+      - The existing_room_count parameter must also be 0 for the placement to be APPROVED

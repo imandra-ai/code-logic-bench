@@ -1,0 +1,72 @@
+model: "procedural_quest_generator"
+q1:
+  question: "How many distinct quest availability scenarios exist for RivalFaction quests specifically, and what are the exact numeric thresholds?"
+  answer: "61 scenarios (using ~assuming to focus on RivalFaction)"
+  key_thresholds:
+    player_reputation: [80, 85, 95]
+    completed_faction_quests: [5, 8, 12]
+    player_level: [4, 6]
+    player_gold: [50, "difficulty*50"]
+    current_hour: [0, 4, 20, 24]
+  why_focused: "~assuming restricts to RivalFaction, enabling deeper exploration of complex override branches with class-specific exceptions"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_rival_faction_scenarios.json'
+q2:
+  question: "Can HostileEmpire ever offer FetchQuests (i.e., result in FullyAvailable, ConditionalUnlock, or HiddenQuestline)?"
+  answer: "NO - FetchQuests from HostileEmpire are ALWAYS PermanentlyBlocked"
+  fetchquest_available_count: 0
+  why_counterintuitive: "Even with reputation≥90 and completed_faction_quests≥10 (which normally unlock HiddenQuestline), FetchQuests have explicit exception: 'if quest_type = FetchQuest then PermanentlyBlocked'"
+  key_insight: "HostileEmpire override has nested condition that checks quest_type BEFORE granting HiddenQuestline - FetchQuests are seen as beneath their dignity"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_hostile_empire_fetch.json'
+    llm_challenge: "LLMs might trace through the reputation/quest requirements and conclude FetchQuests can be unlocked with high reputation, missing the explicit FetchQuest blocking in lines 161-162"
+q3:
+  question: "For HostileEmpire quests with reputation=90 and completed_faction_quests≥10 (meeting hidden questline requirements), does this ALWAYS result in HiddenQuestline for non-FetchQuest types?"
+  answer: "REFUTED - Property violated by dead zone counterexample"
+  property: "(faction=HostileEmpire AND reputation=90 AND completed≥10 AND quest_type≠FetchQuest) ==> (result = HiddenQuestline OR ConditionalUnlock OR FullyAvailable)"
+  counterexample:
+    quest_type: "PuzzleQuest"
+    player_class: "Cleric"
+    player_level: 5
+    completed_faction_quests: 10
+    quest_difficulty: 8
+    player_gold: 0
+    current_hour: 38
+    result: "PermanentlyBlocked"
+  why_refuted: "Dead zone check (in_reputation_overflow_zone) executes BEFORE faction override logic"
+  dead_zone_trigger:
+    - "reputation = 90 (in range [85, 95])"
+    - "player_level = 5 (in range [4, 6])"
+    - "completed_faction_quests = 10 (in range [8, 12])"
+    - "All three conditions met → PermanentlyBlocked (anti-exploit)"
+  key_insight: "Dead zone blocks even LEGITIMATE high-reputation players to prevent exploit scenarios where players game the level/reputation discount system"
+  additional_edge_case: "Even WITHOUT dead zone, PuzzleQuest has player_level < 8 requirement (line 164), so level=5 would cause TemporarilyLocked instead of HiddenQuestline"
+  metadata:
+    extraction: 'jq "if .[0].proved != null then \"PROVEN\" else \"REFUTED\" end" vg_q3_hidden_questline_property.json'
+    llm_challenge: "LLMs reading the code would likely focus on the HostileEmpire override logic (lines 155-169) and conclude that reputation=90 + completed≥10 guarantees HiddenQuestline. They would miss that the dead zone check at line 195 happens FIRST and blocks the entire flow."
+analysis_metadata:
+  total_rival_faction_scenarios: 61
+  hostile_empire_fetchquest_scenarios: 0
+  property_q3_result: "REFUTED"
+  imandra_runtime: "All analyses completed successfully, no timeouts"
+  pattern_complexity:
+    override_nested: "RivalFaction: (rep≥80 AND completed≥5) → [Warrior→Blocked, Rogue→HiddenQuestline IF MainStory/SideQuest, Mage/Cleric→ConditionalUnlock IF not Combat]"
+    override_exception: "HostileEmpire: FetchQuest explicitly blocked BEFORE HiddenQuestline logic"
+    dead_zone: "reputation∈[85,95] AND level∈[4,6] AND completed∈[8,12] → PermanentlyBlocked (happens FIRST)"
+    multiplexer_faction: "faction×quest_type multiplies reputation thresholds: PlayerAlliance MainStory÷2, RivalFaction MainStory×2, HostileEmpire FetchQuest×3"
+    multiplexer_class: "class×quest_type determines difficulty limits: Warrior Combat≤10 Puzzle≤3, Mage Puzzle≤10 Combat≤5"
+    weighted_quorum: "prereq(2) + rep(2) + diff(1) + resource(1) + time(1) + faction(2/1/0/-1) ≥ 5"
+    anti_exploit: "When level discount creates adjusted_reputation≤2, reverts to cost=100"
+  why_challenging_for_llms:
+    multi_level_nesting: "Override logic has 3+ levels of nested conditions with class/quest-type exceptions"
+    dead_zone_counterintuitive: "Dead zone at HIGH reputation (85-95) blocks access - opposite of intuition"
+    precedence_tricky: "Dead zone check happens BEFORE override logic, preventing expected HiddenQuestline"
+    exception_easy_to_miss: "FetchQuest exception buried in HostileEmpire override (lines 161-162)"
+    multiplexer_combinatorics: "Two multiplexer patterns (faction×quest, class×quest) create explosion of cases"
+    weighted_quorum_subtle: "Faction-dependent weights make quorum pass/fail non-obvious"
+    puzzlequest_double_block: "PuzzleQuest has BOTH dead zone block AND level<8 requirement"
+  demonstration_of_imandrax_power:
+    q1_assuming: "~assuming lets us focus on RivalFaction's 61 scenarios instead of full state space (would be 1000s)"
+    q2_exhaustive: "Decomposition proves FetchQuest is NEVER available from HostileEmpire (0 scenarios)"
+    q3_counterexample: "Verification finds surprising counterexample: dead zone blocks reputation=90 players"
+    llm_vs_imandra: "LLM would likely miss: (1) FetchQuest exception, (2) dead zone precedence, (3) PuzzleQuest level requirement - ImandraX finds all automatically"

@@ -1,0 +1,28 @@
+model: "npc_pathfinding"
+q1:
+  question: "How many distinct pathfinding scenarios exist across all NPC types and terrain conditions?"
+  answer: "82 scenarios"
+  key_thresholds:
+    obstacle_distance: [1, 2]
+    stuck_count: 3
+    time_since_replan: 10
+    terrain_costs: "Open=1, Rough=2, Difficult=4, Water=8, Blocked=100"
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_all_paths.json'
+q2:
+  question: "Can Civilian NPCs ever successfully path through Water terrain?"
+  answer: "NO - Civilians cannot traverse Water (0 scenarios)"
+  explanation: "can_traverse check blocks Civilian + Water combination"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.invariant_str == \"true\")] | length" decomp_q2_civilian_water.json'
+q3:
+  question: "When both Civilian and Scout have valid paths, does Scout always have equal or lower cost?"
+  answer: "REFUTED - Scout not always faster"
+  property: "(both_valid) ==> scout_cost <= civilian_cost"
+  counterexample_reason: "When path_length = 0 or terrain_cost = 0, both have cost = 0 (division by speed doesn't matter)"
+  metadata:
+    extraction: 'cat vg_q3_scout_speed.json | jq ".[0] | keys"'
+analysis_metadata:
+  total_scenarios_q1: 82
+  civilian_water_q2: 0
+  property_result_q3: "REFUTED"

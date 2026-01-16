@@ -1,0 +1,44 @@
+model: "infusion_pump_controller"
+q1:
+  question: "How many distinct infusion safety scenarios exist in determine_infusion_safety, and what are the exact numeric thresholds that determine these scenarios?"
+  answer: "448 scenarios"
+  key_thresholds:
+    patient_weight: [50, 60, 69, 71, 85, 90]
+    requested_rate: [10, 48, 52]
+    battery_level: [19, 21]
+    rate_percentage: [80]
+  metadata:
+    extraction: 'jq ".[0].regions_str | length" decomp_q1_infusion_scenarios.json'
+q2:
+  question: "Can the pump allow infusion when hardware status is Critical? If so, under what exact conditions?"
+  answer: "YES - 18 scenarios where Critical hardware allows infusion"
+  example:
+    scenario: "Vasopressor (critical drug) + HighRisk patient + low rate (1-10 ml/hour)"
+    constraints: ["drug = Vasopressor", "patient_risk = HighRisk", "hardware = Critical", "requested_rate <= 10"]
+    result: "allow_infusion = true"
+  why_counterintuitive: "Critical hardware sounds like it should block everything, BUT the code allows critical drugs (Opioid/Vasopressor) to continue at very low rates (<=10 ml/hour) - this implements a 'keep patient alive' safety override"
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_eval_str == \"true\")] | length" decomp_q2_critical_hardware.json'
+q3:
+  question: "Can a HighRisk patient receiving a critical drug ever avoid requiring double-check verification? If so, under what exact conditions?"
+  answer: "YES - 2 scenarios where HighRisk + critical drug avoids double check"
+  example:
+    scenario: "Opioid + HighRisk + dead zone (rate=48-52, weight=69-71, battery=19-21)"
+    constraints: ["drug = Opioid", "patient_risk = HighRisk", "rate ∈ [48,52]", "weight ∈ [69,71]", "battery ∈ [19,21]"]
+    result: "require_double_check = false (in dead zone, configuration marked invalid)"
+  why_surprising: "These are configurations in the dead zone, which are marked invalid. The function returns a default structure with require_double_check=false. This reveals an edge case: invalid configurations don't trigger double-check warnings, which could be a safety concern."
+  metadata:
+    extraction: 'jq "[.[0].regions_str[] | select(.model_eval_str == \"true\")] | length" decomp_q3_double_check.json'
+    safety_note: "This finding suggests dead zone handling could be improved to explicitly flag need for review"
+analysis_metadata:
+  total_regions: 448
+  imandra_runtime: "All analyses completed successfully within 60s timeout"
+  pattern_complexity:
+    override: "Critical hardware blocks high rates, BUT allows critical drugs at low rates (<=10)"
+    multiplexer: "Weight adjustment formulas vary by drug: Opioid uses 50/90 thresholds, Vasopressor uses 60/85 thresholds"
+    quorum: "Alarm requires 2 of 4: [critical_drug, high_risk, critical_hardware, rate_exceeds_max]"
+    dead_zone: "rate∈[48,52] AND weight∈[69,71] AND battery∈[19,21] → invalid"
+  interesting_findings:
+    - "18 scenarios where Critical hardware allows infusion (safety override for critical drugs)"
+    - "Dead zone configurations avoid double-check requirement (potential safety gap)"
+    - "Multiplexer reveals different weight thresholds per drug class"
