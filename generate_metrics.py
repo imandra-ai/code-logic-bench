@@ -35,8 +35,9 @@ script_dir = Path(__file__).parent
 examples_dir = script_dir / 'examples'
 
 DEFAULT_ANSWER_MODELS: list[str] = [
+    'anthropic/claude-opus-4.6',
     'anthropic/claude-opus-4.5',
-    'anthropic/claude-sonnet-4',
+    'anthropic/claude-sonnet-4.5',
     'openai/gpt-5.2',
     'google/gemini-3-pro-preview',
     'x-ai/grok-code-fast-1',
