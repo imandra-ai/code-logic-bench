@@ -131,7 +131,15 @@ def aggregate_metrics() -> pl.DataFrame:
             print(f'Warning: No data in {file_path}')
             continue
 
-        for eval_entry in data:
+        # Deduplicate: keep only the most recent entry per (answer_model, eval_model)
+        latest: dict[tuple[str, str], dict[str, Any]] = {}
+        for entry in data:
+            key = (entry.get('answer_model', 'unknown'), entry.get('eval_model', 'unknown'))
+            ts = entry.get('timestamp', '')
+            if key not in latest or ts > latest[key].get('timestamp', ''):
+                latest[key] = entry
+
+        for eval_entry in latest.values():
             answer_model = eval_entry.get('answer_model', 'unknown')
             eval_model = eval_entry.get('eval_model', 'unknown')
             metrics = eval_entry.get('metrics', {})
