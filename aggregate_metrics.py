@@ -484,6 +484,107 @@ def print_summary(df: pl.DataFrame) -> None:
     print('=' * 60)
 
 
+def create_sample_count_table(df_agg: pl.DataFrame) -> None:
+    """Create a table image showing sample counts per model and metric."""
+    # Derive method from question using QUESTION_METHOD
+    df_with_method = df_agg.with_columns(
+        pl.col('question')
+        .map_elements(lambda q: QUESTION_METHOD.get(q, 'unknown'), return_dtype=pl.Utf8)
+        .alias('method')
+    )
+
+    # Count distinct (project, question) per method per model
+    method_counts = (
+        df_with_method.group_by(['model', 'method'])
+        .agg(pl.struct('project', 'question').n_unique().alias('n'))
+        .sort(['model', 'method'])
+    )
+    method_pivot = method_counts.pivot(
+        values='n', index='method', on='model'
+    ).fill_null(0)
+
+    # Per-metric sample counts
+    metric_counts = (
+        df_agg.group_by(['model', 'metric'])
+        .agg(pl.col('score').count().alias('n'))
+        .sort(['model', 'metric'])
+    )
+    metric_pivot = metric_counts.pivot(
+        values='n', index='metric', on='model'
+    ).fill_null(0)
+
+    # Sort metric rows by METRIC_ORDER
+    ordered_metrics = [m for m in METRIC_ORDER if m in metric_pivot['metric'].to_list()]
+    metric_pivot = metric_pivot.filter(pl.col('metric').is_in(ordered_metrics))
+    metric_pivot = sort_by_metric_order(metric_pivot)
+
+    col_labels = sorted([c for c in metric_pivot.columns if c != 'metric'])
+
+    # Build rows: method counts first, then metric counts
+    row_labels: list[str] = []
+    cell_data: list[list[str]] = []
+
+    # Method answer counts
+    method_order = ['vg', 'decomp']
+    method_display = {'vg': '# Answers (vg)', 'decomp': '# Answers (decomp)'}
+    for method in method_order:
+        if method in method_pivot['method'].to_list():
+            row_labels.append(method_display[method])
+            cell_data.append(
+                [
+                    str(method_pivot.filter(pl.col('method') == method)[c][0])
+                    for c in col_labels
+                ]
+            )
+
+    n_method_rows = len(row_labels)
+
+    # Metric sample counts
+    for m in metric_pivot['metric'].to_list():
+        row_labels.append(get_label(m, multiline=False))
+        cell_data.append(
+            [str(metric_pivot.filter(pl.col('metric') == m)[c][0]) for c in col_labels]
+        )
+
+    fig, ax = plt.subplots(
+        figsize=(
+            max(8, 2 + 2.5 * len(col_labels)),
+            1.5 + 0.5 * len(row_labels),
+        )
+    )
+    ax.axis('off')
+    table = ax.table(
+        cellText=cell_data,
+        rowLabels=row_labels,
+        colLabels=col_labels,
+        cellLoc='center',
+        loc='center',
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1, 1.6)
+
+    # Style header row
+    for j in range(len(col_labels)):
+        table[0, j].set_facecolor('#457B9D')
+        table[0, j].set_text_props(color='white', weight='bold')
+    # Style row labels
+    for i in range(len(row_labels)):
+        table[i + 1, -1].set_text_props(weight='bold')
+        if i < n_method_rows:
+            table[i + 1, -1].set_facecolor('#D4E6F1')
+            for j in range(len(col_labels)):
+                table[i + 1, j].set_facecolor('#D4E6F1')
+        else:
+            table[i + 1, -1].set_facecolor('#E8E8E8')
+
+    ax.set_title('Sample Count per Model and Metric', size=14, weight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(output_dir / 'sample_count_table.png', dpi=300, bbox_inches='tight')
+    print(f'Saved: {output_dir}/sample_count_table.png')
+    plt.close()
+
+
 def main() -> None:
     output_dir.mkdir(exist_ok=True)
     print('Aggregating metrics from examples/...')
@@ -508,6 +609,7 @@ def main() -> None:
     create_radar_chart(df_agg)
     create_bar_chart(df_agg)
     create_overall_performance_chart(df_agg)
+    create_sample_count_table(df_agg)
 
     print('\nDone!')
 
