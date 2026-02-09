@@ -180,15 +180,13 @@ def aggregate_metrics() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def create_radar_chart(df_agg: pl.DataFrame) -> None:
+def create_radar_chart(df_agg: pl.DataFrame, models: list[str]) -> None:
     """Create a radar chart comparing models across metrics."""
     model_metrics = (
         df_agg.group_by(['model', 'metric'])
         .agg(pl.col('score').mean())
         .sort(['model', 'metric'])
     )
-
-    models = sorted(model_metrics['model'].unique().to_list())
     available_metrics = [
         m for m in METRIC_ORDER if m in model_metrics['metric'].unique().to_list()
     ]
@@ -237,15 +235,13 @@ def create_radar_chart(df_agg: pl.DataFrame) -> None:
     plt.close()
 
 
-def create_bar_chart(df_agg: pl.DataFrame) -> None:
+def create_bar_chart(df_agg: pl.DataFrame, models: list[str]) -> None:
     """Create a grouped bar chart comparing models across metrics."""
     model_metrics = (
         df_agg.group_by(['model', 'metric'])
         .agg(pl.col('score').mean())
         .sort(['model', 'metric'])
     )
-
-    models = sorted(model_metrics['model'].unique().to_list())
     available_metrics = [
         m for m in METRIC_ORDER if m in model_metrics['metric'].unique().to_list()
     ]
@@ -302,20 +298,20 @@ def create_bar_chart(df_agg: pl.DataFrame) -> None:
     plt.close()
 
 
-def create_overall_performance_chart(df_agg: pl.DataFrame) -> None:
+def create_overall_performance_chart(df_agg: pl.DataFrame, models: list[str]) -> None:
     """Create a horizontal bar chart showing overall average score for each model."""
     model_averages = (
         df_agg.group_by('model')
         .agg(pl.col('score').mean().alias('avg_score'))
-        .sort('avg_score')
+        .sort(['avg_score', 'model'])
     )
 
     fig, ax = plt.subplots(figsize=(12, 8))
-    models = model_averages['model'].to_list()
+    ordered_models = model_averages['model'].to_list()
     scores = model_averages['avg_score'].to_list()
-    bar_colors = [COLORS[i % len(COLORS)] for i in range(len(models))]
+    bar_colors = [COLORS[models.index(m) % len(COLORS)] for m in ordered_models]
 
-    bars = ax.barh(models, scores, color=bar_colors, alpha=0.8, edgecolor='black')
+    bars = ax.barh(ordered_models, scores, color=bar_colors, alpha=0.8, edgecolor='black')
 
     for bar, score in zip(bars, scores):
         ax.text(
@@ -343,7 +339,7 @@ def create_overall_performance_chart(df_agg: pl.DataFrame) -> None:
     plt.close()
 
 
-def create_summary_plots(df_agg: pl.DataFrame) -> None:
+def create_summary_plots(df_agg: pl.DataFrame, models: list[str]) -> None:
     """Create summary plots."""
     sns.set_style('whitegrid')
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -409,8 +405,8 @@ def create_summary_plots(df_agg: pl.DataFrame) -> None:
 
     # 4. Average score by model
     ax4 = axes[1, 1]
-    model_avg = df_agg.group_by('model').agg(pl.col('score').mean()).sort('score')
-    colors_model = [COLORS[i % len(COLORS)] for i in range(len(model_avg))]
+    model_avg = df_agg.group_by('model').agg(pl.col('score').mean()).sort(['score', 'model'])
+    colors_model = [COLORS[models.index(m) % len(COLORS)] for m in model_avg['model'].to_list()]
     ax4.barh(
         model_avg['model'].to_list(),
         model_avg['score'].to_list(),
@@ -484,7 +480,7 @@ def print_summary(df: pl.DataFrame) -> None:
     print('=' * 60)
 
 
-def create_sample_count_table(df_agg: pl.DataFrame) -> None:
+def create_sample_count_table(df_agg: pl.DataFrame, models: list[str]) -> None:
     """Create a table image showing sample counts per model and metric."""
     # Derive method from question using QUESTION_METHOD
     df_with_method = df_agg.with_columns(
@@ -518,7 +514,7 @@ def create_sample_count_table(df_agg: pl.DataFrame) -> None:
     metric_pivot = metric_pivot.filter(pl.col('metric').is_in(ordered_metrics))
     metric_pivot = sort_by_metric_order(metric_pivot)
 
-    col_labels = sorted([c for c in metric_pivot.columns if c != 'metric'])
+    col_labels = [m for m in models if m in metric_pivot.columns]
 
     # Build rows: method counts first, then metric counts
     row_labels: list[str] = []
@@ -604,12 +600,14 @@ def main() -> None:
         .rename({'answer_model': 'model'})
     )
 
+    models = sorted(df_agg['model'].unique().to_list())
+
     print('\nGenerating plots...')
-    create_summary_plots(df_agg)
-    create_radar_chart(df_agg)
-    create_bar_chart(df_agg)
-    create_overall_performance_chart(df_agg)
-    create_sample_count_table(df_agg)
+    create_summary_plots(df_agg, models)
+    create_radar_chart(df_agg, models)
+    create_bar_chart(df_agg, models)
+    create_overall_performance_chart(df_agg, models)
+    create_sample_count_table(df_agg, models)
 
     print('\nDone!')
 
