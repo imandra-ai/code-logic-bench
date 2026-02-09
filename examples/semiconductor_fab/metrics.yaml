@@ -4634,3 +4634,712 @@
         No mention of yield loss (extra in ImandraX but irrelevant to approval); minor
         gap in explicit short-circuit discussion. Overall, LLM performs comparably
         well without decomposition, demonstrating strong understanding."'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:29'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 24
+        reasoning: The LLM initially estimated '8 wafer processing scenarios' but
+          then self-corrected to '10 approved scenario categories'. The ImandraX answer
+          states '24 scenarios'.
+        score: -2.807354922057604
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified ContaminationClass.CLASS1 as the strictest
+          requirement and the critical override for priority. It also correctly identified
+          the temperature limit. However, its branching for tool status and maintenance
+          cycles only partially captured the full set of scenarios.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No specific edge cases were described or mentioned in the problem
+          description or LLM output. The question focuses on scenario count rather
+          than edge cases.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temperature <= 150
+        - maintenance_cycles < 100
+        - maintenance_cycles < 120
+        - ContaminationClass.CLASS1
+        - ContaminationClass.CLASS10
+        thresholds_from_decomp:
+        - 'temperature: 150'
+        - 'maintenance_cycles: [100, 120]'
+        - 'contamination_requirement: ''Class1 (strictest)'''
+        reasoning: The LLM successfully identified the critical numeric thresholds
+          for temperature, maintenance cycles, and the relevant contamination classes
+          (CLASS1, CLASS10) for approval, which aligns with ImandraX's identified
+          thresholds. Although ImandraX lists only CLASS1 as a contamination requirement,
+          the LLM correctly inferred CLASS10 as a threshold due to the critical override.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM struggled to precisely quantify the exact number of scenarios.
+          While it identified relevant factors, its final count of 10 was significantly
+          different from the decomposition's 24, indicating a lack of precision in
+          its outcome prediction.
+      direction_accuracy:
+        score: 0.7
+        reasoning: The LLM correctly identified the key parameters (priority, contamination,
+          tool status, maintenance cycles, temperature) and their general roles in
+          determining approval for Photolithography. It understood the strictest requirement
+          for Photolithography and the critical override logic. However, its inability
+          to accurately count the scenarios suggests a partial misunderstanding of
+          how these parameters combine to form distinct scenarios.
+      coverage_completeness:
+        score: 0.416
+        reasoning: The LLM identified 10 scenarios as approved, while the decomposition
+          found 24. The coverage score is calculated as 10/24 = 0.416. This indicates
+          that the LLM missed a significant number of approved scenarios.
+      overall_summary: The LLM demonstrated a good understanding of the core logic,
+        correctly identifying critical conditions, overrides, and relevant thresholds
+        for wafer processing approval in the Photolithography step. Its reasoning
+        process showed an attempt to break down the problem by combining different
+        factors. However, it significantly underestimated the total number of distinct
+        approved scenarios, initially stating 8, then self-correcting to 10, compared
+        to the verified 24. This suggests a weakness in comprehensively enumerating
+        all possible valid combinations, despite understanding individual conditions.
+        The LLM also missed completely accounting for the nuanced interaction of tool
+        status and maintenance cycles in forming distinct scenarios.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM identified 3 process steps where Class100 contamination
+          is approved, while the decomposition identified 6 scenarios. The LLM's understanding
+          of 'scenarios' was limited to process steps, while the decomposition explicitly
+          listed 6 distinct scenarios where approval is granted under Class100 contamination.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified how contamination levels are checked
+          against required classes and applied the override logic for critical priority.
+          It accurately traced the conditions for each process step.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No specific edge cases were presented in the question or identified
+          as relevant by either the LLM or decomposition. The LLM's reasoning was
+          sufficient given the scope.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Class1
+        - Class10
+        - Class100
+        - Class1000
+        thresholds_from_decomp:
+        - Class1
+        - Class10
+        - Class100
+        - Class1000
+        reasoning: The LLM successfully identified all relevant contamination classes
+          (thresholds) and explained their hierarchy and impact on approval, matching
+          the decomposition's identified thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM's answer is precise regarding the process steps for which
+          Class100 contamination is approved. However, the LLM mentions 'if tool qualified
+          and temp safe' as conditions for approval without quantifying their impact
+          or contribution to the overall numeric outcome in the form of distributions.
+          While it correctly identifies the factors, it doesn't provide precise numeric
+          distributions for outcomes. The score is 0.8 because while it precisely
+          identifies the qualitative outcomes, it lacks the quantitative precision
+          of numeric distributions that could be present.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately concluded that wafer processing can be approved
+          with Class100 contamination for specific steps (Deposition, Metrology, Etching).
+          The reasoning provided is sound and matches the decomposition's conclusions.
+      coverage_completeness:
+        score: 0.8
+        reasoning: The LLM identified 3 out of the 3 *types* of process steps where
+          Class100 contamination is approved. However, the decomposition clarified
+          there are 6 *scenarios* based on additional factors (like tool qualified
+          and temp safe, implicitly understood as true for the 'yes' answer in the
+          decomposition). The LLM's explanation covers the core logic correctly but
+          misses the full enumeration of specific scenarios, hence a score of 0.8
+          since it covered 3 out of the 6 implicit actual scenarios and all 3 types
+          of steps mentioned in the decomposition.
+      overall_summary: The LLM demonstrated a strong understanding of the core logic,
+        correctly identifying the conditions under which Class100 contamination is
+        approved. It accurately assessed control flow, identified all decision boundaries
+        (contamination classes), and provided precise qualitative outcomes.  While
+        its state-space estimation was lower than the decomposition due to a narrower
+        interpretation of 'scenarios' (focusing on steps rather than specific combinations
+        that lead to approval), its direction accuracy and reasoning for approval
+        conditions were excellent. The only area for improvement is in fully enumerating
+        all specific scenarios for approval rather than just the process steps.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: Both LLM and ImandraX identify a single scenario based on the provided
+          conditions. The ImandraX answer is a direct 'PROVEN' which represents one
+          scenario where the property holds. The LLM's detailed reasoning also examines
+          a single path leading to approval.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies the sequence of checks: tool qualification,
+          temperature safety, then contamination. It correctly identifies that a normal
+          contamination check would fail but the critical override logic branches
+          to approve the processing. It understands that the override ''short-circuits''
+          the failure of the normal contamination check. The override logic itself
+          is correctly understood, as it allows Class10 contamination when priority
+          is Critical for a Class1 requirement. All assessments are correct.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No specific edge cases were presented in the question or identified
+          by either the LLM or ImandraX beyond the specified conditions. No unusual
+          or boundary conditions were missed.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - maintenance_cycles < 100
+        - temperature <= 150
+        thresholds_from_decomp:
+        - maintenance_cycles < 100
+        - temperature <= 150
+        reasoning: The LLM explicitly identifies and uses 'maintenance_cycles < 100'
+          and 'temperature <= 150' as thresholds. The ImandraX answer confirms these
+          implicitly by stating 'qualified tool' and 'safe temp', which are defined
+          by these thresholds in the problem description. Both answers correctly capture
+          the relevant numeric thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM correctly identifies the exact numeric yield loss percentage
+          (5%) associated with the critical override scenario. ImandraX also implicitly
+          supports this by mentioning '5% estimated yield loss', thus both provide
+          precise numeric outcomes when applicable.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's final conclusion is 'Yes, ... processing is always approved,'
+          which perfectly aligns with ImandraX's 'PROVEN - Property always holds.'
+          Both reach the exact same correct conclusion regarding the approval direction.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX provide a complete analysis of the single
+          scenario presented in the question. The LLM breaks down each sub-condition
+          and its outcome, including the override. ImandraX directly proves the property.
+          There are no missing scenarios or partial analyses. The rubric applied is
+          that 1.0 is given when all scenarios are accounted for, and 0.0 otherwise.
+          In this case, there is only one scenario to analyze.
+      overall_summary: The LLM demonstrated an excellent understanding of the control
+        flow and logic, accurately identifying all decision boundaries, override conditions,
+        and precise outcomes. Its reasoning process mirrored the verified decomposition,
+        leading to a perfectly aligned conclusion with ImandraX. The LLM's performance
+        was outstanding, scoring full marks across all evaluated metrics.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:41'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 8
+        n_decomposition_exact_scenarios: 24
+        reasoning: The LLM estimated 8 scenarios based on approved (priority and contamination
+          levels) pairs, but it did not account for all possible combinations in the
+          actual decomposition. The ImandraX analysis reveals a total of 24 scenarios
+          by considering additional conditions that the LLM may have missed.
+        score: -3.0
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: The LLM incorrectly captured the conditions that lead to approvals
+          by not properly assessing the branching structure of the process, particularly
+          with how priorities, contamination classes, and tool statuses interplay
+          in a more complex manner, leading to an incorrect understanding of the overall
+          logic.
+        score: 0.125
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 6
+        reasoning: The LLM did not identify any edge cases, while the decomposition
+          indicated the existence of multiple edge cases related to contamination
+          levels, priority thresholds, and tool statuses that affect process approvals.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - '150'
+        - '100'
+        - '120'
+        thresholds_from_decomp:
+        - '150'
+        - '100'
+        - '120'
+        reasoning: The LLM correctly identified some decision boundaries, but did
+          not account for all possible combinations that the ImandraX analysis laid
+          out. The thresholds for temperature and maintenance cycles were clear but
+          didn't account for all scenarios.
+        score: 1.0
+      outcome_precision:
+        score: 0.3
+        reasoning: The LLM's answer, while giving a numerical output, lacked precision
+          in defining what constitutes a scenario, hence the low score. The misinterpretation
+          of scenario paths led to inaccuracies in the answer.
+      direction_accuracy:
+        score: 0.4
+        reasoning: The LLM reached a destination of 10 scenarios, which was factually
+          incorrect, but its thought process reflected an attempt to navigate through
+          requirements, and despite errors, it showcased reasoning but lacked the
+          correct final assessment.
+      coverage_completeness:
+        score: 0.33
+        reasoning: The LLM captured a few aspects of the scenarios but failed to cover
+          all possible combinations leading to approval. It did not account for all
+          simpler combinations which resulted in the final gap between its findings
+          and the ImandraX analysis.
+      overall_summary: The LLM demonstrated a basic understanding of the semiconductor
+        fab scenario but fell short in accurately estimating the number of processing
+        scenarios due to misunderstandings of conditional branches, lack of edge case
+        identification, failure to clarify decision boundaries, and overall coverage
+        of scenarios.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM estimated that wafer processing can be approved in 3 scenarios
+          (Deposition, Metrology, Etching) under Class100 contamination, while the
+          ImandraX provided an exact total of 6 scenarios. This difference shows the
+          LLM's estimation is incomplete.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: incorrect
+        reasoning: The LLM correctly identifies the precedence of contamination classes
+          and the branching logic regarding which steps can be approved based on the
+          contamination. However, it misrepresents the short-circuit behavior of the
+          overrides and fails to correctly capture the conditions under which overrides
+          apply.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Critical override behavior for Class10 vs Class1 situation
+        total_edge_cases: 1
+        reasoning: The LLM identified the critical override case but did not explore
+          other potential edge cases such as the implications of contamination for
+          other process steps.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Class100
+        - Class1000
+        thresholds_from_decomp:
+        - Class1
+        - Class10
+        - Class100
+        - Class1000
+        reasoning: The LLM successfully identified some thresholds relevant to the
+          approval process but failed to capture the full scope of contamination classes.
+          It should have acknowledged all thresholds from the decomposition.
+        score: 0.5
+      outcome_precision:
+        score: 0.75
+        reasoning: The LLM provided a generally accurate understanding of the conditions
+          for approval but lacked full detail in some areas, resulting in an incomplete
+          precision score.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately concluded that wafer processing can be approved
+          for certain process steps under the Class100 contamination scenario.
+      coverage_completeness:
+        score: 0.5
+        reasoning: While the LLM identified some scenarios, it missed additional approvals
+          that were captured by ImandraX. This percentage reflects that the LLM covered
+          only half of the scenarios available.
+      overall_summary: The LLM demonstrates a reasonable understanding of the basic
+        logic behind wafer approvals under contamination conditions. However, it lacks
+        completeness in terms of scenario identification, edge case recognition, and
+        did not fully encapsulate the variations in contamination classes. The overall
+        performance shows strengths in understanding the basic principles but weaknesses
+        in thoroughness.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM estimated the scenario based on provided conditions and
+          determined the approval process; the ImandraX result confirmed that this
+          process is accurate. Both considered the same scenario.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly understands the precedence of conditions, correctly
+          identifies the branching structure of approvals based on certain criteria,
+          understands short-circuit logic (where one true condition can override the
+          need for others), and comprehends the override logic that allows a critical
+          priority to grant approval despite contamination.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - yield loss due to contamination
+        total_edge_cases: 1
+        reasoning: The LLM identified the condition of yield loss as an edge case
+          resulting from the approval process. ImandraX confirms that the condition
+          exists but didn't explicitly mention any additional edge cases.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temperature <= 150
+        - maintenance_cycles < 100
+        thresholds_from_decomp:
+        - temperature <= 150
+        - maintenance_cycles < 100
+        reasoning: Both the LLM and ImandraX correctly identified the same numeric
+          thresholds for the conditions necessary for the approval, specifically for
+          temperature and maintenance cycles.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provided clear reasoning and a conclusion that maintained
+          all conditions within specified limits, showcasing complete precision in
+          its outcome evaluation.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concluded that the characteristics provided would
+          lead to an approval decision and did not misinterpret any conditions.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covered the necessary conditions for approval under the
+          specified scenario, matching the imandraX result by confirming the approval
+          with all required conditions.
+      overall_summary: The LLM and ImandraX produced aligned results with a detailed
+        understanding of the conditions. The LLM demonstrated robust flow logic and
+        outcome reasoning but was slightly less precise in detailing edge cases beyond
+        the yield loss context.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:44'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 24
+        reasoning: The LLM estimates 10 approved scenario categories for Photolithography,
+          focusing primarily on combinations that lead to approval (5 priority-contamination
+          combos × 2 tool statuses). However, the question asks for the total number
+          of wafer processing scenarios existing for Photolithography, not just approved
+          ones. The ImandraX decomposition identifies 24 total scenarios, likely accounting
+          for all discrete input combinations and continuous parameter regions that
+          define distinct decision outcomes. The LLM's estimate is an undercount and
+          misinterprets the scope by limiting to approved paths.
+        score: -2.807354922057604
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions is correct: the LLM accurately describes
+          the sequential checks starting with contamination class requirements for
+          Photolithography (CLASS1), followed by the critical priority override for
+          CLASS10, then tool status and maintenance cycles, and finally temperature.
+          Branching structure is partial: it captures the main branches for contamination
+          (CLASS1 normal approval vs. CLASS10 override) and tool qualification (AVAILABLE
+          <100 or PROCESSING <120), but does not fully enumerate all possible branches
+          including non-qualifying tool states or other contamination classes that
+          lead to rejection. Short-circuit behavior is correct: no explicit short-circuiting
+          is mentioned in the logic, and the LLM does not misrepresent any early exits.
+          Override logic is correct: it clearly identifies the critical priority override
+          allowing CLASS10 contamination approval, which is a key feature of the core
+          logic.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Critical priority override for CLASS10 contamination
+        - Maintenance cycles exactly at 100 for AVAILABLE tool status
+        - Maintenance cycles exactly at 120 for PROCESSING tool status
+        - Temperature exactly at 150 threshold
+        total_edge_cases: 5
+        reasoning: 'The LLM identifies 4 edge cases: the critical override as a rare
+          policy-violating allowance, the distinct maintenance cycle thresholds for
+          AVAILABLE (boundary at 100) and PROCESSING (boundary at 120) tool statuses,
+          and the temperature threshold at 150. It implies but does not explicitly
+          list boundary cases for contamination classes. The decomposition likely
+          includes 5 total edge cases, adding one more related to contamination class
+          boundaries (e.g., exactly CLASS1 vs. next class) or tool status transitions,
+          which the LLM misses by not detailing rejection paths for higher contamination
+          levels.'
+        edge_case_count: 4
+        score: 0.8
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 150 (temperature ≤ 150)
+        - 100 (maintenance_cycles < 100 for AVAILABLE)
+        - 120 (maintenance_cycles < 120 for PROCESSING)
+        - CLASS1 (contamination value ≤ 1)
+        thresholds_from_decomp:
+        - 150 (temperature)
+        - 100 (maintenance_cycles for AVAILABLE)
+        - 120 (maintenance_cycles for PROCESSING)
+        - Class1 (contamination requirement, value 1)
+        reasoning: 'The LLM correctly identifies the key numeric thresholds for temperature
+          (≤150), maintenance cycles (distinct for AVAILABLE <100 and PROCESSING <120),
+          and contamination (CLASS1, interpreted as value ≤1). It also implies the
+          CLASS10 allowance under override but does not list its threshold separately.
+          The decomposition lists the same thresholds, with ''contamination_requirement:
+          Class1 (strictest)'' matching the LLM''s understanding. No thresholds are
+          missed, but the LLM does not explicitly note the strictest class as a boundary
+          value beyond the numerical interpretation.'
+        score: 1.0
+      outcome_precision:
+        score: 0.25
+        reasoning: The LLM provides a numeric estimate of 10 scenarios but waffles
+          between 8 and 10 in its reasoning, indicating uncertainty and lack of precise
+          enumeration. It focuses on discrete enum combinations (priority, contamination,
+          tool status) leading to approval, ignoring full state space including rejection
+          paths and continuous parameter discretizations (e.g., maintenance_cycles
+          and temperature ranges that create multiple regions). The actual decomposition
+          yields 24 precise scenarios, so the LLM's count is imprecise, capturing
+          only about 40% of the space with no distribution details for continuous
+          vars, resulting in a low score.
+      direction_accuracy:
+        score: 0.4
+        reasoning: The LLM reaches a conclusion in the ballpark of multiple scenarios
+          (10) rather than a single or zero, correctly identifying that Photolithography
+          has strict requirements with overrides leading to a non-trivial number of
+          paths. However, it underestimates the total (24) by focusing only on approved
+          outcomes instead of all existing scenarios (approved and rejected). The
+          direction is somewhat correct in recognizing combinatorial explosion from
+          priorities, contamination, and tool states, but the misinterpretation of
+          'scenarios exist' as 'approved scenarios' reduces accuracy.
+      coverage_completeness:
+        score: 0.42
+        reasoning: Coverage is assessed as the proportion of decision scenarios found
+          by the LLM relative to the decomposition's total (10 estimated approved
+          scenarios out of 24 total regions). The rubric applied is ratio of LLM's
+          enumerated paths to actual decomposed regions, focusing on discrete and
+          continuous inputs for Photolithography (e.g., 4 priorities × 5 contaminations
+          × 4 tool statuses × maintenance/temp regions). The LLM covers priority-contamination-tool
+          combos for approval but misses rejection scenarios and finer-grained continuous
+          splits, achieving partial coverage.
+      overall_summary: '"The LLM demonstrates solid understanding of the core control
+        flow, including contamination requirements, critical overrides, tool qualification,
+        and temperature checks for Photolithography, correctly identifying key thresholds
+        and some edge cases like the CLASS10 override. However, it underestimates
+        the total state space by interpreting ''scenarios'' narrowly as approved paths
+        (10 vs. actual 24 total), missing rejection branches and continuous parameter
+        regions. Strengths include accurate override logic and boundary recognition;
+        weaknesses are in scope misinterpretation, incomplete branching coverage,
+        and imprecise counting without full enumeration. Overall, the LLM provides
+        a directional but incomplete analysis compared to ImandraX''s verified decomposition."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM answer does not provide an explicit numeric estimate of
+          the total number of scenarios where approval is possible under chamber_contamination
+          = Class100. It qualitatively identifies the process steps (Deposition, Metrology,
+          Etching) where approval can occur but does not quantify the scenarios (e.g.,
+          combinations of other variables like tool status or temperature). The ImandraX
+          answer specifies exactly 6 scenarios from decomposition, which represents
+          the ground truth region count.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          - precedence_of_conditions: The LLM correctly understands the precedence
+          by first checking the contamination acceptability via <= comparison against
+          required class values per step, then considering overrides only if needed.
+          It accurately applies this for each step without misordering.
+
+          - branching_structure: The LLM properly captures the branching per process
+          step (Photolithography, Ion_Implant, Deposition, Metrology, Etching), evaluating
+          contamination checks and noting additional conditions like tool qualification
+          and temperature for approval paths.
+
+          - short_circuit_behavior: No explicit short-circuiting (e.g., && operators)
+          is detailed in the logic description, but the LLM implies sequential checks
+          (contamination first, then overrides if applicable, then other conditions),
+          treating it correctly without assuming incorrect early exits.
+
+          - override_logic: The LLM accurately describes the critical override as
+          applying only when required_class == CLASS1 and chamber_contamination ==
+          CLASS10, confirming it does not help for Class100, which aligns with the
+          structure.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical override inapplicable to Class100 (only for CLASS10 with CLASS1
+          requirement)
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies one edge case: the critical override logic,
+          which is a rare policy override that could potentially allow dirtier conditions
+          but explicitly does not apply to Class100 (only for CLASS10 when CLASS1
+          is required). This is a policy-violating boundary in the sense of exceptional
+          approval rules. No other edge cases (e.g., extreme temperature or maintenance
+          states combined with Class100) are mentioned. From decomposition, there
+          is likely only this one relevant edge case in the override path, as the
+          ImandraX answer does not highlight additional rare scenarios beyond the
+          standard step-based approvals.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - CLASS1 (value=1) for Photolithography
+        - CLASS10 (value=10) for Ion_Implant
+        - CLASS100 (value=100) for Deposition and Metrology
+        - CLASS1000 (value=1000) for Etching
+        thresholds_from_decomp:
+        - Class1 (1)
+        - Class10 (10)
+        - Class100 (100)
+        - Class1000 (1000)
+        reasoning: The LLM correctly identifies all key numeric thresholds for contamination
+          classes and maps them to specific process steps, including the boundary
+          comparisons (e.g., 100 <= 1 False, 100 <= 100 True, 100 <= 1000 True). It
+          misses no thresholds and accurately ties them to decision points. The decomposition
+          (via ImandraX) uses the same thresholds with the hierarchy Class1 > Class10
+          > Class100 > Class1000, confirming full identification.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provides qualitative outcomes (approval possible for specific
+          steps if tool qualified and temp safe) without exact numeric distributions
+          or counts of scenarios (e.g., no breakdown of how many combinations of other
+          variables like priority or maintenance lead to approval). The ImandraX specifies
+          '6 scenarios,' offering higher precision. The score reflects partial precision
+          in describing conditional approvals but lacking quantitative distribution
+          details.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the fully correct conclusion: yes, approval is
+          possible for Deposition, Metrology, and Etching under Class100, with detailed
+          reasoning on why not for other steps and confirmation that overrides do
+          not apply. This matches the ImandraX direction exactly, including the listed
+          steps and exclusion of Photolithography/Ion_Implant.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: Using the step-based decision scenarios rubric from decomposition,
+          the LLM covers all relevant scenarios where Class100 allows approval (Deposition,
+          Metrology, Etching), implying full coverage of the 3 key branches out of
+          5 total steps. It does not miss any approvable paths and qualifies with
+          necessary conditions (tool/temp), aligning with the 6 scenarios in ImandraX,
+          which likely vary other parameters within these steps.
+      overall_summary: 'The LLM answer demonstrates strong understanding of the core
+        logic, correctly identifying approvable steps and boundaries without decomposition,
+        closely matching ImandraX in direction and coverage but lacking quantitative
+        scenario counts for full precision. Strengths: clear control flow and threshold
+        explanations. Weaknesses: no explicit scenario enumeration or edge case quantification.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM treats the query as a single specific scenario (Photolithography,
+          Critical priority, Class10 contamination, available tool with maintenance_cycles
+          < 100, temperature <=150) and concludes it always results in approval, implying
+          an estimation of 1 scenario. The ImandraX answer confirms this as a single
+          property that always holds, with decomposition verifying exactly 1 decision
+          region under these precise conditions. The LLM's estimation matches the
+          actual decomposed scenario count perfectly.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly sequences the checks
+          as tool qualification first, then temperature safety, then contamination,
+          followed by critical override, matching the logical flow in the core logic.
+          Branching structure: It accurately describes the branching where contamination
+          fails but override branch activates, leading to approval. Short-circuit
+          behavior: No explicit short-circuiting is detailed, but the LLM implies
+          no early exit prevents the override evaluation, correctly assuming full
+          evaluation; this is appropriate as the override follows the contamination
+          check without short-circuit. Override logic: The LLM precisely captures
+          the critical override for Class10 vs Class1 requirement, explaining it activates
+          when priority is Critical and contamination exceeds but meets override criteria,
+          directly aligning with ImandraX''s explanation.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical priority override for Class10 contamination in Photolithography
+          (Class1 required)
+        total_edge_cases: 1
+        reasoning: The LLM identifies the key edge case of high contamination (Class10
+          for Class1 process) being overridden by Critical priority, noting it leads
+          to approval with yield loss, which is the primary rare/policy edge in this
+          scenario. The ImandraX decomposition highlights this exact override as the
+          critical edge, with no other edges mentioned for this property; thus, the
+          LLM finds all (1) edge cases present in the decomposed property.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - maintenance_cycles < 100
+        - temperature <= 150
+        - chamber_contamination = Class10 vs required Class1
+        thresholds_from_decomp:
+        - maintenance_cycles < 100
+        - temperature <= 150
+        - chamber_contamination = Class10 vs required Class1
+        reasoning: 'The LLM explicitly identifies the numeric/ordinal thresholds:
+          maintenance_cycles < 100 for tool qualification, temperature <= 150 for
+          safety (matching Photolithography limit), and the contamination boundary
+          of Class10 exceeding the Class1 requirement, triggering the override. These
+          match exactly the thresholds in the ImandraX decomposition, which focuses
+          on the same conditions for the proven property; no thresholds are missed.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric outcomes matching the model: approved=True,
+          decontamination_required=True, estimated_yield_loss_pct=5 (from loss_map
+          for Class10 to Class1). ImandraX confirms the 5% yield loss under the override.
+          No distributions are probabilistic here (deterministic approval), so the
+          precision is perfect (1.0), with no approximations or ranges used by the
+          LLM.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM concludes 'yes, always approved' under the specified conditions,
+          directly matching the ImandraX 'PROVEN - Property always holds' and the
+          explanation of override granting approval. The direction (affirmative, always
+          true) is entirely correct, with no deviations in reasoning or outcome.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The query specifies a single decision scenario/property (Photolithography
+          + Critical + Class10 + qualified tool + safe temp ==> approved). The LLM
+          fully covers this by analyzing all relevant conditions and concluding it
+          holds, matching the ImandraX decomposition which proves the exact property
+          with no additional scenarios in scope. Coverage is complete (1.0) as the
+          LLM addresses the entire specified scenario without gaps.
+      overall_summary: The LLM demonstrates strong understanding of the control flow,
+        correctly identifying the critical override as the key mechanism for approval
+        in this contamination edge case. It provides precise step-by-step reasoning
+        that aligns perfectly with the ImandraX decomposition, including exact thresholds,
+        outcomes, and yield loss. No weaknesses in direction, coverage, or precision;
+        the answer is comprehensive and accurate for the query's scope, effectively
+        simulating decomposition-level analysis without formal tools.

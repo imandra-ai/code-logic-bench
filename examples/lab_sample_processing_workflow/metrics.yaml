@@ -4655,3 +4655,1157 @@
         it effectively reasons about the specific property without needing broader
         state space exploration, as the question is narrowly focused. Overall, LLM
         performs equivalently well for this yes/no safety property question.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:01'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 54
+        n_decomposition_exact_scenarios: 918
+        reasoning: LLM estimated 54 scenarios, which is significantly lower than the
+          918 scenarios identified by ImandraX. The LLM's initial detailed breakdown
+          suggested 12 scenarios based on high-level decision paths and conditions,
+          then it scaled it to 'approximately 54' later, by multiplying with 4 sample
+          types, which is still a rough estimate. The LLM failed to consider a comprehensive
+          combination of all input parameters and their interactions, leading to a
+          substantial underestimation of the distinct scenarios. ImandraX provided
+          a precise count of 918 scenarios, along with a breakdown by outcome (Approved,
+          Quarantine, Rejected).
+        score: -8.754887502163468
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM correctly identified the precedence of conditions, such
+          as the temperature dead zone branching first, and the priority override
+          branching next, before the normal quorum logic. The branching structure
+          was correctly understood at a high level. Short-circuit behavior was implicitly
+          understood by evaluating conditions in order. However, the override logic
+          was only partially understood in terms of its impact on the total number
+          of scenarios, as evidenced by the underestimation of the true number of
+          scenarios. Although the LLM correctly identified that 'high_priority=True
+          AND user_clearance >= 4' leads to approval, it missed the full scope of
+          interactions with other parameters when this override is not met, which
+          would lead to more scenarios.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - temperature dead zone
+        - high priority override
+        - contamination_ok=False affecting score
+        total_edge_cases: 3
+        reasoning: The LLM identified the temperature dead zone, the high priority
+          override, and the impact of 'contamination_ok=False' as special conditions.
+          These align with the key edge cases that create distinct processing paths.
+          ImandraX's output implicitly confirms these by showing distinct 'Quarantine'
+          outcomes for 'Dead zone or borderline cases' and different 'Approved' and
+          'Rejected' scenarios, which include priority overrides.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temp in [0,2) or (8,10]
+        - user_clearance >= 4
+        - time_since_received <= 720
+        - score >= 3
+        - score == 2
+        - score < 2
+        thresholds_from_decomp:
+        - 'user_clearance'': [2, 3, 4, 5]'
+        - '''current_temp'': [0, 2, 8, 10, 18, 25]'
+        - '''time_since_received'': [720]'
+        - '''approval_score'': [2, 3]'
+        reasoning: The LLM identified thresholds related to temperature (0, 2, 8,
+          10), user clearance (4), time since received (720), and approval score (0,
+          1, 2, 3). ImandraX identified user_clearance thresholds at 2, 3, 4, 5; current_temp
+          thresholds at 0, 2, 8, 10, 18, 25; time_since_received at 720; and approval_score
+          at 2, 3. The LLM missed the additional `user_clearance` thresholds (2,3,5),
+          temperature thresholds (18, 25), and also framed temperature conditions
+          as a range rather than individual boundaries. The LLM also did not identify
+          the implicit thresholds related to `required_clearance(sample_type)` and
+          `combined_contamination` that are present in the full decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provided a single numeric estimate (54 scenarios) without
+          any distributions. ImandraX provided a precise breakdown of scenarios for
+          Approved (244), Quarantine (434), and Rejected (240). Therefore, the LLM's
+          outcome precision score is 0.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's final answer for the number of distinct processing scenarios
+          was 54, while the correct answer from ImandraX was 918. This is a significant
+          discrepancy, indicating an incorrect direction in terms of the scale of
+          the state space. While the LLM correctly identified some high-level decision
+          paths and outcomes, its overall conclusion regarding the total count was
+          very inaccurate.
+      coverage_completeness:
+        score: 0.05
+        reasoning: The LLM identified a negligible proportion of the actual decision
+          scenarios (54 out of 918). Even though it described some of the high-level
+          decision branches and logic, its enumeration of the *combinations* of input
+          parameters that lead to distinct scenarios was profoundly incomplete. The
+          LLM's reasoning for arriving at 54 scenarios, by multiplying 12 sub-scenarios
+          by 4 sample types, is largely heuristic and not a systematic enumeration
+          of the state space. Therefore, the score is calculated as 54/918 which is
+          approximately 0.058.
+      overall_summary: The LLM demonstrated a good understanding of the control flow
+        and high-level decision logic, correctly identifying precedence, branching,
+        and some edge cases like the temperature dead zone and priority override.
+        However, it severely underestimated the total number of distinct processing
+        scenarios by not fully considering the granular combinations of all input
+        parameters and their interactions. This led to a very low accuracy in state
+        space estimation, outcome precision, direction accuracy, and coverage completeness.
+        The LLM also missed several specific decision boundaries (thresholds) identified
+        by ImandraX, especially for user clearance and current temperature, and provided
+        a qualitative estimate instead of a precise count for the scenario breakdown.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM identified that Chemical samples can be approved, and the
+          ImandraX output confirmed 4 such scenarios. The LLM did not provide a specific
+          number of scenarios, hence 'unknown'.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that the priority override path bypasses
+          the normal quorum path, specifically stating that the temperature dead zone
+          check happens before the priority override, and the priority override happens
+          before the quorum path. It correctly deduced that a high contamination level
+          for chemical samples would always fail the normal quorum path (`contamination_ok
+          = False`). The LLM correctly identified that the conditions for approval
+          are `high_priority=True AND user_clearance >= 4 AND NOT in temperature dead
+          zone`.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Chemical sample approved via priority override
+        - Chemical sample always has HIGH combined contamination
+        total_edge_cases: 2
+        reasoning: The LLM explicitly identified that chemical samples can only be
+          approved via the priority override path, which is an edge case given their
+          high contamination level. It also correctly identified that chemical samples
+          always result in a HIGH combined contamination, regardless of other contamination
+          sources.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4
+        - current_temp not in [0,2)
+        - current_temp not in (8,10]
+        thresholds_from_decomp:
+        - user_clearance >= 4
+        - current_temp >= 2
+        - current_temp <= 8
+        reasoning: 'The LLM identified the `user_clearance >= 4` threshold. It also
+          correctly identified the temperature dead zone boundaries: `not in [0,2)`
+          (meaning `current_temp < 0` or `current_temp >= 2`) and `not in (8,10]`
+          (meaning `current_temp <= 8` or `current_temp > 10`). These align with the
+          decomposition''s `current_temp >= 2` and `current_temp <= 8` to avoid the
+          dead zone.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM precisely identified the conditions for approval: `high_priority=True
+          AND user_clearance >= 4 AND the sample must NOT be in the temperature dead
+          zone (i.e., either refrigerated_sample=False, or if refrigerated_sample=True
+          then current_temp must not be in [0,2) or (8,10])`. These conditions exactly
+          align with the ImandraX explanation of the override pattern.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion that Chemical samples can be approved and
+          the conditions under which this occurs are entirely accurate and consistent
+          with the ImandraX answer. It correctly identified the override mechanism
+          and its specific conditions.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM comprehensively covered all aspects of the conditions under
+          which Chemical samples can be approved. It explicitly addressed the contamination
+          issue, the priority override mechanism, and the temperature dead zone, matching
+          the scope of the ImandraX output. The reasoning for why normal quorum path
+          approval is impossible for Chemical samples is detailed and accurate, ensuring
+          full coverage of the decision space for this question.
+      overall_summary: The LLM provided an excellent answer, accurately identifying
+        the ability to approve Chemical samples due to the priority override and precisely
+        detailing the conditions. It demonstrated strong understanding of control
+        flow, edge cases, and decision boundaries. The reasoning was thorough and
+        accurate, fully aligning with the verified decomposition.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM does not explicitly state the number of scenarios it considered,
+          so it''s marked as ''unknown''. The decomposition identifies two scenarios:
+          ''in_temperature_dead_zone'' and ''NOT in_temperature_dead_zone''.'
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the `in_dead_zone` check is the
+          'VERY FIRST decision point' with an 'unconditional early return', which
+          implies understanding of precedence. It also correctly states that 'The
+          priority override... is checked AFTER the dead zone check, so it never gets
+          a chance to override the dead zone quarantine', demonstrating understanding
+          of override logic and its interaction with short-circuiting behavior. This
+          also indirectly confirms an understanding of the branching structure as
+          a whole.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - temperature dead zone
+        total_edge_cases: 1
+        reasoning: The LLM correctly identifies the 'temperature dead zone' as the
+          critical edge case that prevents direct approval. The decomposition also
+          highlights this as the key insight.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 0-2°C
+        - 8-10°C
+        thresholds_from_decomp:
+        - 0-2°C
+        - 8-10°C
+        reasoning: The LLM explicitly identifies the temperature thresholds '0-2°C
+          or 8-10°C' for refrigerated samples, which precisely matches the thresholds
+          provided in the ImandraX decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM''s answer is absolutely precise: ''No, samples... can
+          NEVER be directly approved... They are always quarantined.''. This aligns
+          perfectly with the ''PROVEN'' outcome from ImandraX and the conclusion that
+          dead zone samples ''can ONLY result in Quarantine, never Approved''.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM correctly concludes that samples in the temperature dead
+          zone can ''NEVER be directly approved for processing'' and ''are always
+          quarantined''. This is in exact agreement with the ImandraX answer: ''PROVEN
+          - Dead zone samples NEVER directly approved'' and ''dead zone samples can
+          ONLY result in Quarantine, never Approved''.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM fully covers the implications of the temperature dead zone
+          on processing decisions. It addresses the core question comprehensively
+          by explaining why direct approval is impossible and explicitly stating the
+          resulting 'QUARANTINE' decision. The reasoning provided demonstrates full
+          understanding of all relevant conditions and their precedence, leaving no
+          gaps in coverage for the specified problem.
+      overall_summary: The LLM provided an excellent answer that is fully aligned
+        with the formal verification results from ImandraX. It correctly identified
+        the core logic, precedence of conditions, and the impact of the temperature
+        dead zone as an override. The reasoning was clear, accurate, and comprehensive,
+        demonstrating a deep understanding of the problem's control flow and decision
+        boundaries. All metrics are scored very highly, with most being perfect, indicating
+        a strong performance.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:18'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 54
+        n_decomposition_exact_scenarios: 918
+        reasoning: The LLM estimated 54 distinct processing decision scenarios based
+          on a detailed walkthrough of branches and conditions in the decision tree.
+          However, upon decomposition and thorough review of all sample types, environmental
+          conditions, and user parameters within the ImandraX framework, the actual
+          number of scenarios was determined to be 918. There exists significant disparity
+          between the LLM's estimated scenarios and the actual count.
+        score: -8.754887502163468
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM captures some structural understanding of control flow
+          in the decisions (e.g., dead zones and overrides). However, it incorrectly
+          evaluates the precedence of conditions and misses several connections between
+          input parameters and output decisions in the branching logic. It also does
+          not account adequately for the impact of all boolean conditions leading
+          to appropriate results.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - Borderline contamination levels
+        - Urgent priority sample handling
+        total_edge_cases: 8
+        reasoning: The LLM found 2 edge cases it categorized as critical situations
+          in processing (handling of borderline contamination and urgent priority
+          samples). However, it missed the full scope of 8 key edge cases identified
+          during decomposition, which included additional factors affecting safety
+          and approvals.
+        edge_case_count: 2
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4
+        - temp in [0, 2) or (8, 10)
+        thresholds_from_decomp:
+        - 'user_clearance: [2, 3, 4, 5]'
+        - 'current_temp: [0, 2, 8, 10, 18, 25]'
+        - 'time_since_received: [720]'
+        - 'approval_score: [2, 3]'
+        reasoning: The LLM identified some decision thresholds frameworks but missed
+          additional thresholds that define the necessary cuts for approval, rejection,
+          and quarantine outcomes across various ranges for the parameters.
+        score: 0.5
+      outcome_precision:
+        score: 0.3
+        reasoning: The LLM managed to provide a general outline of how decision outcomes
+          relate to conditions; however, due to misestimating the number of scenarios
+          and the lack of a precise categorization of thresholds, the precision of
+          numeric distributions remains quite low.
+      direction_accuracy:
+        score: 0.1
+        reasoning: The conclusion reached by the LLM indicated a strong underestimation
+          of distinct scenarios and potential decision outcomes. The assertions made
+          did not support the actual outcomes derived in the decomposition.
+      coverage_completeness:
+        score: 0.05
+        reasoning: Coverage of scenarios was notably incomplete, representing only
+          a fraction of the comprehensive decision scenarios discovered in the deeper
+          ImandraX analysis, indicating a very low proportion of scenarios considered
+          by the LLM.
+      overall_summary: The evaluation demonstrated that the LLM significantly underestimated
+        the complexity of the decision scenarios and the conditions applied in the
+        sample processing workflow. It recognized some branches and control flows
+        but failed to capture their full implications across all parameter combinations.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM identified the approval through the priority override as
+          the only condition and did not articulate different scenarios, whereas ImandraX
+          correctly identified 4 scenarios.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM correctly identified how the priority override mechanism works
+          and also assessed the precedence of conditions leading to the decision.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Temperature dead zone consideration
+        total_edge_cases: 0
+        reasoning: The LLM identified the temperature dead zone as a factor in approving
+          chemical samples, but it did not enumerate additional edge cases exactly.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4
+        thresholds_from_decomp:
+        - user_clearance >= 4
+        reasoning: Both LLM and ImandraX correctly identified the user clearance threshold;
+          however, ImandraX elaborated more on related thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: LLM provided clear conditions under which the approval would occur,
+          and those were precise and aligned with ImandraX findings.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both LLM and ImandraX reached the same conclusion that Chemical
+          samples can be approved under specific conditions, thus they were correct.
+      coverage_completeness:
+        score: 0.25
+        reasoning: The LLM identified only one scenario (the priority override), while
+          the ImandraX found 4 scenarios indicating a lower coverage of overall possible
+          decisions.
+      overall_summary: LLM demonstrated a strong understanding of control flow and
+        decision-making, but missed the complexity of multiple scenarios leading to
+        approval.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM did not provide an estimation of scenarios and focused
+          solely on the handling of samples in the temperature dead zone.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately captured the precedence of the dead zone check
+          as the first decision point. It also correctly identified the branching
+          structure involving quarantine and approved processing. The short-circuit
+          behavior was recognized in that it returns from the function immediately
+          upon identifying a dead zone and bypasses all further logic. The override
+          logic was comprehensively understood, as the LLM noted that the priority
+          override is evaluated after the dead zone check.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Priority override for urgent samples
+        total_edge_cases: 1
+        reasoning: The LLM identified the edge case related to the priority overrides
+          but did not elaborate on other potential edge cases that might arise under
+          various conditions beyond the dead zone.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 0-2°C
+        - 8-10°C
+        thresholds_from_decomp:
+        - 0-2°C
+        - 8-10°C
+        reasoning: The LLM successfully identified the numeric thresholds for the
+          temperature dead zones in accordance with the defined parameters. It matched
+          precisely with the decomposition's definition.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provided a clear and precise answer regarding the outcome
+          of quarantine for samples in the dead zone, aligning completely with the
+          expected results. Thus, it demonstrated high precision.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reached the correct conclusion that dead zone samples can
+          never be directly approved and are classified as quarantined, in line with
+          the model's logic.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covered all relevant decision scenarios concerning samples
+          in the temperature dead zone, correctly identifying that they lead exclusively
+          to quarantine.
+      overall_summary: Overall, the LLM answer demonstrates a thorough understanding
+        of the decision logic surrounding temperature dead zones, accurately capturing
+        key elements such as control flow, priority overrides, and outcome precision.
+        Minor limitations were noted in terms of edge case identification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:21'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 54
+        n_decomposition_exact_scenarios: 918
+        reasoning: The LLM explicitly states '54 distinct processing decision scenarios'
+          in its answer. The ImandraX decomposition provides an exact count of 918
+          total scenarios, derived from full enumeration of parameter combinations
+          and decision regions.
+        score: -8.754887502163468
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: The LLM correctly identifies the priority override as a high-precedence
+          branch after the temperature dead zone check (precedence partial, as it
+          acknowledges the order but simplifies the exact conditions). It outlines
+          a branching structure with dead zone, priority override, and quorum logic
+          branches (branching partial, capturing main paths but missing finer sample_type
+          dependencies and exact quorum calculations). No mention of short-circuit
+          behavior in conditions, so incorrect. Override logic for high_priority and
+          user_clearance >=4 is correctly described.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - Temperature dead zone (refrigerated and temp in [0,2) or (8,10])
+        - Priority override failure with high score but contamination HIGH
+        - Score exactly 2 leading to QUARANTINE
+        - Time expired (>720) as a failing condition
+        - Contamination HIGH with score >=3 from other conditions
+        total_edge_cases: 12
+        reasoning: The LLM identifies 5 key edge cases related to dead zones, overrides,
+          exact score thresholds, expiration, and contamination overrides. Based on
+          ImandraX's breakdown, total edge cases include additional rare combinations
+          around thresholds like temp [18,25], specific clearance levels (2,3,5),
+          and policy-violating quorums; estimating 12 total from key_thresholds and
+          quarantine borderline cases, the LLM misses several like non-refrigerated
+          temp extremes and type-specific clearances.
+        edge_case_count: 5
+        score: 0.4166666666666667
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >=4 (override)
+        - current_temp [0,2),(8,10] (dead zone)
+        - current_temp [2,8] or outside [0,10] (temp_ok)
+        - time_since_received <=720
+        - approval_score >=3, ==2, <2
+        - contamination != HIGH
+        - required_clearance by sample_type (implied 2-5)
+        thresholds_from_decomp:
+        - 'user_clearance: [2,3,4,5]'
+        - 'current_temp: [0,2,8,10,18,25]'
+        - 'time_since_received: [720]'
+        - 'approval_score: [2,3]'
+        reasoning: The LLM identifies core thresholds like temp dead zones (0,2,8,10),
+          time 720, score 2/3, clearance 4, and contamination binary. It misses finer
+          user_clearance levels (2,3,5) and additional temp boundaries (18,25), as
+          well as explicit sample_type impacts on clearance. From decomp, these are
+          the exact boundaries defining regions.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides no numeric distributions for outcomes (e.g., no
+          counts for Approved/Quarantine/Rejected), only a total scenario count of
+          54 without breakdown. ImandraX gives precise 244/434/240, so precision is
+          zero as no exact or approximate distributions are offered.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion of 54 scenarios is orders of magnitude below
+          the actual 918, and its reasoning underestimates by collapsing parameter
+          spaces (e.g., ignoring full sample_type variations and temp ranges). No
+          alignment in outcome proportions or directions; it even miscounts sub-branches
+          (e.g., claiming 10 in quorum but total low).
+      coverage_completeness:
+        score: 0.06
+        reasoning: LLM covers a small fraction of scenarios, estimating 54 vs 918
+          actual (54/918 ≈ 0.059). It describes high-level paths (dead zone, override,
+          quorum subs) but fails to enumerate full combinations of 4 sample_types,
+          multiple temp ranges, 4+4 contamination levels, etc., missing most decision
+          regions per ImandraX decomposition rubric.
+      overall_summary: 'The LLM demonstrates partial understanding of the core decision
+        tree, correctly spotting key branches like temperature dead zones and priority
+        overrides, but severely underestimates the state space by not fully expanding
+        parameter combinations (e.g., sample_type effects, granular temps). It identifies
+        some thresholds and edges but lacks precision in counts/distributions, leading
+        to inaccurate total scenarios. Strengths: intuitive tracing of main logic.
+        Weaknesses: oversimplification, no outcome breakdowns, misses finer boundaries.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM answer does not explicitly estimate or count the number
+          of scenarios where Chemical samples can be approved; it describes the conditions
+          qualitatively (priority override with high_priority=True, user_clearance
+          >=4, and not in temperature dead zone) without quantifying into distinct
+          scenarios. The ImandraX answer specifies exactly 4 scenarios for approval
+          of Chemical samples with High contamination, which serves as the decomposition's
+          exact count of regions.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the normal quorum path fails
+          for Chemical samples due to always-high contamination (contamination_ok=False),
+          leading to QUARANTINE or REJECT regardless of score, as the code checks
+          contamination_ok after score >=3. It accurately describes the priority override
+          as the only approval path, which bypasses the quorum (checked before), requiring
+          high_priority=True and user_clearance>=4. This demonstrates correct understanding
+          of condition precedence (override before quorum), branching (normal vs override
+          paths), short-circuit (contamination blocks normal approval), and override
+          logic (bypasses contamination). The explanation matches the ImandraX insight
+          on override bypassing quorum.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Priority override for high-contamination Chemical samples
+        - Temperature dead zone blocking even override approval
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies two key edge cases: (1) the rare approval of
+          inherently high-contamination Chemical samples via priority override (bypassing
+          normal quorum failure), which is a policy-violating edge due to contamination
+          risk; (2) the temperature dead zone as a blocker even for overrides, creating
+          borderline rejection scenarios. The ImandraX answer highlights the override
+          pattern for contaminated samples but does not explicitly list edge cases;
+          inferring from the decomposition context, these two align with the total
+          rare scenarios (override success vs temperature-blocked override), so total=2.
+          No other edges like time constraints or type-specific clearances are mentioned
+          by LLM beyond the core.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4
+        - temperature not in [0,2) or (8,10] for refrigerated_sample=True
+        thresholds_from_decomp:
+        - user_clearance >= 4
+        - refrigerated_sample=False OR (refrigerated_sample=True AND current_temp
+          not in [0,2) U (8,10])
+        reasoning: The LLM identifies the exact clearance threshold (>=4) for override
+          and the temperature dead zone boundaries ([0,2) and (8,10]) as conditions
+          to avoid for approval. These match the decomposition's thresholds, with
+          the LLM phrasing the temperature condition equivalently (not in dead zone).
+          No misses; the ImandraX focuses on clearance but implies temperature is
+          separate (not detailed in provided answer), confirming LLM captures all
+          relevant numeric boundaries for Chemical approval.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM does not provide any numeric distributions, counts, or
+          probabilistic outcomes for approval scenarios; it only describes qualitative
+          conditions without quantifying (e.g., no mention of '4 scenarios' or proportions).
+          The ImandraX specifies exactly '4 scenarios' for approval, indicating precise
+          decomposition-based counting, so LLM's lack of numeric precision scores
+          0.0.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both answers correctly conclude that Chemical samples can be approved
+          only via priority override (high_priority=True and user_clearance>=4), bypassing
+          the failed quorum due to high contamination. The LLM adds the accurate temperature
+          dead zone condition, which aligns with the model's logic (checked before
+          override). No incorrect directions; conclusions match decomposition verification.
+      coverage_completeness:
+        score: 0.75
+        reasoning: Using the scenario-based rubric from decomposition (ImandraX identifies
+          4 exact approval scenarios for Chemical+High contamination), the LLM covers
+          the core conditions enabling all 4 (override + clearance + no temp dead
+          zone), but does not enumerate or explicitly recognize the 4 distinct combinations
+          (e.g., variations in other params like location/equipment contamination,
+          which are irrelevant but might define regions). Coverage is partial (75%)
+          as it describes the full enabling logic without quantifying the space.
+      overall_summary: The LLM answer is directionally accurate and demonstrates strong
+        control flow understanding, correctly isolating the priority override as the
+        sole approval path for Chemical samples while explaining why the normal path
+        fails due to inherent high contamination. It identifies key decision boundaries
+        (clearance and temperature thresholds) and relevant edges (override bypass
+        and temp blocking). However, it lacks precision in quantifying the state space
+        (no scenario count) and coverage (does not enumerate the 4 scenarios from
+        decomposition), making it qualitative rather than exhaustive. Compared to
+        ImandraX's verified, scenario-counted response, the LLM is insightful but
+        less complete for full verification.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM answer does not provide an explicit numerical estimate
+          of the total number of scenarios or regions in the state space. It implicitly
+          considers the dead zone as a single uniform outcome region across all combinations
+          of other parameters (e.g., sample type, clearance, etc.), but does not quantify
+          it. The decomposition treats the dead zone as a single decision region (defined
+          by temperature intervals [0,2) or (8,10] for refrigerated samples), where
+          the outcome is always QUARANTINE regardless of other variables, leading
+          to 1 exact region for this property.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct - LLM accurately identifies
+          the dead zone check as the very first decision point with highest precedence,
+          executing before any other logic. Branching structure: Correct - LLM describes
+          the unconditional early return to QUARANTINE if in dead zone, followed by
+          all other logic in the else branch. Short-circuit behavior: Correct - LLM
+          explicitly notes the early return as an unconditional short-circuit that
+          prevents further evaluation. Override logic: Correct - LLM correctly states
+          that the priority override (and other checks) occur after the dead zone
+          check, so they cannot bypass it, even for urgent samples.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Refrigerated samples with temperature in [0,2) or (8,10]°C, regardless of
+          other parameters (e.g., priority, clearance)
+        total_edge_cases: 1
+        reasoning: The LLM identifies the temperature dead zone itself as the key
+          edge case, emphasizing that it always leads to quarantine due to safety
+          design, and considers variations in other parameters (e.g., priority override,
+          contamination) but concludes they do not affect the outcome. This matches
+          the single primary edge case from the decomposition (borderline storage
+          temperatures requiring forced quarantine). No other edge cases are missed
+          in the context of this question, as the dead zone is the focused rare/policy-violating
+          condition.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 0°C
+        - 2°C
+        - 8°C
+        - 10°C
+        thresholds_from_decomp:
+        - 0°C
+        - 2°C
+        - 8°C
+        - 10°C
+        reasoning: 'The LLM correctly identifies the exact numeric thresholds defining
+          the dead zone for refrigerated samples: [0,2)°C and (8,10]°C, matching the
+          decomposition precisely. It describes the intervals as 0-2°C or 8-10°C (noting
+          the likely half-open nature implicitly through code reference). No thresholds
+          are missed, as these are the only ones relevant to the dead zone condition.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact and precise outcomes with no probabilistic
+          or distributional ambiguity: dead zone samples result in 100% QUARANTINE
+          and 0% APPROVED, unconditionally. This matches the deterministic nature
+          from decomposition, with no ranges or approximations; the conclusion is
+          absolute (''NEVER be directly approved'').'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion ('No, ... can NEVER be directly approved')
+          is fully correct and aligns perfectly with the ImandraX proven property
+          (in_temperature_dead_zone ==> result != Approved). It reaches the right
+          directional answer (impossibility of direct approval) with accurate reasoning
+          about why, including control flow precedence.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Using the property verification rubric from ImandraX (in_temperature_dead_zone
+          ==> result != Approved), the LLM fully covers the decision scenarios within
+          the dead zone region, concluding that all combinations lead to QUARANTINE
+          (no APPROVED). It considers the full state space variations (e.g., priority,
+          clearance) but shows they are irrelevant due to the early check, achieving
+          complete coverage of the relevant scenarios without omission.
+      overall_summary: 'The LLM answer demonstrates strong performance, accurately
+        capturing the control flow and safety-critical nature of the dead zone check
+        without relying on decomposition. Strengths include precise identification
+        of thresholds, correct precedence and override logic, and a definitive conclusion
+        matching the verified property. Minor weakness: no explicit quantification
+        of state space regions, but this does not impact the yes/no question resolution.
+        Overall, it rivals the ImandraX answer in correctness and insight for this
+        targeted query.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 17:53:13'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 54
+        n_decomposition_exact_scenarios: 918
+        reasoning: 'The LLM estimated 54 distinct processing decision scenarios, while
+          ImandraX''s decomposition identified 918 actual scenarios. The LLM''s estimate
+          represents approximately 5.9% of the actual state space (54/918 = 0.059).
+          The LLM attempted to count scenarios by analyzing the decision tree structure
+          and identifying outcome paths, but significantly undercounted the actual
+          parameter combinations. The LLM recognized there are multiple sample types
+          (4), temperature ranges, clearance levels (0-5), and various boolean conditions,
+          but failed to enumerate all concrete parameter combinations that produce
+          distinct decision outcomes. The decomposition shows 918 total scenarios
+          distributed as: 244 Approved (27%), 434 Quarantine (47%), 240 Rejected (26%),
+          indicating a rich state space that the LLM''s simplified analysis missed.'
+        score: -8.754887502163468
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates partial to correct understanding of control
+          flow: (1) Precedence of conditions is PARTIAL - The LLM correctly identifies
+          that the temperature dead zone check occurs first and takes precedence,
+          and correctly notes that priority override is checked next before normal
+          quorum logic. However, the explanation conflates some aspects of how contamination_ok
+          interacts with approval score, showing incomplete clarity on exact precedence.
+          (2) Branching structure is CORRECT - The LLM accurately identifies the three
+          main branches: (1) temperature dead zone leading to QUARANTINE, (2) priority
+          override leading to APPROVED, (3) normal quorum logic with score-based outcomes.
+          (3) Short-circuit behavior is CORRECT - The LLM correctly identifies that
+          temperature dead zone short-circuits to QUARANTINE and priority override
+          short-circuits to APPROVED when conditions are met. (4) Override logic is
+          CORRECT - The LLM accurately describes high_priority AND user_clearance
+          >= 4 override that bypasses normal quorum logic, with proper exception for
+          the temperature dead zone.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Temperature dead zone boundaries [0,2) and (8,10] for refrigerated samples
+        - Priority override requiring both high_priority=True AND user_clearance >=
+          4
+        - 'Contamination contradiction: contamination_ok=True prevents score from
+          being 0'
+        - 'Borderline case: score >= 3 with contamination_ok=False leads to QUARANTINE'
+        total_edge_cases: 12
+        reasoning: 'The LLM identified 4 edge cases while the decomposition contains
+          at least 12 distinct edge cases and boundaries. FOUND: (1) Temperature dead
+          zone boundaries [0,2) and (8,10] correctly identified as critical thresholds
+          for refrigerated samples creating different processing paths. (2) Priority
+          override conditions correctly noted as requiring both high_priority AND
+          user_clearance >= 4. (3) Contamination score contradiction insightfully
+          detected where contamination_ok=True means score >= 1. (4) Borderline contamination
+          case where score >= 3 with high contamination leads to QUARANTINE. MISSED:
+          (5-8) Different sample type clearance requirements (BIOLOGICAL=4, CHEMICAL=3,
+          ENVIRONMENTAL=2, UNKNOWN=0), (9) Time threshold at exactly 720 minutes as
+          a boundary, (10) Interaction between location_contamination and equipment_contamination
+          affecting combined_contamination levels, (11) Score thresholds at 2 and
+          3 interactions with various parameter combinations, (12) Equipment_available
+          interaction with approval score calculations.'
+        edge_case_count: 4
+        score: 0.3333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4 (for priority override)
+        - time_since_received <= 720
+        - 'temperature ranges: [0,2), (8,10] (dead zone), [2,8] (safe for refrigerated)'
+        - approval_score >= 3 (for approval)
+        - approval_score >= 3 with contamination_ok=False (for quarantine)
+        - approval_score == 2 (for quarantine)
+        - approval_score < 2 (for rejection)
+        thresholds_from_decomp:
+        - 'user_clearance: [2, 3, 4, 5]'
+        - 'current_temp: [0, 2, 8, 10, 18, 25]'
+        - 'time_since_received: [720]'
+        - 'approval_score: [2, 3]'
+        reasoning: 'The LLM identified several key thresholds but missed important
+          specifics. IDENTIFIED CORRECTLY: (1) user_clearance >= 4 for priority override,
+          (2) time_since_received <= 720 as a boundary, (3) Temperature dead zone
+          boundaries at 0, 2, 8, 10 for refrigerated samples, (4) Approval score thresholds
+          at 2 and 3. INCOMPLETE/MISSED: (1) The decomposition identifies specific
+          user_clearance levels [2, 3, 4, 5] as decision boundaries, implying different
+          sample types have different clearance requirements. The LLM only mentioned
+          the priority override at 4, missing that levels 2 and 3 are also critical
+          decision points for different sample types (ENVIRONMENTAL=2, CHEMICAL=3,
+          BIOLOGICAL=4). (2) Temperature thresholds [18, 25] are absent from LLM analysis,
+          likely representing boundaries for non-refrigerated or environmental sample
+          handling. The decomposition shows temperature has 6 critical points, suggesting
+          more nuanced logic than the LLM described. (3) The LLM does not explicitly
+          identify how clearance level boundaries affect different sample types differently.'
+        score: 1.0
+      outcome_precision:
+        score: 0.15
+        reasoning: 'The LLM provides qualitative outcome analysis with limited numeric
+          precision. STRENGTHS: (1) The LLM correctly identifies the three primary
+          decision branches (dead zone, priority override, normal quorum) and maps
+          them to outcomes. (2) It correctly maps decision logic to outcomes (e.g.,
+          score >= 3 AND contamination_ok → APPROVED). (3) It correctly enumerates
+          10 sub-scenarios in the quorum branch based on (score, contamination_ok)
+          combinations. WEAKNESSES: (1) The final estimate of 54 scenarios lacks precision
+          and doesn''t provide exact outcome distribution. No percentages or proportions
+          are provided. (2) The LLM recognizes sample type (4 values) and other parameters
+          expand the space but doesn''t enumerate actual counts. (3) The decomposition
+          provides exact precision: 244 Approved (26.6%), 434 Quarantine (47.3%),
+          240 Rejected (26.1%) across 918 scenarios. The LLM''s ''approximately 54''
+          with hand-wavy justification demonstrates imprecise quantification. The
+          LLM misses the actual distribution by a factor of 17x in total scenarios.
+          Score of 0.15 reflects understanding of outcome types but severe lack of
+          numerical rigor in distribution analysis.'
+      direction_accuracy:
+        score: 0.92
+        reasoning: 'The LLM reaches mostly correct conclusions about decision direction
+          with one critical magnitude error. CORRECT DIRECTIONS: (1) Temperature dead
+          zone correctly maps to QUARANTINE. (2) Priority override with high_priority
+          AND user_clearance >= 4 correctly maps to APPROVED. (3) Quorum logic with
+          score >= 3 AND contamination_ok correctly leads to APPROVED. (4) Score ==
+          2 correctly leads to QUARANTINE. (5) Score < 2 correctly leads to REJECTED.
+          (6) High contamination with score >= 3 correctly leads to QUARANTINE rather
+          than approval. All directional mappings align with ImandraX decomposition
+          outcomes. CRITICAL ERROR: The magnitude is drastically wrong: 54 vs 918
+          scenarios (17x underestimate). However, this is a state space enumeration
+          error, not a directional error. The outcome mappings (APPROVED/QUARANTINE/REJECTED)
+          themselves flow correctly. VERIFICATION: The decomposition shows QUARANTINE
+          as most common outcome (47%), which aligns with LLM''s qualitative understanding
+          that score=2 and borderline contamination cases are frequent. Score of 0.92
+          reflects sound directional logic, with the underestimation not fundamentally
+          breaking outcome direction correctness.'
+      coverage_completeness:
+        score: 0.059
+        reasoning: 'The LLM identifies 54 out of 918 actual scenarios, achieving approximately
+          5.9% coverage. COVERAGE ASSESSMENT: (1) The decomposition method identified
+          918 scenarios by enumerating all distinct parameter combinations producing
+          different decision outcomes. This represents ground truth state space. (2)
+          The LLM''s approach identified abstract decision paths (dead zone, priority
+          override, quorum with 10 sub-cases) then estimated expansion via sample
+          types, yielding 54 scenarios. (3) While the LLM correctly identified three
+          main branches, it failed to fully enumerate parameter combinations across:
+          sample_type (4 values with different clearance), refrigerated_sample (2
+          values), current_temp (6 critical ranges), time_since_received (2 ranges),
+          location_contamination × equipment_contamination interactions, user_clearance
+          (multiple boundaries 2,3,4,5), equipment_available (2 values), high_priority
+          (2 values). (4) The actual state shows 918 = 244 + 434 + 240 by outcome,
+          suggesting roughly (918/54) ≈ 17 scenarios per LLM estimate. The LLM missed
+          entire parameter interaction spaces. Against a rubric expecting 80-100%
+          coverage, this is significantly incomplete. Score of 0.059 reflects correct
+          identification of decision flow structure but catastrophic miss of distinct
+          input-output combinations.'
+      overall_summary: >2
+
+        The LLM demonstrates solid understanding of the decision tree's control flow
+        structure and correctly maps conditions to outcomes directionally. However,
+        the analysis fails critically in state space enumeration, estimating 54 scenarios
+        when actual count is 918 (17x underestimate, or 5.9% coverage). The LLM correctly
+        identifies three main decision branches (temperature dead zone → QUARANTINE,
+        priority override → APPROVED, quorum logic with score-based outcomes), accurately
+        describes control flow including short-circuiting, and correctly maps decision
+        outcomes. Branching structure, override logic, and short-circuit behavior
+        are well understood. However, the analysis severely undercounts scenarios
+        because it: (1) Does not fully enumerate parameter combinations (4 sample
+        types with different clearance requirements, 6 temperature boundaries, contamination
+        interactions), (2) Provides qualitative rather than quantitative scenario
+        counts and distributions, (3) Attempts to extrapolate from patterns rather
+        than systematically enumerate. The decomposition reveals 918 scenarios with
+        27% Approved, 47% Quarantine, 26% Rejected outcomes, plus specific thresholds
+        (user_clearance: 2,3,4,5; temp: 0,2,8,10,18,25; time: 720; score: 2,3) that
+        the LLM only partially identified. Strengths: accurate control flow understanding.
+        Weaknesses: imprecise enumeration, lack of quantitative rigor, missing parameter
+        interaction combinations.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM answer does not provide a specific numeric count of scenarios
+          where Chemical samples can be approved. It describes the conditions qualitatively
+          (high_priority=True AND user_clearance >= 4 AND NOT in temperature dead
+          zone) but does not enumerate or count how many distinct scenarios meet these
+          conditions. ImandraX decomposition identified exactly 4 scenarios. The LLM
+          appears to focus on the logical conditions rather than scenario enumeration,
+          so the count cannot be reliably extracted from the LLM response.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates strong understanding of the control flow:
+          (1) Precedence: correctly identifies that priority_override is checked BEFORE
+          the quorum path, meaning high_priority + clearance >= 4 can bypass contamination_ok
+          check. (2) Branching structure: accurately describes both the normal quorum
+          path (which always fails for Chemical samples due to HIGH contamination)
+          and the override path. (3) Short-circuit behavior: correctly explains that
+          contamination_ok is ALWAYS False for Chemical samples because combined_contamination
+          is ALWAYS HIGH ("highest level wins" logic), and this causes quorum to fail
+          even if other conditions are met. (4) Override logic: correctly states that
+          priority_override allows Chemical samples to be approved when high_priority=True
+          AND user_clearance >= 4, and this path bypasses the contamination check.
+          The only minor limitation is that the LLM doesn''t explicitly count the
+          4 scenarios, but the logical understanding is sound.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Temperature dead zone blocking approval even with valid priority override
+          (when refrigerated_sample=True and current_temp in [0,2) or (8,10])
+        - Chemical samples can never be approved through normal quorum path despite
+          meeting other conditions (clearance 4, no location contamination, no equipment
+          contamination)
+        - 'Score calculation for Chemical samples: maximum score is 4 but all scores
+          map to QUARANTINE or REJECTED in normal path'
+        total_edge_cases: 4
+        reasoning: 'The LLM identifies 3 edge cases explicitly: (1) the temperature
+          dead zone blocking override approval, (2) the impossibility of quorum approval
+          despite potentially meeting other conditions, and (3) the score ceiling
+          of 4 always resulting in QUARANTINE. However, ImandraX identifies 4 total
+          edge cases, suggesting one additional edge case was missed. The missing
+          edge case likely relates to specific boundary conditions in the temperature
+          dead zone or clearance thresholds. The LLM''s temperature dead zone description
+          is detailed but may not capture all boundary nuances.'
+        edge_case_count: 3
+        score: 0.75
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - user_clearance >= 4 (for priority override and Chemical sample processing)
+        - contamination_ok requires contamination != HIGH
+        - score >= 3 (for normal quorum path approval)
+        - 'temperature dead zone: [0,2) or (8,10] when refrigerated_sample=True'
+        thresholds_from_decomp:
+        - user_clearance >= 4 (required for Chemical sample override approval)
+        - high_priority = True (required for override approval)
+        - 'temperature dead zone: [0,2) or (8,10] (blocks override approval)'
+        - contamination level = HIGH (blocks normal quorum path)
+        - score >= 3 (normal path threshold, but irrelevant for Chemical samples)
+        - 'location_contamination: Low, Medium, High (may affect combined contamination)'
+        - 'equipment_contamination: Low, Medium, High (may affect combined contamination)'
+        reasoning: 'The LLM identifies the key numeric thresholds: user_clearance
+          >= 4, contamination levels (HIGH vs non-HIGH), score >= 3, and the temperature
+          dead zone boundaries. However, the decomposition reveals additional precision:
+          the exact specification of which combinations of location_contamination
+          and equipment_contamination values matter (Low, Medium, High as distinct
+          values). The LLM correctly identifies that location_contamination and equipment_contamination
+          don''t matter for Chemical samples in the override path (due to the "highest
+          level wins" rule where Chemical base=HIGH always dominates), but could have
+          been more explicit about these as enumerable thresholds. Overall, the LLM
+          captures the essential decision boundaries but with less granularity regarding
+          contamination value combinations.'
+        score: 0.5714285714285714
+      outcome_precision:
+        score: 0.75
+        reasoning: 'The LLM provides qualitatively precise outcomes (Chemical samples
+          approved ONLY via priority override with specific conditions) but lacks
+          numeric precision in two ways: (1) It does not specify that there are exactly
+          4 scenarios where this can occur. ImandraX decomposition reveals these 4
+          scenarios with full specificity (likely combinations of location_contamination
+          and equipment_contamination values that are irrelevant to override but matter
+          for completeness). (2) The LLM does not provide the exact outcome distribution
+          or enumerate all approved scenarios. However, the conditions stated are
+          correct: the outcomes described (APPROVED via override, QUARANTINE or REJECTED
+          via normal path) are accurate for all scenarios matching the conditions.
+          The reasoning about why Chemical samples cannot be approved through quorum
+          (contamination_ok=False always) is precise and well-justified.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM answer is directionally correct: Chemical samples CAN
+          be approved, but ONLY through the priority override path. This matches ImandraX''s
+          affirmative answer. The specific conditions stated (high_priority=True,
+          user_clearance >= 4, NOT in temperature dead zone) are all correct. The
+          reasoning about why the normal quorum path fails (contamination_ok always
+          False due to HIGH base contamination) is accurate. The reasoning about why
+          the override path succeeds (it checks priority/clearance before contamination_ok)
+          is correct. The negative claim that Chemical samples NEVER approve through
+          quorum is correct. All directional conclusions and their supporting logic
+          are sound.'
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'The LLM covers the major decision scenarios: (1) Chemical samples
+          in normal quorum path (always QUARANTINE or REJECTED due to HIGH contamination),
+          (2) Chemical samples in priority override path with valid conditions (APPROVED),
+          and (3) the temperature dead zone blocking condition. However, the coverage
+          is incomplete in that it does not enumerate all 4 distinct scenarios identified
+          by ImandraX decomposition. The LLM treats the conditions (high_priority,
+          user_clearance, temperature dead zone) as threshold-based logic rather than
+          scenario enumeration. This means it covers the conceptual decision space
+          (90-95%) but misses the specific scenario count (75%). The coverage is strong
+          for understanding when Chemical samples can be approved, but weak for documenting
+          all distinct approval scenarios.'
+      overall_summary: >2
+
+        The LLM answer demonstrates strong control flow understanding and directional
+        accuracy. It correctly identifies that Chemical samples can only be approved
+        through the priority override path and correctly explains the logic preventing
+        quorum approval (HIGH contamination always → contamination_ok=False). The
+        conditions for approval (high_priority=True, user_clearance >= 4, NOT in temperature
+        dead zone) are accurate.
+
+
+        Strengths:
+
+        - Correct identification of the override mechanism and its precedence over
+        quorum
+
+        - Clear explanation of why quorum fails for Chemical samples (HIGH base contamination)
+
+        - Accurate specification of required conditions and their role
+
+        - Strong logical reasoning with code-level detail
+
+
+        Weaknesses:
+
+        - Does not enumerate or count the 4 specific scenarios where approval occurs
+
+        - Lacks precision in specifying which combinations of location_contamination
+        and equipment_contamination values create distinct scenarios
+
+        - Temperature dead zone description is correct but presented qualitatively
+        rather than as complete scenario boundaries
+
+        - No explicit mention that some edge cases (likely boundary conditions) exist
+
+
+        Overall, the LLM provides a highly accurate and well-reasoned answer that
+        captures the essential logic of Chemical sample processing approval. It falls
+        short only in scenario enumeration and granular boundary specification, achieving
+        approximately 80-85% completeness of a full decomposition-based analysis.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM answer does not attempt to enumerate specific scenario
+          counts or provide a numerical estimate of decision regions. Instead, it
+          focuses on the logical structure and control flow. The decomposition result
+          (PROVEN) indicates that dead zone enforcement is absolute across all parameter
+          combinations, meaning the dead zone check effectively reduces the decision
+          space to a single outcome (Quarantine) for affected samples. The LLM correctly
+          identifies that no combination of parameters can override the dead zone,
+          but does not quantify state space or scenario counts.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates excellent understanding of control flow:
+          (1) Precedence: The LLM correctly identifies that the dead zone check is
+          ''VERY FIRST decision point'' and has the highest precedence, executing
+          before any other logic. (2) Branching structure: The LLM accurately describes
+          the if-else structure with the early return pattern. (3) Short-circuit behavior:
+          The LLM clearly explains that the unconditional early return (`if in_dead_zone:
+          return ProcessingDecision.QUARANTINE`) short-circuits the entire evaluation,
+          preventing any downstream logic from executing. (4) Override logic: The
+          LLM correctly identifies that the priority override (which could grant APPROVED)
+          is checked AFTER the dead zone check and therefore has no opportunity to
+          bypass the dead zone enforcement. This matches the ImandraX verification
+          that ''overrides don''t bypass it.'''
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Urgent/high-priority samples in dead zone are still quarantined (not approved)
+        - Samples with maximum user clearance in dead zone are still quarantined
+        - Low contamination samples in dead zone are still quarantined
+        - Samples meeting all other approval criteria (clearance, contamination, equipment,
+          time) are still quarantined if in dead zone
+        total_edge_cases: 4
+        reasoning: 'The LLM identifies the key edge cases by explicitly addressing
+          how the dead zone check defeats common override scenarios: ''No matter what
+          the sample type, user clearance, priority status, contamination levels,
+          equipment availability, or time constraints are.'' The LLM specifically
+          mentions (1) priority override attempting to grant APPROVED but failing,
+          (2) sample type variations being irrelevant, (3) user clearance being irrelevant,
+          (4) all other conditions being overridden. These represent the main edge
+          cases where one might expect approval but the dead zone enforces quarantine
+          regardless. The LLM articulates each of these scenarios, demonstrating comprehensive
+          edge case awareness.'
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'Temperature dead zone: [0,2)°C or (8,10]°C for refrigerated samples'
+        - 'Implicit: if in_dead_zone, return Quarantine (no continuation)'
+        thresholds_from_decomp:
+        - 'Temperature dead zone: [0,2)°C or (8,10]°C for refrigerated samples'
+        - 'Control flow threshold: dead zone check at line 1 of determine_processing_decision'
+        reasoning: 'The LLM identifies the exact numeric temperature boundaries [0,2)
+          and (8,10] for the dead zone, which matches the decomposition definition.
+          The LLM does not provide additional thresholds (e.g., specific contamination
+          limits or clearance levels) but this is appropriate for the question scope,
+          which focuses on dead zone behavior. The key boundary clarity is achieved:
+          the LLM explains that temperatures within these ranges trigger mandatory
+          quarantine with no exceptions. The control flow boundary (dead zone check
+          executes first) is also clearly articulated. All critical thresholds for
+          answering the question are correctly identified.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides precise outcomes with exact conclusions: (1)
+          ''can NEVER be directly approved'' - categorical precision; (2) ''always
+          quarantined'' - definitive outcome specification; (3) ''absolutely no combination
+          of parameters'' - quantified scope of the guarantee. The answer uses precise
+          control flow language (''unconditional early return,'' ''immediately returns'')
+          and avoids ambiguity about edge cases. The ImandraX verification confirms
+          this precision with the PROVEN property that ''Dead zone samples NEVER directly
+          approved'' and ''Dead zone samples can ONLY result in Quarantine.'' The
+          LLM''s conclusion that this is ''deliberate safety design'' is also supported
+          by the decomposition''s reasoning (''Force manual review via Quarantine'').'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the correct conclusion: samples in the temperature
+          dead zone can NEVER be directly approved for processing. This is fully aligned
+          with the ImandraX verification result ''PROVEN - Dead zone samples NEVER
+          directly approved.'' The direction of the conclusion is correct (absolute
+          prohibition on approval), the scope is correct (applies universally to all
+          dead zone samples), and the reasoning supporting the conclusion is accurate
+          (control flow precedence, early return, no bypass paths). The LLM''s explanation
+          of why this conclusion is correct (safety design rationale) aligns with
+          the decomposition insight about forcing manual review. Zero directional
+          errors or contradictions are present.'
+      coverage_completeness:
+        score: 0.9
+        reasoning: 'The LLM answer covers the core decision scenario comprehensively:
+          (1) Primary path (dead zone → quarantine) is fully explained with control
+          flow details; (2) Override scenarios are addressed (priority, clearance,
+          contamination, equipment, time) and correctly identified as ineffective;
+          (3) The reason for the design decision is provided (safety mechanism for
+          borderline temperatures). The answer does not enumerate or count distinct
+          decision regions, but this is not essential for answering the posed question.
+          Minor coverage gaps: the answer does not explicitly discuss non-refrigerated
+          samples (which bypass the dead zone check entirely), though this is somewhat
+          implicit in ''refrigerated AND the temperature is in [0,2).'' Overall, the
+          answer addresses all material decision paths relevant to the question.'
+      overall_summary: The LLM answer demonstrates exceptional quality across all
+        evaluation dimensions. It correctly identifies that dead zone samples can
+        never be approved, supported by accurate control flow analysis showing the
+        dead zone check has highest precedence and executes as an early return before
+        any override logic. The answer identifies exact temperature thresholds ([0,2)
+        and (8,10]°C), recognizes key edge cases where various override mechanisms
+        fail, and provides precise categorical outcomes. The reasoning is sound, the
+        conclusions are correctly directed, and the explanation reflects a deep understanding
+        of the system's deliberate safety design. The answer fully aligns with the
+        ImandraX verification (PROVEN property). The only minor gap is the lack of
+        explicit treatment of non-refrigerated samples, but this does not affect the
+        accuracy of the core claim or the overall quality of the response. This represents
+        a high-quality LLM analysis that captures the essential behavior and design
+        intent of the system.

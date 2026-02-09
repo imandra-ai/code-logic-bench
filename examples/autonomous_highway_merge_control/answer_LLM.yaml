@@ -535,3 +535,200 @@
         4. Quorum and execute merge logic (only reachable if emergency check passed)
       - No boundary conditions or edge cases can violate this property given the code
       structure
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:12'
+  q1:
+    answer: >-
+      There are 5 distinct merge decision scenarios with the following exact numeric
+      thresholds:
+
+
+      1. **Dead Zone → ADJUST_SPEED (safe_to_merge=False)**: gap_size in [48, 52]
+      AND closing_rate in [18, 22].
+
+
+      2. **Critical Gap → EMERGENCY_BRAKE (safe_to_merge=False)**: closing_rate >
+      30 (i.e., closing_rate >= 31), AND not in dead zone.
+
+
+      3. **Emergency Present (non-emergency vehicle) → ABORT_MERGE (safe_to_merge=False)**:
+      emergency_present=True AND v_type ≠ EMERGENCY_VEHICLE, AND not in dead zone,
+      AND closing_rate ≤ 30.
+
+
+      4. **Quorum Met + Large Gap → EXECUTE_MERGE (safe_to_merge=True)**: Not in dead
+      zone, closing_rate ≤ 30, not blocked by emergency override, safety quorum met
+      (≥2 of 3 conditions: gap_size ≥ threshold, closing_rate < 15, speed_matched),
+      AND gap_size ≥ threshold + 10.
+
+
+      5. **Quorum Met + Insufficient Gap → ADJUST_SPEED (safe_to_merge=False)**: Same
+      as #4 but gap_size < threshold + 10.
+
+
+      6. **Quorum Not Met → ABORT_MERGE (safe_to_merge=False)**: Not in dead zone,
+      closing_rate ≤ 30, not blocked by emergency override, and fewer than 2 of 3
+      safety conditions met.
+
+
+      The weather-adjusted thresholds are:
+
+      - AUTONOMOUS: CLEAR=30, RAINY=39, ADVERSE=51
+
+      - HUMAN_DRIVEN: CLEAR=45, RAINY=58, ADVERSE=76
+
+      - EMERGENCY_VEHICLE: CLEAR=25, RAINY=32, ADVERSE=42
+
+
+      So there are **6 distinct terminal decision scenarios** (though the question
+      of "distinct" could be counted as 5 unique MergeCommand values mapped: ADJUST_SPEED
+      appears in two different scenarios, ABORT_MERGE appears in two different scenarios,
+      EMERGENCY_BRAKE in one, and EXECUTE_MERGE in one — yielding 4 distinct commands
+      but 6 distinct code paths).
+    reasoning: >-
+      - I traced every return statement in determine_merge_decision and identified
+      6 distinct code paths:
+        1. Dead zone check: returns ADJUST_SPEED if (48 <= gap_size <= 52) and (18
+      <= closing_rate <= 22)
+        2. Critical gap check: returns EMERGENCY_BRAKE if closing_rate > 30
+        3. Emergency override: returns ABORT_MERGE if emergency_present=True and v_type
+      != EMERGENCY_VEHICLE
+        4. Quorum met + large gap (gap_size >= threshold + 10): returns EXECUTE_MERGE
+        5. Quorum met + small gap (gap_size < threshold + 10): returns ADJUST_SPEED
+        6. Quorum not met: returns ABORT_MERGE
+      - The safety quorum requires ≥2 of 3 conditions: (gap_size >= threshold), (closing_rate
+      < 15), (speed_matched)
+
+      - The thresholds are computed as (base * weather_multiplier) // 10
+
+      - Base thresholds: AUTONOMOUS=30, HUMAN_DRIVEN=45, EMERGENCY_VEHICLE=25
+
+      - Weather multipliers (÷10): CLEAR=1.0, RAINY=1.3, ADVERSE=1.7
+
+      - This yields 9 possible adjusted thresholds depending on vehicle type × weather
+  q2:
+    answer: >-
+      Yes, an Emergency_Vehicle with gap_size=45m and gap_closing_rate=25 CAN be commanded
+      to Emergency_Brake, but ONLY when the dead zone check does NOT apply (which
+      is the case here since gap_size=45 is outside [48,52]).
+
+
+      The exact conditions are:
+
+      - closing_rate=25 is NOT > 30, so the critical gap check FAILS. Therefore, with
+      exactly gap_size=45 and closing_rate=25, EMERGENCY_BRAKE is **NOT** issued.
+
+
+      **Correction: No, an Emergency_Vehicle with gap_size=45m and closing_rate=25
+      can NEVER be commanded to Emergency_Brake.** The critical gap check requires
+      closing_rate > 30, and 25 ≤ 30 fails this check. The dead zone check requires
+      gap_size in [48,52], which also doesn't apply. So the function proceeds past
+      both early returns.
+
+
+      For an EMERGENCY_VEHICLE with gap_size=45 and closing_rate=25:
+
+      - Dead zone: 45 not in [48,52] → skip
+
+      - Critical: 25 not > 30 → skip
+
+      - Threshold depends on weather (CLEAR=25, RAINY=32, ADVERSE=42)
+
+      - The function would proceed to quorum/merge logic, never reaching EMERGENCY_BRAKE.
+
+
+      To get EMERGENCY_BRAKE, the closing_rate must be > 30 (e.g., 31+), AND the gap_size/closing_rate
+      must not be in the dead zone.
+    reasoning: >-
+      - Step 1: Dead zone check — gap_size=45 is NOT in [48,52], so dead zone does
+      not trigger.
+
+      - Step 2: Critical gap check — closing_rate=25 is NOT > 30, so EMERGENCY_BRAKE
+      is NOT returned.
+
+      - Since closing_rate must be strictly greater than 30 to trigger EMERGENCY_BRAKE,
+      a closing_rate of 25 can never reach that branch.
+
+      - For any EMERGENCY_VEHICLE to get EMERGENCY_BRAKE, it needs closing_rate >
+      30 (i.e., ≥ 31) AND must not be in the dead zone (which is impossible anyway
+      since dead zone requires closing_rate in [18,22] and gap in [48,52]).
+
+      - Therefore with the exact parameters gap_size=45 and closing_rate=25, EMERGENCY_BRAKE
+      is impossible regardless of weather, speed_matched, or emergency_present values.
+  q3:
+    answer: >-
+      **No, the safety property 'non-emergency vehicles with emergency_present=true
+      should never Execute_Merge' can NEVER be violated under normal execution.**
+
+
+      Here is the detailed analysis:
+
+
+      The emergency override check occurs at this point in the code:
+
+      ```
+
+      if emergency_present and v_type != VehicleType.EMERGENCY_VEHICLE:
+          return MergeDecision(command=MergeCommand.ABORT_MERGE, safe_to_merge=False)
+      ```
+
+
+      This check runs BEFORE any EXECUTE_MERGE decision is possible. The only two
+      checks that run before it are:
+
+      1. Dead zone → returns ADJUST_SPEED (not EXECUTE_MERGE)
+
+      2. Critical gap → returns EMERGENCY_BRAKE (not EXECUTE_MERGE)
+
+
+      Neither of these returns EXECUTE_MERGE. Therefore, for any non-emergency vehicle
+      with emergency_present=True, the function will ALWAYS return one of:
+
+      - ADJUST_SPEED (dead zone)
+
+      - EMERGENCY_BRAKE (critical gap)
+
+      - ABORT_MERGE (emergency override)
+
+
+      None of these is EXECUTE_MERGE.
+
+
+      **However, there is one subtle edge case worth noting:** If the vehicle is of
+      type EMERGENCY_VEHICLE with emergency_present=True, the override does NOT apply
+      (because of the `v_type != EMERGENCY_VEHICLE` condition). In that case, the
+      emergency vehicle itself CAN receive EXECUTE_MERGE. But this is by design —
+      the property specifically says "non-emergency vehicles," and EMERGENCY_VEHICLE
+      type is correctly excluded from the override.
+
+
+      The property holds absolutely for all non-emergency vehicles (AUTONOMOUS, HUMAN_DRIVEN)
+      when emergency_present=True. There are no boundary conditions, integer overflow
+      risks, or logic gaps that could cause a violation.
+    reasoning: >-
+      - The code structure processes checks in this order: (1) dead zone, (2) critical
+      gap, (3) emergency override, (4) quorum-based merge logic.
+
+      - EXECUTE_MERGE only appears in step (4), inside the `if quorum:` block when
+      `gap_size >= threshold + 10`.
+
+      - For a non-emergency vehicle with emergency_present=True to reach step (4),
+      it must pass steps (1), (2), AND (3).
+
+      - Step (3) explicitly checks `if emergency_present and v_type != VehicleType.EMERGENCY_VEHICLE`
+      — this will ALWAYS be True for non-emergency vehicles when emergency_present=True.
+
+      - When step (3) triggers, it returns ABORT_MERGE immediately, so execution never
+      reaches step (4).
+
+      - Steps (1) and (2) can preempt step (3), but they return ADJUST_SPEED and EMERGENCY_BRAKE
+      respectively — neither is EXECUTE_MERGE.
+
+      - Therefore, no combination of inputs (gap_size, closing_rate, weather, speed_matched)
+      can cause a non-emergency vehicle with emergency_present=True to receive EXECUTE_MERGE.
+
+      - The property is fully enforced by the code structure with no edge cases or
+      violations possible.
+
+      - Even extreme boundary values (e.g., gap_size=MAX_INT, closing_rate=0, speed_matched=True)
+      would hit the emergency override at step (3) and return ABORT_MERGE.

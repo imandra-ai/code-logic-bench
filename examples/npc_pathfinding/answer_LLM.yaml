@@ -231,3 +231,74 @@
 
       - For any path_length and these terrain costs, Scout's estimated_cost will always
       be ≤ Civilian's estimated_cost due to integer division by a larger speed value
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:44:52'
+  q1:
+    answer: 25 distinct pathfinding scenarios exist across all NPC types and terrain
+      conditions.
+    reasoning: >2
+
+      - There are 5 NPC types: CIVILIAN, GUARD, MERCHANT, WARRIOR, SCOUT.
+
+      - There are 5 terrain types: OPEN, ROUGH, DIFFICULT, WATER, BLOCKED.
+
+      - Each NPC type can be paired with each terrain type, giving 5 × 5 = 25 distinct
+      NPC-type/terrain combinations.
+
+      - These 25 combinations represent distinct pathfinding scenarios because each
+      combination produces a different traversal capability outcome (can_traverse
+      returns different results) and/or different cost calculations (due to different
+      terrain_cost and npc_speed values).
+
+      - Specifically, the can_traverse function creates distinct groupings: BLOCKED
+      terrain is impassable for all 5 NPCs; WATER is impassable for CIVILIAN and MERCHANT;
+      DIFFICULT is impassable for MERCHANT; all other combinations are traversable.
+      Combined with the varying speed modifiers and terrain costs, each of the 25
+      pairs represents a distinct scenario.
+  q2:
+    answer: No, Civilian NPCs can never successfully path through Water terrain.
+    reasoning: >2
+
+      - The can_traverse function explicitly checks: if terrain == Terrain.WATER and
+      npc_type in (NpcType.CIVILIAN, NpcType.MERCHANT), it returns False.
+
+      - Since CIVILIAN is in the exclusion set for WATER terrain, can_traverse always
+      returns False for this combination.
+
+      - When can_traverse returns False, determine_path_validity immediately returns
+      a PathDecision with path_valid=False, requires_replanning=True, avoidance_needed=False,
+      estimated_cost=0.
+
+      - No other parameters (obstacle_type, obstacle_distance, stuck_count, etc.)
+      can override this check, as it is evaluated first in the function.
+
+      - Therefore, Civilian NPCs can never have a valid path through Water terrain
+      regardless of any other conditions.
+  q3:
+    answer: Yes, when both Civilian and Scout have valid paths through the same terrain,
+      Scout always has equal or lower estimated_cost.
+    reasoning: >2
+
+      - For a path to be valid, the NPC must pass the can_traverse check, not be blocked
+      by an obstacle, and not need replanning. When valid, estimated_cost = (terrain_cost
+      * path_length) // speed.
+
+      - Both Civilian and Scout can traverse: OPEN (cost 1), ROUGH (cost 2), and DIFFICULT
+      (cost 4). (WATER is blocked for Civilian; BLOCKED is blocked for both.)
+
+      - Civilian has speed 1, Scout has speed 4.
+
+      - For the same terrain and same path_length, Civilian's cost = (base_cost *
+      path_length) // 1 = base_cost * path_length.
+
+      - Scout's cost = (base_cost * path_length) // 4.
+
+      - Since Scout's speed (4) is strictly greater than Civilian's speed (1), the
+      integer division by 4 always yields a result ≤ the division by 1.
+
+      - Therefore, Scout's estimated_cost is always ≤ Civilian's estimated_cost for
+      any shared valid terrain and path_length.
+
+      - Concrete examples: OPEN terrain, path_length=5: Civilian cost = 5, Scout cost
+      = 1. ROUGH terrain, path_length=5: Civilian cost = 10, Scout cost = 2. DIFFICULT
+      terrain, path_length=5: Civilian cost = 20, Scout cost = 5.

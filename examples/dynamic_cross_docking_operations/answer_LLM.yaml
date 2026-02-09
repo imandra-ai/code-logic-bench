@@ -624,8 +624,7 @@
       - For routing to succeed (route_approved=True) to a Maintenance dock:
         - blocked_by_maintenance = True
         - can_route = emergency_bypass (which requires BOTH priority==EMERGENCY AND
-      needs_override==True)
-      - When can_route=True, the return statement is: RoutingDecision(route_approved=True,
+      needs_override==True) - When can_route=True, the return statement is: RoutingDecision(route_approved=True,
       ..., requires_emergency_override=needs_override, ...)
 
       - Since needs_override must be True for emergency_bypass to be True, requires_emergency_override
@@ -643,3 +642,183 @@
 
       - No edge cases exist where Hazardous products can be routed to Maintenance
       without emergency override
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:20'
+  q1:
+    answer: >-
+      There are 5 distinct routing scenarios, determined by the following thresholds
+      and conditions:
+
+
+      1. **Dead Zone Rejection** (routing_valid=False): Product volume is between
+      58 and 62 (inclusive) AND dock status is PARTIALLY_OCCUPIED. Returns route_approved=False,
+      routing_valid=False.
+
+
+      2. **Temperature Incompatibility Rejection** (routing_valid=True): The dock
+      temperature zone cannot accommodate the product temperature zone. Returns route_approved=False,
+      routing_valid=True.
+
+
+      3. **Maintenance Dock with Emergency Override Approval**: Dock status is MAINTENANCE,
+      priority is EMERGENCY, and emergency override quorum is met (≥3 of 4 factors
+      true). Returns route_approved=True, routing_valid=True.
+
+
+      4. **Normal/Capacity-Based Approval**: Dock is not in maintenance, and either
+      (a) product_volume ≤ effective_capacity (dock_capacity + priority_adjustment),
+      or (b) emergency bypass applies (priority=EMERGENCY and override quorum met).
+      Returns route_approved=True, routing_valid=True.
+
+
+      5. **Capacity/Maintenance Rejection**: Dock is not in dead zone, temperature
+      is compatible, but capacity is insufficient and no emergency bypass applies
+      (or dock is in maintenance without emergency override). Returns route_approved=False,
+      routing_valid=True.
+
+
+      Key numeric thresholds:
+
+      - Dead zone: 58 ≤ product_volume ≤ 62 (for PARTIALLY_OCCUPIED docks only)
+
+      - Dock capacities: AVAILABLE=100, PARTIALLY_OCCUPIED=60, FULLY_OCCUPIED=0, MAINTENANCE=0
+
+      - Priority capacity adjustments: NORMAL=0, HIGH=-10 (effective caps: 100/50/−10/−10),
+      EMERGENCY=-30 (effective caps: 70/30/−30/−30)
+
+      - Emergency override quorum: ≥3 of 4 factors (priority==EMERGENCY, time_to_deadline<30,
+      product_value>10000, dock_distance>100)
+
+      - Handling time bases: STANDARD=15, FRAGILE=30, HAZARDOUS=45, PERISHABLE=20,
+      HIGH_VALUE=25
+
+      - Temperature multipliers: AMBIENT=1, REFRIGERATED=2, FROZEN=3
+
+      - Priority time adjustments: EMERGENCY=70% (except HAZARDOUS=100%), HIGH=90%,
+      NORMAL=100%
+    reasoning: >-
+      - I traced through all branching paths in determine_routing_decision:
+        - Branch 1: in_dead_zone check (product_volume 58-62 with PARTIALLY_OCCUPIED
+      dock) → immediate rejection with routing_valid=False
+        - Branch 2: temp_compatible check → if incompatible, rejection with routing_valid=True
+        - Branch 3: blocked_by_maintenance AND emergency_bypass → approved route to
+      maintenance dock
+        - Branch 4: NOT blocked_by_maintenance AND (capacity_ok OR emergency_bypass)
+      → approved normal route
+        - Branch 5: All other cases (no capacity, no emergency bypass, or maintenance
+      without override) → rejection with routing_valid=True
+      - The numeric thresholds come from:
+        - is_in_dead_zone: 58 ≤ volume ≤ 62 for PARTIALLY_OCCUPIED
+        - dock_capacity_limit: 100, 60, 0, 0
+        - priority_capacity_adjustment: 0, -10, -30
+        - check_emergency_override_needed: time_to_deadline < 30, product_value >
+      10000, dock_distance > 100, count ≥ 3
+        - base_handling_time: 15, 30, 45, 20, 25
+        - temp_handling_multiplier: 1, 2, 3
+  q2:
+    answer: >-
+      Yes, a Hazardous product can be routed to a Maintenance dock, but only under
+      the following exact conditions:
+
+
+      1. **Priority must be EMERGENCY** (priority == PriorityLevel.EMERGENCY)
+
+      2. **Emergency override quorum must be met** (≥3 of the following 4 factors
+      must be true):
+         - priority == EMERGENCY (always true given condition 1, so this counts as
+      1)
+         - time_to_deadline < 30
+         - product_value > 10000
+         - dock_distance > 100
+         Since condition (a) is always satisfied, at least 2 of the remaining 3 conditions
+      (b, c, d) must also be true.
+      3. **Temperature compatibility must hold**: The maintenance dock's temperature
+      zone must be compatible with the Hazardous product's temperature zone (exact
+      match, or dock is "colder" — e.g., Refrigerated dock for Ambient product, Frozen
+      dock for Refrigerated/Ambient product).
+
+      4. **Product volume must NOT be in the dead zone**: Since maintenance docks
+      are not PARTIALLY_OCCUPIED, this is automatically satisfied (dead zone only
+      applies to PARTIALLY_OCCUPIED).
+
+
+      When routed, the assigned dock_id will be 0 (since the dock_map has no entry
+      for any (temp_zone, MAINTENANCE) combination), and the handling time will be
+      45 × temp_multiplier (no emergency speed reduction for Hazardous products).
+    reasoning: >-
+      - For a Hazardous product to be routed to a Maintenance dock:
+        - The dead zone check only applies to PARTIALLY_OCCUPIED, so MAINTENANCE bypasses
+      that
+        - Temperature compatibility must pass (is_temp_compatible)
+        - blocked_by_maintenance is True for MAINTENANCE docks
+        - The only way to route when blocked_by_maintenance is True is via emergency_bypass
+        - emergency_bypass requires: priority == EMERGENCY AND needs_override == True
+        - needs_override requires ≥3 of 4 conditions: priority==EMERGENCY (auto-true),
+      time_to_deadline<30, product_value>10000, dock_distance>100
+        - So with EMERGENCY priority already satisfying 1 factor, need 2 more of the
+      remaining 3
+        - The product type being Hazardous does NOT block routing — only affects handling
+      time (no speed reduction)
+        - The dock_id assigned will be 0 since dock_map has no (*, MAINTENANCE) entries
+        - Handling time for Hazardous is always 45 × temp_multiplier regardless of
+      priority (no emergency reduction)
+  q3:
+    answer: >-
+      Yes, the safety property "Hazardous products routed to maintenance docks must
+      have emergency override" can NEVER be violated in the current implementation.
+      Here is the analysis:
+
+
+      The safety property holds universally because:
+
+      - When dock_status == MAINTENANCE, the variable blocked_by_maintenance is True.
+
+      - The only path to route_approved=True when blocked_by_maintenance is True requires
+      emergency_bypass to be True.
+
+      - emergency_bypass being True requires BOTH priority == EMERGENCY AND needs_override
+      == True.
+
+      - When needs_override is True and the route is approved (can_route=True), the
+      returned RoutingDecision always sets requires_emergency_override=needs_override,
+      which is True.
+
+      - This applies regardless of product type, so it holds for Hazardous products
+      specifically.
+
+
+      Therefore, every Hazardous product routed to a maintenance dock will always
+      have requires_emergency_override=True. The safety property cannot be violated.
+
+
+      **However, there is one subtle edge case worth noting regarding dock_id**: When
+      a Hazardous product IS routed to a maintenance dock via emergency override,
+      the assigned_dock_id will be 0 (the default/invalid ID), because assign_dock_by_temp_and_status
+      has no mapping for any (temp_zone, MAINTENANCE) combination. This means the
+      route is "approved" with an invalid dock ID, which could be considered a different
+      kind of safety concern — but it does NOT violate the specific stated property
+      about emergency override.
+    reasoning: >-
+      - I traced every code path where a Hazardous product could be routed to a Maintenance
+      dock:
+        - blocked_by_maintenance = True when dock_status == MAINTENANCE
+        - The code: if blocked_by_maintenance: can_route = emergency_bypass
+        - emergency_bypass = (priority == EMERGENCY) and needs_override
+        - So can_route = True requires needs_override = True
+        - In the return statement when can_route is True: requires_emergency_override=needs_override
+        - Since needs_override must be True for can_route to be True on a maintenance
+      dock, requires_emergency_override is always True
+        - This logic is product-type-agnostic — there's no special path for Hazardous
+      products that could bypass the override requirement
+        - The safety property is guaranteed by the code structure: maintenance routing
+      REQUIRES emergency_bypass, which REQUIRES needs_override, which IS the value
+      returned as requires_emergency_override
+        - Edge case: The dead zone check (volume 58-62 with PARTIALLY_OCCUPIED) doesn't
+      apply here since dock is MAINTENANCE, not PARTIALLY_OCCUPIED
+        - Edge case: Temperature incompatibility would reject before reaching the
+      maintenance check, but that results in route_approved=False, so the property
+      trivially holds (product isn't routed)
+        - Edge case: The dock_id being 0 (invalid) is a notable observation but doesn't
+      violate the specific stated property
+        - No race conditions or integer overflow concerns exist in this pure Python
+      logic

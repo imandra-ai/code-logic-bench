@@ -285,3 +285,150 @@
         - PARTIALLY_APPROVED: if new_usage_pct > 90%
         - FULLY_APPROVED: only when not in throttle zone, tenant is active, AND new_usage_pct
       <= 90%
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:05'
+  q1:
+    answer: >-
+      There are 4 distinct allocation scenarios for GracePeriod billing status, governed
+      by two thresholds: usage_pct ≥ 70% and the tier being Enterprise vs. non-Enterprise.
+
+
+      Scenario 1: usage_pct ≥ 70%, ANY tier (including Enterprise) → DENIED (from
+      billing override)
+
+      Scenario 2: usage_pct < 70%, Enterprise tier → FULLY_APPROVED (from billing
+      override), then downgraded to PARTIALLY_APPROVED if new_usage_pct > 90%
+
+      Scenario 3: usage_pct < 70%, Non-Enterprise tier → PARTIALLY_APPROVED (from
+      billing override), then DENIED if new_usage_pct > tier threshold (60% for Basic,
+      75% for Professional)
+
+      Scenario 4: usage_pct < 70%, Non-Enterprise tier → PARTIALLY_APPROVED (from
+      billing override), remains PARTIALLY_APPROVED if new_usage_pct ≤ tier threshold
+
+
+      More precisely, expanding all final outcomes:
+
+      - usage_pct ≥ 70%, any tier → DENIED
+
+      - usage_pct < 70%, Enterprise, new_usage_pct ≤ 90% → FULLY_APPROVED
+
+      - usage_pct < 70%, Enterprise, new_usage_pct > 90% → PARTIALLY_APPROVED
+
+      - usage_pct < 70%, non-Enterprise, new_usage_pct > tier threshold → DENIED
+
+      - usage_pct < 70%, non-Enterprise, new_usage_pct ≤ tier threshold → PARTIALLY_APPROVED
+
+
+      That gives 5 distinct final-outcome scenarios. The exact numeric thresholds
+      involved are: 70% (GracePeriod usage cutoff), 60% (Basic tier threshold), 75%
+      (Professional tier threshold), and 90% (Enterprise tier threshold).
+    reasoning: >-
+      - The billing override function `apply_billing_override` for GracePeriod has
+      three branches:
+        1. usage_pct >= 70 → DENIED (applies to ALL tiers, including Enterprise —
+      the code checks usage_pct >= 70 BEFORE checking if tier is Enterprise)
+        2. tier == Enterprise (and usage_pct < 70) → FULLY_APPROVED
+        3. All other tiers (and usage_pct < 70) → PARTIALLY_APPROVED
+
+      - After the billing override, `determine_allocation_decision` further refines
+      the result:
+        - If billing returned DENIED → final is DENIED
+        - If billing returned FULLY_APPROVED → check new_usage_pct > threshold; if
+      so PARTIALLY_APPROVED, else FULLY_APPROVED
+        - If billing returned PARTIALLY_APPROVED → check new_usage_pct > threshold;
+      if so DENIED, else PARTIALLY_APPROVED
+
+      - Additionally, the throttle zone check (75-85% usage_pct) runs BEFORE billing
+      overrides, so if usage_pct is 75-85%, it's DENIED before GracePeriod logic is
+      even reached. However, this overlaps with the ≥70% denial from GracePeriod.
+
+
+      - The distinct thresholds are: 70% (GracePeriod denial cutoff), 60% (Basic),
+      75% (Professional), 90% (Enterprise), and 75%-85% (throttle zone, though this
+      is pre-empted by the 70% rule for values 75-85%).
+  q2:
+    answer: >-
+      No, Basic tier can NEVER achieve FullyApproved status when billing_status is
+      GracePeriod. It is impossible under any conditions.
+
+
+      The billing override function for GracePeriod returns either DENIED (if usage_pct
+      ≥ 70%) or PARTIALLY_APPROVED (for non-Enterprise tiers with usage_pct < 70%).
+      It only returns FULLY_APPROVED for Enterprise tier. Since Basic is not Enterprise,
+      the billing override will never return FULLY_APPROVED for Basic.
+
+
+      When the billing override returns PARTIALLY_APPROVED, the main function either
+      keeps it as PARTIALLY_APPROVED (if new_usage_pct ≤ 60%) or downgrades it to
+      DENIED (if new_usage_pct > 60%). There is no code path that upgrades PARTIALLY_APPROVED
+      to FULLY_APPROVED.
+
+
+      Therefore, the best outcome Basic tier can achieve under GracePeriod is PARTIALLY_APPROVED
+      (when usage_pct < 70% and new_usage_pct ≤ 60%).
+    reasoning: >-
+      - In `apply_billing_override`, when billing_status is GRACE_PERIOD:
+        - If usage_pct >= 70 → returns DENIED (regardless of tier)
+        - If tier == Enterprise → returns FULLY_APPROVED
+        - Otherwise → returns PARTIALLY_APPROVED
+      - Basic tier is not Enterprise, so when usage_pct < 70%, the billing override
+      returns PARTIALLY_APPROVED
+
+      - In the main function, when billing_result is PARTIALLY_APPROVED:
+        - If new_usage_pct > threshold (60% for Basic) → DENIED
+        - Else → PARTIALLY_APPROVED
+      - There is NO code path that converts PARTIALLY_APPROVED from billing override
+      into FULLY_APPROVED
+
+      - The only way to get FULLY_APPROVED after billing override is if billing override
+      itself returned FULLY_APPROVED, which requires Enterprise tier in the GracePeriod
+      case
+
+      - Therefore, Basic tier under GracePeriod can only ever get PARTIALLY_APPROVED
+      (best case) or DENIED (worst case), never FULLY_APPROVED
+  q3:
+    answer: >-
+      No, Enterprise tier with Current billing status does NOT always result in FullyApproved.
+      There are two conditions that can block it:
+
+
+      1. **Throttle zone (75-85% usage)**: If current usage_pct is between 75% and
+      85% inclusive, the request is DENIED before billing overrides are even considered.
+      This check runs first in the main function.
+
+
+      2. **Tenant status not ACTIVE**: If tenant_status is SUSPENDED or QUOTA_EXCEEDED,
+      the request is DENIED regardless of tier or billing status.
+
+
+      3. **New usage exceeding tier threshold**: Even after billing override returns
+      FULLY_APPROVED (which it always does for Current billing), if the new_usage_pct
+      (after adding requested_amount) exceeds 90% (Enterprise threshold), the result
+      is downgraded to PARTIALLY_APPROVED instead of FULLY_APPROVED.
+
+
+      So FullyApproved only occurs when: tenant is ACTIVE, current usage_pct is NOT
+      in 75-85% range, AND new_usage_pct ≤ 90%.
+    reasoning: >-
+      - Step 1 in `determine_allocation_decision`: Check throttle zone. If usage_pct
+      is 75-85%, return DENIED immediately. This applies regardless of tier or billing
+      status.
+
+      - Step 2: Check tenant_status. If not ACTIVE, return DENIED. This also applies
+      universally.
+
+      - Step 3: `apply_billing_override` for CURRENT billing always returns FULLY_APPROVED,
+      regardless of tier or usage.
+
+      - Step 4: But even when billing returns FULLY_APPROVED, the main function checks:
+      if new_usage_pct > threshold (90% for Enterprise), it returns PARTIALLY_APPROVED
+      instead of FULLY_APPROVED.
+
+      - Example blocking scenarios:
+        - Enterprise, Current, Active, usage at 80% → DENIED (throttle zone)
+        - Enterprise, Current, Suspended tenant → DENIED (tenant status)
+        - Enterprise, Current, Active, usage at 50% but requesting enough to push
+      new_usage to 95% → PARTIALLY_APPROVED (exceeds 90% threshold)
+      - Only when all conditions are favorable (active tenant, not in throttle zone,
+      new usage ≤ 90%) does Enterprise+Current get FULLY_APPROVED

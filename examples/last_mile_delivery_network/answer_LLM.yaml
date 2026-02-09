@@ -278,3 +278,141 @@
 
       - Therefore, direct ASSIGNED decision is impossible for vehicles in their dead
       zone
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:15'
+  q1:
+    answer: 'The model has 3 vehicle types × 3 package priorities × 3 weather conditions
+      = 27 categorical combinations. Each combination interacts with continuous parameters
+      (battery_level, current_load, capacity, package_weight, distance), which create
+      multiple distinct decision boundary regions. Analyzing the key decision paths:
+      (1) Battery dead zone → WAITLIST (each vehicle type has its own dead zone range,
+      giving 3 dead zone scenarios per categorical combo = up to 27 dead-zone WAITLIST
+      paths), (2) Emergency override → ASSIGNED (applies only to EMERGENCY priority
+      with battery >15% and outside dead zone = 9 override paths across vehicle×weather),
+      (3) Quorum-based scoring with score≥4 → ASSIGNED, score=3 → WAITLIST, score<3
+      → REJECTED. The quorum path has 6 boolean conditions yielding 2^6=64 possible
+      boolean combinations, though not all are reachable for every categorical combo.
+      Conservatively, considering the 27 categorical combinations × 3 major decision
+      branches (dead zone, emergency override, quorum) and within the quorum path
+      the 3 possible outcomes, the total number of truly distinct decision scenarios
+      (unique paths through the logic with distinguishable outcomes) is approximately
+      **81 to 162 distinct scenario classes**. More precisely: 27 dead-zone scenarios
+      (all WAITLIST) + 9 emergency override scenarios (all ASSIGNED, only EMERGENCY
+      priority × 3 vehicles × 3 weathers, minus cases absorbed by dead zone) + the
+      remaining non-dead-zone, non-emergency-override categorical combos (18 priority/vehicle/weather
+      combos for STANDARD/URGENT, plus EMERGENCY with battery≤15%) each with 3 possible
+      quorum outcomes = roughly 54+ quorum sub-scenarios. A reasonable total is approximately
+      **90 distinct decision scenarios**.'
+    reasoning: >-
+      - There are 3 vehicle types (Truck, Drone, Robot), 3 package priorities (Standard,
+      Urgent, Emergency), and 3 weather conditions (Clear, Rain, Storm) = 27 categorical
+      combinations.
+
+      - Each categorical combination interacts with continuous parameters (battery_level,
+      current_load, capacity, package_weight, distance) that create multiple decision
+      regions.
+
+      - The logic has 3 major sequential decision gates: (1) battery dead zone check
+      → WAITLIST, (2) emergency override check → ASSIGNED, (3) quorum scoring → ASSIGNED/WAITLIST/REJECTED.
+
+      - Dead zone applies per vehicle type with specific battery ranges (Truck: 20-25%,
+      Drone: 25-35%, Robot: 15-20%), creating 27 dead-zone WAITLIST scenarios (one
+      per categorical combo).
+
+      - Emergency override: only for EMERGENCY priority with battery >15% AND not
+      in dead zone = up to 9 paths (3 vehicles × 3 weathers).
+
+      - Quorum path: 6 boolean conditions (weather_ok, battery_ok, capacity_ok, distance_ok,
+      priority_ok, not_overloaded) are scored. Score ≥4 → ASSIGNED, =3 → WAITLIST,
+      <3 → REJECTED. Each of the remaining categorical combos (those not caught by
+      dead zone or emergency override) can yield 3 different outcomes.
+
+      - For the 18 non-EMERGENCY categorical combos (Standard/Urgent × 3 vehicles
+      × 3 weathers), each can produce 3 quorum outcomes = 54 scenarios.
+
+      - For EMERGENCY priority with battery ≤15% (not in dead zone), these also go
+      to quorum: 3 vehicles × 3 weathers × 3 outcomes = up to 27 more, though some
+      are unreachable.
+
+      - Total distinct scenario classes: ~27 (dead zone) + 9 (emergency override)
+      + ~54-81 (quorum paths) ≈ 90-117 distinct decision scenarios.
+  q2:
+    answer: 'No, Drones cannot be directly assigned deliveries during Storm weather
+      through the normal quorum path because weather_ok is always False for Drones
+      in Storm, making it very difficult to achieve the quorum of 4. However, there
+      is ONE exception: Drones CAN be assigned during Storm weather via the **emergency
+      override** path. This occurs when: (1) the package priority is EMERGENCY, (2)
+      the battery level is >15%, AND (3) the battery level is NOT in the Drone''s
+      dead zone (i.e., battery is NOT between 25% and 35%). So a Drone with battery
+      >35% (or between 15% exclusive and 25% exclusive) carrying an EMERGENCY package
+      in a Storm WILL be assigned. Additionally, through the quorum path, assignment
+      is theoretically possible if all 5 other conditions are true (battery_ok, capacity_ok,
+      distance_ok, priority_ok, not_overloaded) giving a score of 5 ≥ 4, which would
+      result in ASSIGNED even with weather_ok=False.'
+    reasoning: >-
+      - The `_vehicle_weather_compatible` function returns False for Drones during
+      Storm weather (weather_ok = False).
+
+      - The decision logic is checked in order: (1) dead zone, (2) emergency override,
+      (3) quorum scoring.
+
+      - Emergency override path: If priority is EMERGENCY and battery > 15% and NOT
+      in dead zone (25-35% for Drones), the function returns ASSIGNED immediately,
+      completely bypassing the weather check. So a Drone with EMERGENCY priority,
+      battery >35% (or 15< battery <25), in Storm weather WILL be assigned.
+
+      - Quorum path: weather_ok=False means the Drone starts with one condition already
+      failed. It needs 4 out of 6 to be ASSIGNED. With weather_ok=False, the Drone
+      needs all 5 remaining conditions to be True to get score=5≥4 (ASSIGNED), or
+      4 of the remaining 5 for score=4 (ASSIGNED).
+
+      - For the quorum path in Storm: battery must be ≥35% (not in dead zone 25-35,
+      so >35), battery_ok requires ≥35% so battery_ok=True if battery>35%. distance_ok
+      requires distance≤30. capacity_ok requires current_load+package_weight≤capacity.
+      not_overloaded requires current_load < capacity*80//100. priority_ok: for EMERGENCY
+      battery>15% would have been caught by override (since >35%>15%), so this only
+      applies to STANDARD (always True) or URGENT (requires battery≥40).
+
+      - So for STANDARD priority, Storm, Drone with battery>35%: weather_ok=False,
+      battery_ok=True, and if capacity_ok=True, distance_ok=True, priority_ok=True,
+      not_overloaded=True → score=5 → ASSIGNED. This IS possible.
+
+      - For URGENT priority, Storm, Drone with battery≥40%: weather_ok=False, battery_ok=True,
+      priority_ok=True, and if capacity/distance/overload OK → score=5 → ASSIGNED.
+
+      - So yes, Drones CAN be assigned in Storm through both the emergency override
+      AND the quorum path.
+  q3:
+    answer: 'No, vehicles in their battery dead zone can NEVER be directly assigned
+      to deliveries. They are always given WAITLIST status. The dead zone check is
+      the very first check in the function, executed before the emergency override
+      check and before the quorum-based scoring. When a vehicle''s battery is in the
+      dead zone (Truck: 20-25%, Drone: 25-35%, Robot: 15-20%), the function immediately
+      returns WAITLIST, regardless of package priority (even EMERGENCY), weather conditions,
+      capacity, distance, or any other factor. The emergency override, which could
+      otherwise force an ASSIGNED result, is never reached because the dead zone check
+      comes first.'
+    reasoning: >-
+      - The `determine_vehicle_assignment` function checks the battery dead zone FIRST,
+      before any other logic.
+
+      - The code is: `if in_dead_zone: return AssignmentDecision.WAITLIST` — this
+      is an immediate return with no exceptions.
+
+      - The dead zone ranges are: Truck (20% ≤ battery ≤ 25%), Drone (25% ≤ battery
+      ≤ 35%), Robot (15% ≤ battery ≤ 20%).
+
+      - Because this check precedes the emergency override check, even an EMERGENCY
+      priority package cannot trigger an ASSIGNED result when the vehicle is in its
+      dead zone.
+
+      - For example, a Drone with battery=30% and an EMERGENCY package would hit the
+      dead zone check first and return WAITLIST, even though the emergency override
+      (battery >15% and EMERGENCY priority) would have returned ASSIGNED if it had
+      been reached.
+
+      - There are no conditional branches or exceptions within the dead zone check
+      — it unconditionally returns WAITLIST.
+
+      - This means dead zone → WAITLIST is an absolute rule in the system with zero
+      exceptions.

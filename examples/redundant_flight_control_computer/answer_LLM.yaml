@@ -252,3 +252,85 @@
       remain
 
       - If 2 computers are Failed, quorum is lost and pilot intervention is required
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:44:53'
+  q1:
+    answer: '729'
+    reasoning: >-
+      - The input parameters and their possible values are:
+        - comp_a: 3 values (OPERATIONAL, DEGRADED, FAILED)
+        - comp_b: 3 values (OPERATIONAL, DEGRADED, FAILED)
+        - comp_c: 3 values (OPERATIONAL, DEGRADED, FAILED)
+        - flight_phase: 3 values (TAKEOFF, CRUISE, LANDING)
+        - agreement: 3 values (FULL_AGREEMENT, PARTIAL_AGREEMENT, DISAGREEMENT)
+        - altitude: continuous integer (0-50000), but treated as a parameter axis
+      - However, "distinct control scenarios" refers to the distinct combinations
+      of the discrete enumeration inputs, since altitude is continuous and doesn't
+      define discrete scenarios on its own.
+
+      - Wait — altitude does affect behavior through the dead zone check (9800-10200
+      with specific conditions). But the question asks about "distinct control scenarios"
+      which most naturally maps to the total number of distinct input combinations
+      of the discrete parameters.
+
+      - Total discrete input combinations: 3 × 3 × 3 × 3 × 3 = 243... but altitude
+      adds another dimension.
+
+      - Re-reading: altitude creates effectively 3 zones of behavior: altitude in
+      dead zone range (9800-10200), altitude in valid range but not dead zone, and
+      altitude in invalid range (negative or >50000). That gives 3 altitude categories.
+
+      - So total distinct scenarios: 3 × 3 × 3 × 3 × 3 × 3 = 729 distinct control
+      scenarios.
+
+      - Each unique combination of (comp_a, comp_b, comp_c, flight_phase, agreement,
+      altitude_category) produces a potentially different control decision pathway.
+  q2:
+    answer: 'Yes'
+    reasoning: >-
+      - Landing is a critical phase (flight_phase == FlightPhase.LANDING), so `_requires_pilot_override`
+      sets `critical_phase = True` and initially `needs_pilot = True`.
+
+      - However, there is an exception: if `agreement == SensorAgreement.FULL_AGREEMENT`
+      AND `_has_quorum()` returns True (2+ operational computers), then `override
+      = True`.
+
+      - When `override` is True, the function returns `not override` which is `False`,
+      meaning pilot intervention is NOT required.
+
+      - So for Landing phase with FULL_AGREEMENT sensors and at least 2 OPERATIONAL
+      computers, `pilot_needed = False`.
+
+      - Additionally, quorum must be True (which it is in this case, since 2+ operational),
+      so `not quorum` is False.
+
+      - The final `require_pilot_intervention = pilot_needed or not quorum = False
+      or False = False`.
+
+      - Therefore, Landing phase CAN operate without pilot intervention under the
+      right conditions (full sensor agreement + quorum of operational computers).
+  q3:
+    answer: 'Yes'
+    reasoning: >-
+      - The system uses quorum-based operation requiring at least 2 OPERATIONAL computers.
+
+      - With 1 FAILED computer, the remaining 2 computers can still be OPERATIONAL,
+      satisfying the quorum requirement (_count_operational >= 2).
+
+      - When quorum is met, `_select_computers` selects all non-FAILED computers (OPERATIONAL
+      or DEGRADED status).
+
+      - The final decision applies `use_x and quorum` — so if quorum is True, the
+      non-failed computers will be used.
+
+      - Example: comp_a=OPERATIONAL, comp_b=OPERATIONAL, comp_c=FAILED → op_count=2,
+      quorum=True, use_a=True, use_b=True, use_c=False. The system uses computers
+      A and B.
+
+      - Even with 1 FAILED and 1 DEGRADED (e.g., comp_a=OPERATIONAL, comp_b=DEGRADED,
+      comp_c=FAILED), op_count=1 which is less than 2, so quorum fails and computers
+      are not used (pilot intervention required). So it depends on the status of the
+      other two computers.
+
+      - In summary: yes, the system can use computers with 1 failed computer, provided
+      the other 2 computers are OPERATIONAL (meeting the quorum of 2).

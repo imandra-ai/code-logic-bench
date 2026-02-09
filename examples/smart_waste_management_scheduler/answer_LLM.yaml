@@ -249,9 +249,8 @@
       of fuel
         2. Non-emergency with fuel < 20: approved=False
         3. Non-emergency with fuel >= 20: priority calculated, approved if priority
-      >= 50
-      - With 2 compatible trucks × all parameter combinations, scenarios are technically
-      infinite due to continuous integer inputs
+      >= 50 - With 2 compatible trucks × all parameter combinations, scenarios are
+      technically infinite due to continuous integer inputs
 
       - If counting distinct behavioral outcomes: ~8-12 unique patterns based on code
       branches
@@ -267,9 +266,8 @@
         3. If emergency is True, it returns immediately with approved=True WITHOUT
       checking fuel level
         4. Only after the emergency check does the function check if fuel_level >=
-      20
-      - Emergency override condition: waste == WasteType.HAZARDOUS AND fill_pct >=
-      90
+      20 - Emergency override condition: waste == WasteType.HAZARDOUS AND fill_pct
+      >= 90
 
       - When this is true, the function returns CollectionDecision(approved=True,
       priority_score=1000, ...)
@@ -308,3 +306,116 @@
 
       - Therefore, approval always occurs under these conditions with a compatible
       truck
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:06'
+  q1:
+    answer: >-
+      There are an infinite number of collection scenarios (due to continuous integer
+      parameters like fill_pct, days_since_empty, fuel_level), but they can be categorized
+      into distinct behavioral partitions. For Hazardous waste with Hazardous_Only
+      or Multi_Type trucks, there are 5 distinct outcome categories:
+
+
+      1. Emergency override (fill_pct >= 90, any fuel_level, any weather) → approved=True,
+      priority=1000, special_handling=True
+
+      2. Non-emergency, insufficient fuel (fill_pct < 90, fuel_level < 20) → approved=False,
+      priority=0
+
+      3. Non-emergency, sufficient fuel, overfilled (75 <= fill_pct < 90, fuel_level
+      >= 20, non-extreme weather) → approved=True (priority doubled, likely >= 50)
+
+      4. Non-emergency, sufficient fuel, under-threshold (fill_pct < 75, fuel_level
+      >= 20) → approved depends on priority >= 50
+
+      5. Non-emergency, sufficient fuel, extreme weather → priority halved, approval
+      depends on final score >= 50
+
+
+      If counting specific input combinations: fill_pct has 101 values (0-100), days_since_empty
+      is unbounded, fuel_level has 101 values, weather has 4 values, and 2 truck types
+      — yielding a very large but finite (if parameters are bounded) number of scenarios.
+      However, in terms of distinct behavioral partitions, there are approximately
+      5 key scenario classes.
+    reasoning: >-
+      - Hazardous waste can be collected by Hazardous_Only trucks (waste == HAZARDOUS
+      → True) and Multi_Type trucks (always True). So both truck types are compatible.
+
+      - For each compatible truck, the logic paths are identical since truck type
+      only affects the compatibility check, not subsequent logic.
+
+      - The distinct behavioral paths for Hazardous waste when the truck is compatible:
+        1. **Emergency override path**: fill_pct >= 90 AND waste == HAZARDOUS → immediately
+      approved=True, priority=1000, special_handling=True, time=30*weather_multiplier.
+      This bypasses fuel check entirely. With 4 weather conditions, this creates 4
+      sub-scenarios per truck type.
+        2. **Insufficient fuel path**: fill_pct < 90 AND fuel_level < 20 → approved=False,
+      priority=0.
+        3. **Normal path with sufficient fuel**: fill_pct < 90 AND fuel_level >= 20
+      → priority calculated normally, approved if final_priority >= 50. The threshold
+      for Hazardous is 75, so fill_pct >= 75 doubles the priority. Weather=EXTREME
+      halves priority.
+      - Since there are 2 truck types, and the behavior is identical for both once
+      compatibility is confirmed, the number of distinct scenario *classes* is the
+      same for both trucks.
+
+      - If we're counting distinct input tuples, it depends on the ranges of fill_pct
+      (0-100), days_since_empty, fuel_level, and weather (4 values), times 2 trucks
+      — which is very large.
+  q2:
+    answer: Yes, a collection can be approved when fuel_level < 20. This occurs when
+      Hazardous waste has fill_pct >= 90 AND the truck is compatible (Hazardous_Only
+      or Multi_Type). The emergency override check happens BEFORE the fuel level check,
+      so emergency hazardous collections bypass the fuel requirement entirely.
+    reasoning: >-
+      - The function `determine_collection_decision` processes checks in this order:
+        1. Truck compatibility check → if incompatible, return approved=False
+        2. Emergency override check → if emergency (Hazardous AND fill_pct >= 90),
+      return approved=True immediately with priority=1000
+        3. Fuel level check → if fuel_level < 20, return approved=False
+        4. Normal priority calculation
+      - The emergency override at step 2 returns approved=True WITHOUT ever checking
+      fuel_level.
+
+      - So for example: fill_pct=95, waste=HAZARDOUS, truck=HAZARDOUS_ONLY, fuel_level=5,
+      weather=SUNNY → the truck is compatible, emergency override triggers (95 >=
+      90 and HAZARDOUS), and approved=True is returned with priority_score=1000, requires_special_handling=True,
+      estimated_time=30.
+
+      - This is the ONLY way to get approved=True with fuel_level < 20, since all
+      non-emergency paths hit the fuel check and are rejected.
+  q3:
+    answer: Yes, for Organic waste at exactly 80% fill with fuel_level >= 20 and weather
+      = Sunny, approval always occurs — provided the truck is compatible (Organic_Only
+      or Multi_Type). If the truck is incompatible (Standard or Hazardous_Only), the
+      collection is rejected regardless of other factors.
+    reasoning: >-
+      - Organic waste has a threshold of 80%. At fill_pct = 80, `is_overfilled` checks
+      `80 >= 80` which is True (uses >= comparison).
+
+      - Since fill_pct=80 is at the threshold boundary, priority is doubled via `apply_threshold_escalation`.
+
+      - Base priority calculation: fill_component=80, time_component=days_since_empty*5,
+      waste_urgency=30 (for ORGANIC).
+        - base = 80 + (days_since_empty * 5) + 30 = 110 + (days_since_empty * 5)
+        - Minimum base (days_since_empty=0): 110
+        - With threshold escalation (doubled): 220
+        - Weather is Sunny, so no EXTREME penalty (weather penalty only applies for
+      EXTREME weather).
+        - final_priority = 220 (minimum, with days_since_empty=0)
+      - The approval threshold is 50, and 220 >> 50, so approved=True in all cases.
+
+      - Even with days_since_empty=0 (minimum possible), the priority of 220 far exceeds
+      50.
+
+      - If days_since_empty is negative (unusual but technically possible with int),
+      e.g., days_since_empty = -100: base = 80 + (-500) + 30 = -390, doubled = -780,
+      which is < 50 → would NOT be approved. However, negative days_since_empty is
+      not a realistic input.
+
+      - For any non-negative days_since_empty, with a compatible truck, the answer
+      is always approved=True.
+
+      - Truck compatibility: Organic waste can only be collected by ORGANIC_ONLY or
+      MULTI_TYPE trucks. STANDARD and HAZARDOUS_ONLY trucks are incompatible and would
+      result in approved=False before any priority calculation.
