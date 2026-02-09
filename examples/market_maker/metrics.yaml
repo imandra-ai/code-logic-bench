@@ -5777,3 +5777,705 @@
         For this specific query, both answers are equally correct and well-reasoned,
         with ImandraX offering slightly more comprehensive system-level understanding
         while the LLM provides a more concise direct answer."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:27'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 583
+        reasoning: The LLM estimated 6 scenarios by analyzing code paths. The decomposition
+          found 583 exact scenarios. The LLM's estimate is significantly lower than
+          the actual number of scenarios, indicating a lack of granular understanding
+          of the state space defined by parameter combinations.
+        score: -8.172427508645482
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the precedence of conditions and short-circuit
+          behavior (e.g., dead zone and extreme position checks returning immediately).
+          It also correctly identified the high volatility override logic. However,
+          its understanding of the branching structure within the quorum scoring is
+          partial, as it grouped quorum scores into ranges (0-1, 2-3, >=4) without
+          fully exploring the implications of individual parameter combinations on
+          the quorum score itself.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The problem description does not present an easy way to understand
+          what actual edge cases would be. No specific edge cases were described by
+          the LLM, but none were expected from the problem description itself.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - position_pct 85-95%
+        - position_pct >= 100%
+        - position_pct < 80%
+        - quorum score >= 4
+        - quorum score 2-3
+        - quorum score 0-1
+        thresholds_from_decomp:
+        - position_pct 70
+        - position_pct 85
+        - position_pct 95
+        - position_pct 100
+        - spread_bps 10
+        - spread_bps 25
+        - spread_bps 50
+        - consecutive_adverse 3
+        - market_depth 300
+        - momentum 50
+        - quote_score 2
+        - quote_score 4
+        reasoning: The LLM identified some key thresholds related to position_pct
+          and quorum score ranges. However, it missed several granular thresholds
+          that contribute to the overall state space, particularly within the components
+          that determine the quorum score (e.g., spread_bps, consecutive_adverse,
+          market_depth, momentum). It also stated threshold ranges where the decomposition
+          gives exact values.
+        score: 0.5
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provided no numeric distributions, only a count of decision
+          scenarios. The ImandraX answer provided exact counts and percentages for
+          each decision outcome (FullSize, ReducedSize, NoQuote), demonstrating precise
+          numeric distributions.
+      direction_accuracy:
+        score: 0.5
+        reasoning: While the LLM correctly identified the *types* of quoting decisions
+          and their high-level triggers (e.g., dead zone leads to REDUCED_SIZE), its
+          understanding of the full set of conditions and their interactions, which
+          lead to the actual scenarios, is incomplete. Hence, the 'direction' of its
+          reasoning is generally correct for the main branches, but not accurate enough
+          to enumerate all distinct scenarios. For example, it correctly identified
+          the high volatility override leads to FULL_SIZE, but missed the precise
+          conditions under which this occurs in the broader context.
+      coverage_completeness:
+        score: 0.01
+        reasoning: The LLM identified 6 distinct scenarios, whereas the decomposition
+          found 583. This indicates a very low coverage of the actual decision scenarios.
+          The LLM's approach of tracing distinct code paths did not encompass the
+          combinatorial explosion of the parameter space.
+      overall_summary: The LLM significantly underestimated the number of distinct
+        quoting decision scenarios, identifying only 6 compared to ImandraX's 583.
+        While the LLM demonstrated a reasonable understanding of the high-level control
+        flow, including precedence, short-circuiting, and override logic, it failed
+        to grasp the granular interactions of all parameters that create a much larger
+        state space. This is evident in its limited identification of decision boundaries
+        and complete lack of numeric distributions. The LLM's reasoning traced distinct
+        paths through the code, but without considering the combinatorial impact of
+        the various conditions (e.g. `market_depth`, `momentum`), it could not correctly
+        estimate the state space. Therefore, while its directional accuracy for some
+        top-level decisions was fair, its overall coverage and precision were very
+        low.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 67
+        reasoning: LLM did not quantify the number of scenarios, only stated that
+          it's possible. ImandraX explicitly found 67 such scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM correctly identified that the high volatility override takes
+          precedence over the quorum logic and that the override short-circuits further
+          checks. It also correctly identified that the quorum path is a separate
+          branch that is only taken if the override conditions are not met.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: LLM did not identify the edge case of max_position = 0, which ImandraX
+          explicitly found and explained.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - consecutive_adverse >= 3
+        - volatility_regime is HIGH
+        - position_pct < 80%
+        - position not in dead zone (85-95%)
+        - quorum score >= 4
+        - position_pct <= 70
+        - spread_bps >= 10 (LOW vol)
+        - volatility LOW
+        - market_depth >= 300
+        - '|momentum| <= 50'
+        thresholds_from_decomp:
+        - consecutive_adverse >= 3
+        - volatility_regime == High
+        - position_pct < 80
+        - position >= 85
+        - position <= 95
+        - max_position == 0
+        reasoning: LLM identified most of the relevant thresholds in the override
+          and quorum paths. ImandraX identified additional thresholds related to the
+          dead zone calculation ('position >= 85', 'position <= 95') and the edge
+          case of 'max_position == 0' which is relevant for position_pct calculation.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The question asks for conditions when the market maker can quote
+          at FullSize. This is a boolean outcome (yes/no) and does not involve numeric
+          distributions. Therefore, this metric is not applicable.
+      direction_accuracy:
+        score: 0.9
+        reasoning: LLM correctly identified that FullSize is possible with consecutive
+          adverse selection due to the high volatility override. It also correctly
+          identified most of the conditions for the override. However, it made a slight
+          error by attempting to describe conditions for 'FullSize is also achievable
+          in the quorum path with adverse selection' without fully specifying all
+          parameters, which is incomplete.
+      coverage_completeness:
+        score: 0.9
+        reasoning: LLM covered the primary scenario (high volatility override) enabling
+          FullSize even with adverse selection. It also attempted to cover the quorum
+          path, although it didn't fully specify the parameter ranges for the quorum
+          path, which makes it less complete than ImandraX.
+      overall_summary: The LLM correctly identified the main mechanism (high volatility
+        override) that allows quoting at FullSize despite adverse selection. It also
+        demonstrated good understanding of control flow and override logic. However,
+        it missed one edge case identified by ImandraX, did not quantify the number
+        of scenarios, and was less precise in specifying conditions for the quorum
+        path. ImandraX provided a more comprehensive and precise answer, including
+        the exact scenario count and an identified edge case.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not explicitly state a number of scenarios but rather
+          provides a single, clear answer. The ImandraX answer verifies a single scenario
+          (dead zone leads to not FullSize).
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the dead zone check is the FIRST
+          check in the decision function and leads to an immediate return. It also
+          correctly states that the high volatility override and quorum-based scoring
+          are never reached due to this early return. This demonstrates a correct
+          understanding of precedence, branching, short-circuiting, and override logic.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The question is straightforward and does not involve specific edge
+          cases to be identified beyond the core logic of the dead zone.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 85-95% of max position
+        - < 80%
+        thresholds_from_decomp:
+        - position_pct ∈ [85, 95]
+        reasoning: The LLM correctly identifies the 85-95% dead zone and mentions
+          the < 80% threshold for the high volatility override. The decomposition
+          confirms the 85-95% range. The LLM's identification of the <80% threshold,
+          while not directly the focus of the question, demonstrates a good understanding
+          of related boundaries.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM''s answer is precise and definitive: ''No, the market
+          maker cannot quote at FullSize... It will always return REDUCED_SIZE.''
+          This aligns perfectly with the ImandraX''s ''PROVEN - Dead zone positions
+          NEVER quote FullSize''.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion is entirely correct and directly matches the
+          verified answer from ImandraX. Both state that FullSize quoting is impossible
+          in the dead zone, and the reasoning provided by both is consistent.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM fully covers the question regarding the market maker's
+          ability to quote at FullSize in the dead zone. It addresses all relevant
+          conditions and explains why other factors (like high volatility override
+          or quorum) do not change the outcome. This is a complete and accurate coverage
+          of the decision scenario.
+      overall_summary: The LLM provides an excellent and highly accurate answer to
+        the question. It correctly identifies the core logic of the dead zone taking
+        precedence, and its reasoning for why other conditions (like high volatility
+        override) do not apply is well-explained and correct. The LLM's understanding
+        of control flow and decision boundaries is strong, leading to a precise and
+        correct conclusion that fully aligns with the ImandraX decomposition and verification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:41'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 583
+        reasoning: The LLM estimated 6 distinct quoting decision scenarios based on
+          its reasoning through the decision tree, while ImandraX provided a detailed
+          decomposition resulting in 583 distinct scenarios. The LLM appears to have
+          focused on the main leaf nodes, missing a substantial number of scenarios
+          that stem from more granular combinations of parameters.
+        score: -8.172427508645482
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: The LLM's explanation indicates a misunderstanding of control flow
+          structures. It incorrectly summarizes the guard clauses and decision routes
+          without recognizing the implications of parametric variations and interactions.
+        score: 0.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 5
+        reasoning: The LLM did not identify any edge cases, while the decomposition
+          suggests that there are at least 5 edge cases related to specific thresholds
+          and unexpected outcomes. These include instances like extreme adverse selection,
+          risk boundaries defined by position_pct, and certain oversights in volatility
+          assessments.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - 'position_pct: [70, 85, 95, 100]'
+        - 'spread_bps: [10, 25, 50]'
+        - 'consecutive_adverse: [3]'
+        - 'market_depth: [300]'
+        - 'momentum: [50]'
+        - 'quote_score: [2, 4]'
+        reasoning: The LLM provided no thresholds in its answer, while the decomposition
+          identified several key thresholds relevant to decision-making, indicating
+          a complete lack of awareness of the underlying parameters.
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM estimated 6 decision scenarios incorrectly based on reasoning
+          rather than quantitative assessment. No exact matching numeric distribution
+          aligns with the decomposed data that shows a total of 583 scenarios.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The conclusion reached by the LLM indicates no understanding of
+          the actual scenario count and misrepresents the framework of decision-making
+          fully. It states there are 6 scenarios without recognizing the broader implications
+          of established criteria across combinations.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM's analysis did not capture the entirety of the scenarios,
+          only focusing on the primary leaf nodes. The explicit absence of higher
+          scenario outcomes [583 vs. 6] demonstrates a significant lack of coverage.
+      overall_summary: The LLM shows limited understanding of the quoting decision
+        scenarios compared to ImandraX. It significantly underestimates the scenario
+        count and fails to recognize the key parameters influencing decisions. The
+        response lacks a structured approach to decision-making coverage that would
+        align with the model's complexity.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 67
+        reasoning: LLM incorrectly estimated 2 scenarios by only considering the high-volatility
+          override without accounting for the multiple combinations of other variables
+          that affect the total scenarios.
+        score: -5.022367813028454
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM partially understood the control structures. It recognized
+          that high volatility overrides the quorum conditions but did not fully encompass
+          the interactions among conditions contributing to alternative paths to FullSize.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - max_position = 0 case
+        total_edge_cases: 1
+        reasoning: The LLM successfully identified one edge case regarding the condition
+          where max_position is zero, allowing it to correctly trigger the override
+          despite the adverse selection.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - volatility_regime = HIGH
+        - position_pct < 80
+        thresholds_from_decomp:
+        - volatility_regime = HIGH
+        - position_pct < 80
+        - consecutive_adverse >= 3
+        - score ≥ 4 from remaining conditions
+        reasoning: The LLM identified the conditions related to the high-volatility
+          override but did not detail the additional thresholds necessary from the
+          quorum path, which diminishes its score.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM accurately defined the numeric thresholds required for
+          FullSize quoting conditions under high volatility.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion that FullSize quoting is possible with high
+          volatility and a position percentage below 80% was completely correct, supported
+          by the rationale given.
+      coverage_completeness:
+        score: 0.03
+        reasoning: LLM only identified conditions related to high-volatility override;
+          it missed the vast majority of the decision scenarios involved, leading
+          to inadequate coverage.
+      overall_summary: The LLM answered correctly that FullSize quoting is possible
+        under adverse selection but failed to capture the complexity of all scenarios.
+        It identified one edge case effectively but had a poor understanding of coverage
+        and scenario enumeration.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately identifies the precedence of the dead zone check
+          as the first condition evaluated, thus correctly stating that if the position
+          is in the dead zone, it will return REDUCED_SIZE before reaching other logic
+          paths. The branching structure is accurately represented, and short-circuit
+          behavior is well understood given that the LLM asserts that the early return
+          prevents subsequent checks from taking place. The override logic is also
+          correctly noted, as the LLM recognizes that it cannot trigger the high volatility
+          override while in the dead zone.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Position exactly at 85%
+        - Position exactly at 95%
+        total_edge_cases: 2
+        reasoning: The LLM identifies the edge case of being exactly on the boundaries
+          of the dead zone (85% and 95%). Both are significant thresholds where the
+          decision shifts from possible FullSize quoting to reduced size quoting.
+          The exact edge cases were well identified, showing an understanding of critical
+          thresholds.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Position_pct < 80%
+        - Position_pct ∈ [85, 95]
+        thresholds_from_decomp:
+        - Position_pct < 80%
+        - Position_pct ∈ [85, 95]
+        - Position_pct > 100%
+        reasoning: The LLM correctly identifies the key thresholds that impact the
+          decision-making process, particularly those related to the dead zone and
+          high volatility override. However, it misses the threshold for position_pct
+          > 100% which would lead to No Quote.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides precise numerical boundaries for the dead zone
+          stating it as 85%-95% of max position. The conclusion is drawn with the
+          exact operators, reflecting a clear understanding of the thresholds governing
+          the decision process.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that the market maker cannot quote at FullSize when
+          in the dead zone is completely accurate and the reasoning involves a correct
+          understanding of the model's logic and checks.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covers all decision scenarios related to quoting sizes
+          within the dead zone condition, identifying that ReducedSize is the only
+          option available during this situation.
+      overall_summary: The LLM demonstrates a strong understanding of the control
+        flow mechanics and decision-making thresholds regarding the market maker quoting
+        logic. However, it showed a slight gap in fully identifying all decision boundaries,
+        particularly regarding the No Quote condition.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:56'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 583
+        reasoning: The LLM explicitly states '6 distinct quoting decision scenarios'
+          based on high-level decision tree leaves/paths. The ImandraX decomposition
+          provides an exact count of 583 scenarios from full parameter combinations.
+        score: -8.172427508645482
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM accurately describes the sequential checks: dead zone
+          first, then extreme position, then high volatility override, before falling
+          to quorum evaluation. This captures AND/OR precedence in conditions, if-else-like
+          branching with early returns (short-circuiting), and the override where
+          high vol trumps normal path for position <80%.'
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - position_pct 85-95%
+        - position_pct >=100%
+        - position_pct <80%
+        - quorum_score >=4
+        - quorum_score 2-3
+        - quorum_score 0-1
+        thresholds_from_decomp:
+        - position_pct 70
+        - position_pct 85
+        - position_pct 95
+        - position_pct 100
+        - spread_bps 10
+        - spread_bps 25
+        - spread_bps 50
+        - consecutive_adverse 3
+        - market_depth 300
+        - momentum 50
+        - quote_score 2
+        - quote_score 4
+        reasoning: 'The LLM identifies key position_pct thresholds (85-95, >=100,
+          <80) and quorum score thresholds (0-1,2-3,>=4), but approximates <80 (decomp
+          has 70) and misses all other thresholds related to spread_bps, consecutive_adverse,
+          market_depth, momentum. Identified: 6, total in decomp: 12, score ≈0.5.'
+        score: 0.5
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM qualitatively identifies the three outcomes (FULL_SIZE,
+          REDUCED_SIZE, NO_QUOTE) with directional correctness matching ImandraX (aggressive,
+          conservative, risk-high), but provides no numeric counts or percentages
+          (e.g., no '223 FullSize' or 38%). Rubric applies 0.2 for qualitative but
+          directionally correct descriptions.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes there are 6 distinct scenarios, but ImandraX
+          decomposition shows 583, representing a massive underestimation. The conclusion
+          is completely wrong, with flawed reasoning that only counts high-level paths
+          without decomposing the combinatorial quorum conditions.
+      coverage_completeness:
+        score: 0.01
+        reasoning: 'Using rubric (b) SCENARIO ENUMERATION: The LLM explicitly describes
+          and counts 6 scenarios (decision tree leaves), compared to 583 in decomposition,
+          yielding 6/583 ≈ 0.01. No higher rubric applies as count is explicit but
+          far from complete coverage of parameter combinations.'
+      overall_summary: The LLM provides a high-level but shallow analysis, correctly
+        outlining the main control flow and some thresholds/outcomes but failing to
+        decompose the full state space. It underestimates scenarios by focusing on
+        6 paths, ignoring the combinatorial explosion (e.g., 6 quorum conditions with
+        multiple sub-thresholds each), leading to poor accuracy in counts and coverage.
+        ImandraX excels in exhaustive verification, revealing 583 scenarios and precise
+        distributions, highlighting the LLM's weakness in handling complex parameter
+        interactions.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 67
+        reasoning: The LLM answer does not provide any explicit or implicit numerical
+          estimate of the number of scenarios (e.g., no mention of '67 scenarios',
+          no range like '50-80', no product of factors like '4x5x3=60', and no qualitative
+          count that allows extraction). It discusses paths qualitatively (override
+          and quorum) but without any quantifiable scenario count, so marked as 'unknown'.
+          The decomposition has exactly 67 scenarios as stated in the ImandraX answer.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          - Precedence of conditions: Correct; the LLM accurately describes that the
+          high volatility override is checked BEFORE the quorum logic, establishing
+          proper priority ordering (override trumps quorum conditions).
+
+          - Branching structure: Correct; the LLM distinguishes between the override
+          path (direct return of FULL_SIZE) and the independent quorum path (scoring
+          with if-else based on score thresholds), avoiding confusion between chained
+          if-else-if and separate checks.
+
+          - Short-circuit behavior: Correct; the LLM notes that the override acts
+          as an early return/bypass, short-circuiting the quorum evaluation entirely
+          when conditions are met, and also mentions how adverse selection reduces
+          score but doesn't halt evaluation in quorum path.
+
+          - Override logic: Correct; the LLM clearly explains how the high volatility
+          override prioritizes aggressive quoting over adverse selection risks, trumping
+          the normal quorum operation without any safety checks interfering.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Adverse selection (consecutive_adverse >=3) combined with high volatility
+          override allowing FullSize, which contradicts the naive expectation that
+          adverse selection would always prevent FullSize (counterintuitive outcome)
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies one key edge case: the counterintuitive scenario
+          where consecutive adverse selection (>=3) normally reduces the quorum score
+          but is overridden by high volatility conditions to still allow FullSize,
+          contradicting the expectation that adverse selection would block it. This
+          fits as an edge case due to negation of common case (adverse detected but
+          ignored) and contradicts naive expectation. The decomposition explicitly
+          highlights one edge case (''max_position = 0 case'' where position_pct=0
+          activates override despite edge condition), which the LLM does not mention.
+          Thus, total_edge_cases=1 from decomp, and LLM found 0 matching that specific
+          one, but its identified scenario aligns with the spirit of rare/counterintuitive
+          cases in the override path. However, strictly, it didn''t list the decomp''s
+          exact edge case, so edge_cases_found lists the closest match, but score
+          will reflect 1/1 if generous; wait, formula uses len(found)/total, but since
+          not exact match, perhaps adjust reasoning.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - consecutive_adverse >= 3
+        - position_pct < 80
+        - position_pct in 85-95% (dead zone, but not triggered when <80)
+        - spread_bps >= 10
+        - volatility_regime LOW (for quorum volatility_ok)
+        - market_depth >= 300
+        - '|momentum| <= 50'
+        - volatility_regime != HIGH (for quorum path)
+        thresholds_from_decomp:
+        - consecutive_adverse >= 3
+        - position_pct < 80
+        - volatility_regime = High (for override)
+        - max_position = 0 (special case for position_pct=0)
+        reasoning: 'The LLM identifies several relevant thresholds: the adverse selection
+          trigger (>=3), the override position limit (<80%), the dead zone (85-95%,
+          noted as not applicable here), and quorum conditions like spread >=10 bps,
+          depth >=300, momentum <=50 abs, and volatility not high. However, the decomposition
+          focuses on key ones for the yes scenarios: >=3 adverse, <80% position, High
+          volatility, and the edge case max_position=0 leading to position_pct=0 <80.
+          The LLM misses the explicit max_position=0 threshold/special case but captures
+          the main decision boundaries for override and quorum paths. Score will be
+          len(identified)/len(decomp) = 4/4 if counting overlaps, but strictly 3/4
+          since max_position=0 missed.'
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: No numeric distributions (e.g., probabilities, counts like '67
+          scenarios', or outcome frequencies) are provided by the LLM; it uses qualitative
+          descriptions of conditions leading to FullSize (e.g., 'if 4 of 5 conditions
+          met'). This is directionally correct but approximate, lacking exact numeric
+          precision like the ImandraX's '67 scenarios'. Scored 0.5 for approximate
+          value in conditions (e.g., position <80 exact, but no distribution of how
+          many ways). If strictly no distributions, could be 0.0, but rubric allows
+          0.5 for approximate values.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the completely correct conclusion: YES, FullSize
+          is possible with consecutive adverse >=3, via the high volatility override
+          (vol=High, position<80%) or even in the quorum path if other conditions
+          compensate (e.g., 4/5 other factors true). This matches the ImandraX''s
+          YES with 67 scenarios via override. Reasoning is sound and complete, including
+          both paths, with accurate condition details and an example, showing full
+          understanding without flaws.'
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'The LLM does not provide an explicit count (no ''67'' or range),
+          nor enumerate specific scenarios (e.g., no breakdown of 67 cases), nor cover
+          outcome categories proportionally (e.g., #override vs #quorum). It acknowledges
+          multiplicity qualitatively by describing the override path (bypassing adverse)
+          and the quorum path (possible with >=4/5 other conditions despite adverse
+          reducing score), noting ''this is possible'' and giving an example. Thus,
+          rubric (d) QUALITATIVE ONLY applies: 0.25 for acknowledging multiplicity
+          without quantification. More generous enumeration of 2 main paths (override/quorum)
+          vs decomp''s 67 scenarios would suggest low proportion (~2/67 ~0.03), but
+          instructions favor highest applicable rubric.'
+      overall_summary: 'The LLM answer is strong in direction accuracy and control
+        flow understanding, correctly identifying that FullSize is possible despite
+        adverse selection via override and quorum paths, with precise condition explanations.
+        However, it lacks quantitative depth: no scenario count estimation (unknown
+        vs 67), limited edge case detection (misses max_position=0 but catches counterintuitive
+        override), incomplete threshold coverage (misses special case), and only qualitative
+        coverage without numeric precision on outcomes. Overall, the LLM provides
+        a good conceptual grasp but falls short on exhaustive decomposition and verification
+        compared to ImandraX, which quantifies 67 scenarios and highlights specific
+        edges.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 3
+        reasoning: The LLM answer does not provide any estimation of the number of
+          scenarios or regions in the state space; it focuses solely on the specific
+          dead zone condition without enumerating or approximating total scenarios.
+          The decomposition in the ImandraX answer implies at least 3 main position-based
+          scenarios from the graduated_risk_control (0-70%, 85-95%, 100%+), so n_decomposition_exact_scenarios=3.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct, as LLM identifies dead zone
+          check as the first/highest precedence before any other logic. Branching
+          structure: correct, describes if-dead_zone then ReducedSize else (other
+          logic including quorum), matching the if-else structure. Short-circuit behavior:
+          correct, explicitly notes early return prevents evaluation of other parameters
+          and quorum. Override logic: correct, explains that high volatility override
+          requires position_pct <80, which is incompatible with dead zone (85-95),
+          so it doesn''t trump the dead zone check.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone (85-95%) forces ReducedSize unconditionally, overriding potential
+          FullSize from favorable conditions like high volatility
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies one edge case: the dead zone scenario, which
+          is safety-critical (limits risk at intermediate level) and contradicts naive
+          expectation (might expect FullSize or NoQuote, but gets ReducedSize), and
+          involves negation of common full-size cases via early return. The decomposition
+          highlights the dead zone as a key insight for intermediate risk, and implies
+          another edge case in the 100%+ position for NoQuote (hard limit, safety-critical).
+          Thus, total_edge_cases=2; LLM found 1, missing the extreme 100% case but
+          focusing on the question''s dead zone.'
+        edge_case_count: 1
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - position_pct between 85 and 95 (inclusive)
+        - position_pct < 80 for high volatility override
+        thresholds_from_decomp:
+        - position_pct in [85, 95] for dead zone
+        - position_pct < 80 for high volatility override
+        - position_pct >= 100 for NoQuote
+        reasoning: LLM correctly identifies the dead zone boundaries (85-95%) and
+          the conflicting override threshold (<80%), but does not mention the >=100%
+          threshold for NoQuote, which is part of the broader position-based decomposition
+          in ImandraX's graduated_risk_control. Thus, 2 out of 3 thresholds identified.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM precisely states that the outcome is always REDUCED_SIZE
+          in the dead zone, matching the decomposition's proven property exactly (no
+          FullSize, forces ReducedSize). This is an exact categorical match with no
+          numeric distribution needed, but the certainty (always/never) aligns with
+          1.0 exact match rubric; no approximation or qualitative vagueness.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the completely correct conclusion (No, cannot
+          quote FullSize; always ReducedSize) with solid reasoning that mirrors the
+          decomposition: dead zone precedence forces ReducedSize before overrides
+          or quorum, and conditions for FullSize (e.g., <80%) are incompatible. No
+          flaws in direction or reasoning.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The question focuses on one specific scenario (dead zone), and
+          the LLM fully covers it by enumerating why all paths lead to ReducedSize
+          (early check, incompatible overrides, no quorum). The decomposition verifies
+          this single property/scenario explicitly, so LLM covers 100% of the relevant
+          decision scenario for the question (rubric (b) scenario enumeration: 1 out
+          of 1). Broader decomposition mentions 3 zones, but LLM''s focus matches
+          the query''s scope.'
+      overall_summary: 'The LLM answer is highly accurate and aligns closely with
+        the ImandraX decomposition, correctly capturing the core property that dead
+        zone positions never allow FullSize quoting. Strengths: Excellent control
+        flow understanding, precise outcome, correct direction, and full coverage
+        of the queried scenario; identifies key thresholds and one edge case. Weaknesses:
+        No state space estimation (irrelevant for binary query), misses one broader
+        threshold (100%), and detects only 1/2 edge cases (but query-specific). Overall,
+        LLM performs comparably to ImandraX for this straightforward decision boundary
+        question, providing intuitive reasoning without formal verification.'

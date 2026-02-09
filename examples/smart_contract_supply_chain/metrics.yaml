@@ -4788,3 +4788,475 @@
         is the lack of quantitative state space estimation, but this does not detract
         from the correctness for this yes/no property. Overall, the LLM effectively
         emulates decomposition-level insight.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:49:01'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 18
+        n_decomposition_exact_scenarios: 33
+        reasoning: The LLM estimated 18 scenarios, while the decomposition revealed
+          33. The LLM struggled with the multiplicative effect of multiple independent
+          conditions and also the partitioning of the input space. Its reasoning for
+          arriving at 18 was based on a combination of different counting approaches
+          that led to confusion and an inaccurate final count. It tried to count distinct
+          decision paths, then input combinations, and then 'distinct scenario classes'
+          but ultimately missed a significant number of actual scenarios by conflating
+          some conditions and failing to fully enumerate the partitions.
+        score: -2.9068905956085187
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the order of checks (jurisdiction
+          -> party -> standards -> reputation -> payment). It also correctly recognized
+          that certain conditions short-circuit the validation process (e.g., LOGISTICS
+          role immediately leads to rejection, or failing standards leads to rejection
+          before reputation is considered). There were no explicit override logic
+          examples in the provided problem description, but the short-circuiting behavior
+          implies an understanding of how one condition can override or negate the
+          need for further checks. The LLM's struggle was primarily in the combinatorial
+          enumeration of these paths, not in understanding the flow itself.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The problem inherently doesn't have clear 'edge cases' in the traditional
+          sense beyond the defined thresholds and decision paths. All scenarios are
+          covered by the logical structure. The LLM did not explicitly identify any
+          particular edge cases, nor did the decomposition. If 'edge cases' are interpreted
+          as 'scenarios leading to specific outcomes due to specific inputs', then
+          the LLM's struggle to count these scenarios indicates it didn't precisely
+          identify the boundaries of such 'cases'.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - reputation_score < 70
+        - reputation_score >= 70
+        - payment_advance_pct < 30
+        - payment_advance_pct >= 30
+        - has_iso9001=True
+        - has_fda=True
+        thresholds_from_decomp:
+        - 'reputation_score: 70'
+        - 'payment_advance_pct: 30'
+        reasoning: The LLM correctly identified the numeric thresholds for 'reputation_score'
+          (70) and 'payment_advance_pct' (30). It also correctly identified the boolean
+          conditions (has_iso9001, has_fda) that act as thresholds. The decomposition
+          only listed numerical thresholds, but the LLM also enumerated the boolean
+          conditions which act as similar decision boundaries. The LLM understands
+          where the decisions are made.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The question asks for a count of scenarios. There are no numeric
+          distributions in outcomes to assess precision for. Thus, this metric is
+          not applicable, but since it's a mandatory field, a score of 0.0 is given.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's final answer of 18 is significantly different from the
+          correct answer of 33, leading to an incorrect conclusion regarding the number
+          of scenarios. While its step-by-step breakdown (e.g., LOGISTICS always fails)
+          showed some correct understanding of individual conditions, the ultimate
+          aggregation into a final number was inaccurate.
+      coverage_completeness:
+        score: 0.545
+        reasoning: The LLM estimated 18 scenarios out of 33 actual scenarios, resulting
+          in a coverage score of 18/33 = 0.545. It correctly identified some major
+          branches (e.g., LOGISTICS role, standards pass/fail, reputation, payment)
+          but failed to correctly enumerate the full combinatorial space within these
+          branches, especially the multiplicative effects of multiple independent
+          boolean conditions and their combinations.
+      overall_summary: The LLM demonstrated a good understanding of the control flow
+        and individual decision boundaries within the smart contract validation. It
+        correctly identified how different conditions (jurisdiction, role, standards,
+        reputation, payment) contribute to the contract's approval or rejection, and
+        it recognized the short-circuiting nature of some checks. However, its primary
+        weakness was in accurately enumerating the total number of distinct validation
+        scenarios. It got confused by trying different counting methods and struggled
+        to correctly aggregate the combinatorial possibilities, leading to a significant
+        underestimation of the total number of scenarios (18 vs. 33). This indicates
+        a strong qualitative understanding of the logic but a poor quantitative ability
+        to count the distinct regions in the state space.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX correctly conclude that a Pharmaceuticals
+          contract cannot be approved without FDA certification. Both provide sound
+          reasoning for their conclusion.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX comprehensively cover the relevant logic
+          paths that lead to the conclusion. The LLM's step-by-step breakdown of the
+          `determine_contract_validity` function demonstrates full coverage of the
+          decision-making process for this specific question.
+      overall_summary: The LLM and ImandraX both correctly determined that a Pharmaceuticals
+        contract cannot be approved without FDA certification. The LLM provided a
+        more detailed, step-by-step reasoning process, while ImandraX's explanation
+        was concise and accurate, aligning with the expected outcome from a verification
+        tool. Both answers exhibited strong direction accuracy and coverage completeness,
+        indicating a full understanding of the relevant conditions for contract approval
+        in this specific scenario.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concluded that for approved Pharmaceutical contracts,
+          requires_audit must always be true, matching the ImandraX answer.
+      coverage_completeness: null
+      overall_summary: The LLM provided a correct answer and a sound reasoning process,
+        identical to the ImandraX answer. It correctly identified the relevant conditions
+        and the logical flow that leads to the conclusion. The question was a simple
+        true/false type with no complex state-space, edge cases or decision boundaries
+        to identify, nor any control flow to understand besides a simple conditional.
+        Therefore, most metrics are not applicable.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:05'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 18
+        n_decomposition_exact_scenarios: 33
+        reasoning: The LLM estimated 18 distinct scenarios based on its interpretation
+          of the inputs and outcomes. However, the actual decomposition revealed 33
+          distinct scenarios considering all relevant factors and combinations in
+          the contract validation logic.
+        score: -2.9068905956085187
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM correctly understood the precedence of conditions with
+          respect to essential checks. However, it displayed partial understanding
+          in branching because while it correctly identified some paths, it did not
+          enumerate all relevant outcomes. Short-circuiting was acknowledged but not
+          fully explored, leading to partial assessment for that aspect.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - LOGISTICS role failing party certification
+        - One or both standards (ISO, FDA) fail leading to rejection
+        - Low reputation score leading to an audit requirement
+        total_edge_cases: 8
+        reasoning: The LLM identified a few edge cases related to party certification
+          failures and standard checks. However, there are more complex combinations
+          (e.g., jurisdictional overlaps) that it did not consider, hence it did not
+          detect all edge cases present in the decomposition.
+        edge_case_count: 3
+        score: 0.375
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - reputation_score < 70
+        - payment_advance_pct < 30
+        thresholds_from_decomp:
+        - reputation_score < 70
+        - payment_advance_pct < 30
+        - has_iso9001 = True
+        - has_fda = True
+        reasoning: The LLM successfully identified key thresholds related to reputation
+          and payment percentages but missed additional thresholds related to necessary
+          certifications (ISO and FDA) that are critical for Pharma scenarios.
+        score: 0.5
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM outputs conditions such as 'reputation_score ≥ 70' or 'payment_advance_pct
+          < 30', which are directionally correct. However, it lacked precise numerical
+          definitions in some other cases, leading to an approximate evaluation.
+      direction_accuracy:
+        score: 0.75
+        reasoning: While the LLM reached a conclusion about the number of scenarios,
+          it provided flawed reasoning about the categorization and specifics of those
+          scenarios, leading to an incomplete portrayal of the scenario landscape.
+      coverage_completeness:
+        score: 0.545
+        reasoning: The LLM identified a part of the total scenarios but did not account
+          for all possible pathways and decision outcomes, thus missing several valid
+          scenarios present in the decomposition.
+      overall_summary: The LLM's answer shows an attempt to detail the decision pathways
+        for contract validity but falls short in several key areas, such as counting
+        distinct outcomes correctly and comprehensively understanding edge cases.
+        The ImandraX answer, while more accurate, did not dissect the logic behind
+        scenario computations as thoroughly as needed. Overall, the LLM demonstrates
+        a reasonable grasp of the topic but lacks depth and precision in analyzing
+        the state space of contract validation scenarios.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of conditions in its
+          logical reasoning. It clearly establishes that FDA compliance is mandatory
+          and outlines the logical flow of the checks in the function related to approval
+          determination. There is a clear understanding of how branches are structured,
+          as it accurately represents the dependency of the approval on the FDA check.
+          The short-circuit behavior is also properly captured—if FDA certification
+          is missing, then standards are not met, directly leading to disapproval.
+          The override logic, which would comprise other checks that could prevent
+          approval, is acknowledged as well, as the required standard cannot be disregarded.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 3
+        reasoning: The LLM does not identify any specific edge cases in its answer.
+          However, there are potential edge cases related to interpretations of jurisdictional
+          differences, conditional payments, or other roles in the contract that could
+          affect the FDA requirements. These were not covered by the LLM, resulting
+          in a lack of recognition of any edge cases.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - has_fda = True
+        reasoning: The LLM does not explicitly identify the numeric decision threshold
+          regarding FDA certification, which is crucial in this context. The requirement
+          of having 'has_fda = True' is indeed the key threshold for approval, but
+          since it wasn’t mentioned by the LLM, it reflects a gap in clarity.
+        score: 0.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM’s conclusion that a Pharmaceuticals contract cannot be
+          approved without FDA certification is entirely precise while aligning with
+          the logic detailed in the ImandraX answer. It directly asserts 'No' while
+          also providing a comprehensive reasoning with strict adherence to the terms
+          given.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that FDA certification is mandatory aligns perfectly
+          with the system's requirements. The reasoning provided supports the conclusion
+          entirely and correctly addresses the question's roots.
+      coverage_completeness:
+        score: 0.75
+        reasoning: The LLM’s answer covers the need for FDA certification well, though
+          it does not enumerate the different decision scenarios involved—subsequently
+          indicating there are multiple checks (i.e., payment terms, party roles)
+          associated with these contracts.
+      overall_summary: The LLM provides a concise and correct answer to the question
+        but lacks some insights and clarity regarding edge cases and exact thresholds
+        that are essential within the context of approval logic for Pharmaceuticals
+        within the supply chain model. In contrast, the ImandraX answer supports the
+        LLM's conclusion while offering a more thorough breakdown of the underlying
+        logic.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly captures the flow of the contract approval process
+          and the fact that for Pharmaceuticals, the audit is always required. The
+          precedence and branching are correctly perceived, ensuring when conditions
+          are met, the outcome remains as expected for Pharmaceuticals contracts.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No edge cases were identified, since the logic is straightforward
+          for Pharmaceuticals, and the function is explicitly defined.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM didn't identify specific thresholds since it stated the
+          requirement clearly. However, there was no explicit threshold mentioned
+          in its reasoning.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM presented an exact match for the outcome: all approved
+          Pharmaceuticals require an audit. The conclusion is accurate.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion reached is completely correct, demonstrating sound
+          reasoning. If the contract is approved for Pharmaceuticals, it must require
+          an audit.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM acknowledges the situation for Pharmaceuticals but does
+          not explicitly cover all potential scenarios or acknowledge others that
+          might not require audit, thereby not fully capturing the coverage completeness.
+      overall_summary: The LLM provides a correct, relevant answer, demonstrating
+        a clear understanding of the auditing requirement for pharmaceuticals without
+        capturing broader scenarios. It excels in outcome precision and direction
+        accuracy, while slightly lacking in coverage completeness.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:21'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 18
+        n_decomposition_exact_scenarios: 33
+        reasoning: 'The LLM explicitly states ''Answer: 18'' as the number of contract
+          validation scenarios for Pharmaceuticals. The ImandraX decomposition provides
+          exactly 33 scenarios.'
+        score: -2.9068905956085187
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: 'Precedence of conditions: The LLM correctly describes sequential
+          checks (jurisdiction -> party cert -> standards -> rep -> pay), with AND
+          for standards (both iso and fda required). Branching structure: Accurately
+          models if-else style paths for roles and subsequent checks. Short-circuit
+          behavior: Correctly identifies early rejection for LOGISTICS and standards
+          fail. Override logic: Mentions audit requirements for pharma and penalties,
+          but does not fully explore how safety/audit overrides normal flow in all
+          cases, partial on pharma-specific mandates.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - LOGISTICS role always rejected regardless of other params
+        - Standards fail (any combo of iso/fda false) leading to penalty
+        - Reputation <70 after standards pass, requiring audit
+        - Payment <30 after rep pass, applying penalty
+        total_edge_cases: 4
+        reasoning: The LLM identifies 4 edge cases related to early rejections and
+          specific failure modes for Pharmaceuticals. Assuming decomposition has at
+          least these, but exact total from ImandraX not specified; conservatively
+          set to 4 matching LLM's findings. Missed potential pharma-specific edges
+          like exact boundary equalities if any, or jurisdiction interactions, but
+          none explicitly in LLM.
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - reputation_score >=70 / <70
+        - payment_advance_pct >=30 / <30
+        - has_iso9001 = True (required)
+        - has_fda = True (required)
+        thresholds_from_decomp:
+        - 'reputation_score: 70'
+        - 'payment_advance_pct: 30'
+        reasoning: LLM identifies reputation and payment thresholds correctly, and
+          treats ISO9001 and FDA as binary requirements (effectively thresholds at
+          True). Decomposition lists only numeric thresholds (rep 70, pay 30), so
+          binary certs may not count as 'numeric thresholds'. LLM identifies 2 matching
+          + 2 binary, but score based on decomp's 2, so partial match; missed none
+          of the decomp ones.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides a single numeric estimate of 18 scenarios, but
+          the true count from decomposition is 33. No distribution or operators involved;
+          the estimate is completely wrong (off by 15), so precision score is 0.0.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes there are 18 scenarios, but the decomposition
+          shows 33. This is a completely wrong conclusion on the total count, with
+          flawed reasoning as the path counting mixes distinct paths (5) with input
+          combos (up to 39+), settling arbitrarily on 18 without verification. No
+          partial credit as direction (underestimation) is incorrect quantitatively.
+      coverage_completeness:
+        score: 0.545
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM states 18 vs decomp 33, so
+          proportion 18/33 ≈ 0.545. This is the most direct; LLM acknowledges multiplicity
+          via path analysis but does not enumerate all, underestimating coverage.'
+      overall_summary: '"The LLM shows reasonable understanding of the control flow
+        and key decision points for Pharmaceuticals (e.g., always passing jurisdiction,
+        LOGISTICS rejection, standards AND requirement, sequential checks), identifying
+        correct thresholds for reputation and payment, and some edge cases like early
+        rejections. However, it severely underestimates the state space (18 vs 33
+        scenarios), with inconsistent reasoning oscillating between 5 paths, 39 combos,
+        and settling on 18 arbitrarily without systematic decomposition. This leads
+        to wrong conclusion and low precision. ImandraX provides verified exact count,
+        highlighting LLM''s weakness in exhaustive scenario partitioning for complex
+        multi-variable logic, though directionally it grasps the branching structure."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: LLM explicitly states 'NEVER', implying 0 scenarios where a Pharmaceuticals
+          contract is approved without FDA certification. ImandraX decomposition confirms
+          0 scenarios.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: Simple conditional check without complex AND/OR, correctly
+          understood. Branching: Accurately describes the if-else structure for fda_ok
+          based on requires_standard. Short-circuit: Correctly notes that false standards_ok
+          leads to immediate rejection. Override: Identifies FDA as a mandatory safety
+          check that blocks approval if missing.'
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision:
+        score: 1.0
+        reasoning: LLM precisely concludes no approval without FDA, matching the exact
+          0 scenarios in decomposition. No numeric distributions, but binary outcome
+          is exactly matched.
+      direction_accuracy:
+        score: 1.0
+        reasoning: LLM reaches the completely correct conclusion ('No') with accurate
+          and detailed reasoning tracing the control flow to the mandatory FDA check,
+          aligning perfectly with ImandraX.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Applied (a) EXPLICIT COUNT: LLM implies 0 scenarios (NEVER), matching
+          the decomposition''s 0 scenarios exactly, covering all (none) decision paths
+          where approval without FDA could occur.'
+      overall_summary: The LLM answer is strong and aligns closely with the ImandraX
+        decomposition. It provides detailed, accurate reasoning on the control flow
+        and mandatory nature of FDA certification for Pharmaceuticals, correctly concluding
+        no approval is possible without it. No significant weaknesses; the LLM demonstrates
+        solid understanding without needing decomposition tools. Metrics reflect high
+        performance where applicable, with inapplicable metrics (edge cases, boundaries)
+        set to null due to the binary, non-numeric nature of the question.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM accurately describes the control flow: all checks must
+          pass before reaching the final approval block where approved=True is set,
+          and requires_audit is directly tied to needs_mandatory_audit(category),
+          which is true for Pharmaceuticals. There are no complex precedence issues
+          (simple sequential checks), branching is linear until approval, no short-circuiting
+          mentioned but flow is exhaustive, and the mandatory audit logic overrides
+          any non-audit default by setting it explicitly for Pharmaceuticals.'
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM correctly concludes ''Yes'', matching the ImandraX proven
+          property that (category=Pharmaceuticals && approved) implies requires_audit.
+          The reasoning is complete and aligns with the code: approved only set in
+          final return with requires_audit=needs_audit=true for Pharmaceuticals, and
+          no alternative paths exist.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The question focuses on a single decision scenario: approved Pharmaceuticals
+          contracts. The LLM fully covers this by analyzing the approval path and
+          confirming requires_audit is always true in that case, matching the decomposition''s
+          single verified property. Rubric (a) or (b) applies with full coverage (1/1).'
+      overall_summary: 'The LLM provides a correct and well-reasoned answer that matches
+        the ImandraX verification without needing decomposition, as the logic is straightforward.
+        Strengths: accurate control flow and conclusion. Weaknesses: no formal verification
+        or exploration of potential edge cases (though none exist here). ImandraX
+        adds formal proof value, but LLM is sufficient for this binary property.'

@@ -5532,3 +5532,1026 @@
         clear logical progression. Weaknesses: hidden, unjustified input constraint,
         0% direction accuracy due to wrong conclusion, incomplete state space coverage,
         missing critical edge case."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:49:06'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM correctly identified 6 distinct scenarios by tracing execution
+          paths based on deficit levels and operating modes. The decomposition also
+          found 6 scenarios. The LLM's reasoning for each path was sound and matched
+          the logic of the problem.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately understood the conditional logic and how different
+          deficit levels and modes led to different shedding outcomes. It correctly
+          identified that `mode == Emergency` allows shedding Essential loads, which
+          is an override to the default behavior. The LLM's step-by-step path tracing
+          demonstrates a correct understanding of conditional precedence, branching,
+          and short-circuiting as it evaluated conditions sequentially and stopped
+          when a sufficient shedding level was found.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - No deficit (shed nothing)
+        - Complete blackout (shed everything)
+        total_edge_cases: 2
+        reasoning: The LLM successfully identified the edge cases of 'no deficit'
+          (Path 1) and 'complete blackout' (Path 5). These represent the minimum and
+          maximum shedding scenarios, which are critical edge cases for this system.
+          The LLM missed no edge cases in this context.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit between 1 and 10 kW
+        - deficit between 11 and 40 kW
+        - deficit between 41 and 80 kW
+        - deficit exceeds 80 kW
+        - deficit > 40
+        - deficit == 0
+        - renewable_kw >= total_load_kw
+        - mode == Emergency
+        - mode is NOT Emergency (GridTied or Islanded)
+        thresholds_from_decomp:
+        - 'load_deficit_ranges: 0'
+        - 'load_deficit_ranges: 1-10'
+        - 'load_deficit_ranges: 11-40'
+        - 'load_deficit_ranges: 41-80'
+        - 'load_deficit_ranges: 81-100'
+        - 'load_deficit_ranges: 100+'
+        reasoning: The LLM accurately identified all the numerical thresholds related
+          to `deficit` and `renewable_kw` vs `total_load_kw`, as well as the categorical
+          threshold related to `mode`. It broke down the deficit ranges thoroughly
+          which corresponds well with the ranges provided by Imandrax (even though
+          the Imandrax ranges are slightly more granular covering up to 100+ and not
+          just 80 for the deficit) and explicitly identified the modes. While ImandraX
+          provided specific ranges for `load_deficit_ranges`, the LLM essentially
+          articulated these ranges through its scenario descriptions. The LLM did
+          not explicitly mention `battery_soc` or exact numeric values for `renewable_kw`
+          (50, 80) as specific thresholds. However, these specific renewable_kw thresholds
+          are not directly used in the `determine_load_shedding` function's logic
+          that was provided; rather, the logic depends on `renewable_kw >= total_load_kw`,
+          suggesting that these numeric values might be part of an external or upstream
+          calculation that wasn't directly part of the provided logic for `determine_load_shedding`.
+          Thus, the provided LLM's identified thresholds are relevant to the provided
+          logic.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM precisely described the outcome of each scenario, specifying
+          exactly what would be shed and the `total_shed_kw` corresponding to each
+          path. For example, it correctly states 'shed Deferrable only, total_shed_kw
+          = 10' for Path 2, and 'shed Deferrable + NonEssential + Essential, total_shed_kw
+          = 80' for Path 4 etc. This numeric precision is accurate and matches the
+          problem description.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately determined the correct load shedding actions
+          and final `total_shed_kw` for each identified scenario. Its reasoning for
+          each path, including when certain loads could or could not be shed based
+          on the mode, is entirely correct and aligns with the problem description
+          and expected outcomes.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM successfully covered all distinct load shedding scenarios
+          described by the problem. It identified 6 scenarios, which matches the 6
+          scenarios found by the decomposition. Its path tracing method ensured that
+          all relevant combinations of `deficit` and `mode` were considered, leading
+          to a complete coverage of the decision space.
+      overall_summary: The LLM demonstrated an excellent understanding of the smart
+        microgrid system's load shedding logic. It accurately identified all 6 distinct
+        load shedding scenarios, precisely described the outcome of each, and correctly
+        reasoned about the control flow, including conditional precedence, branching,
+        and override logic. It also successfully detected the key edge cases of no
+        deficit and complete blackout. The identified decision boundaries align well
+        with the problem's logic, despite a slight difference in granularity for deficit
+        ranges compared to ImandraX's explicit thresholds. Overall, the LLM's response
+        was highly accurate, comprehensive, and well-reasoned, matching the decomposition
+        and verification results.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'LLM provided one example scenario, but the decomposition found
+          two distinct scenarios where essential loads are shed despite a healthy
+          battery. LLM''s scenario: mode=Emergency, battery_soc=80, renewable_kw=10,
+          total_load_kw=60. ImandraX''s scenario: {''mode'': ''Emergency'', ''battery_soc'':
+          50, ''renewable_kw'': 0, ''total_load_kw'': 41, ''deficit'': 41, ''result'':
+          ''shed_essential = true''}. The two scenarios are distinct in input values,
+          but both confirm the core logic correctly. The LLM only gave one explicit
+          scenario, while the decomposition could technically give both.'
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that the decision to shed Essential
+          loads depends on the deficit exceeding 40 kW and the mode being Emergency,
+          and that the battery_soc does not influence this decision. This demonstrates
+          a correct understanding of the control flow.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No specific edge cases were presented in the question or the provided
+          answers, so no edge cases were found or missed.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit > 40 kW
+        thresholds_from_decomp:
+        - deficit > 40 kW
+        - battery_soc >= 50
+        reasoning: 'The LLM correctly identified the ''deficit > 40 kW'' threshold.
+          Although the question was about ''battery_soc >= 50'', the LLM correctly
+          identified that this threshold was *not* relevant to the shedding decision,
+          implicitly recognizing its presence but irrelevance in this context. The
+          decomposition explicitly mentioned ''battery_soc: 50'' in its example, which
+          is a threshold, but this was already present in the question. The LLM correctly
+          identified the truly operative threshold.'
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: Both LLM and ImandraX answers precisely converge on 'Yes', with
+          consistent reasoning regarding 'Emergency mode' and 'deficit'. Both also
+          provide a concrete example that confirms their conclusion.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX answers correctly conclude that Essential
+          loads *can* be shed when battery_soc >= 50. The reasoning provided by the
+          LLM is sound and aligns with the ImandraX explanation, highlighting that
+          battery_soc has no direct influence on this specific shedding decision.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM successfully identified the single critical scenario that
+          allows for essential load shedding when battery_soc >= 50, which is the
+          'Emergency mode' coupled with a sufficient deficit. This fully covers the
+          intended question.
+      overall_summary: The LLM demonstrated a strong understanding of the system's
+        logic, correctly identifying that Essential loads can be shed in Emergency
+        mode regardless of battery_soc. It accurately pinpointed the critical conditions
+        and provided a valid example. While the decomposition explicitly provided
+        two scenarios, the LLM correctly focused on the core logic and provided one
+        representative scenario that fully verified the answer. The LLM's reasoning
+        for the irrelevance of `battery_soc` to the shedding decision was particularly
+        insightful.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM does not explicitly enumerate the number of scenarios,
+          so it is marked as unknown. The decomposition identifies two scenarios:
+          one where Critical loads are not shed and one where they are. One of these
+          states is the counterexample.'
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM correctly identifies the conditions for shedding Critical
+          loads ('deficit > 80 AND mode == Emergency'). It understands the branching
+          logic for shedding different load types. Its short-circuit behavior understanding
+          is partial because it does not fully elaborate on how the mode 'Emergency'
+          and the 'deficit' condition combine. The override logic concerning system
+          operating modes and their impact on shedding rules is correctly captured,
+          especially how 'Emergency' mode allows for Critical shedding given a large
+          enough deficit.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - total_load_kw exceeding sum of defined loads
+        total_edge_cases: 1
+        reasoning: The LLM identifies that total_load_kw could exceed the sum of defined
+          loads (100 kW) as an edge case, which is the key to finding the counterexample.
+          It does not consider a general edge case of an extremely high total_load_kw
+          that would lead to a large deficit regardless of renewable_kw.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - renewable_kw >= 80
+        - deficit > 80
+        - total_load_kw = 100
+        - Critical(20)
+        - Essential(40)
+        - NonEssential(30)
+        - Deferrable(10)
+        - deficit = 10
+        - total_load_kw > 160
+        thresholds_from_decomp:
+        - renewable_kw
+        - total_load_kw
+        - battery_soc
+        - deficit
+        - '80'
+        - '3'
+        - '199'
+        - '118'
+        - '81'
+        reasoning: 'The LLM identified most of the relevant numeric values and thresholds
+          from the problem description and its calculations, such as `renewable_kw
+          >= 80` and `deficit > 80`. It correctly uses the defined load values. However,
+          it missed the specific counterexample values, such as ''renewable_kw: 118'',
+          ''total_load_kw: 199'', ''deficit: 81'', and ''battery_soc: 3'' that were
+          found by the decomposition. It also made an assumption about `total_load_kw`
+          being at most 100, which led it astray.'
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's final conclusion is 'No, Critical loads can never be
+          shed when renewable_kw >= 80', which is incorrect. The decomposition demonstrates
+          via a counterexample that Critical loads can be shed under those conditions.
+          Therefore, the outcome precision is 0.0.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM arrived at the incorrect conclusion, stating that Critical
+          loads can never be shed under the given conditions. The ImandraX answer
+          refutes this directly with a counterexample. The LLM's reasoning is flawed
+          in assuming `total_load_kw` cannot exceed 100, which is not stated in the
+          problem description as a hard constraint. Therefore, the direction accuracy
+          score is 0.0.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM fails to cover the scenario where `total_load_kw` is sufficiently
+          high to create a large deficit even with abundant `renewable_kw`, which
+          is the key to the counterexample found by ImandraX. It incorrectly assumes
+          `total_load_kw` is capped at 100kW, missing a valid region of the input
+          space.
+      overall_summary: The LLM incorrectly concludes that Critical loads can never
+        be shed when renewable_kw >= 80. Its reasoning is flawed because it makes
+        an unstated assumption that `total_load_kw` won't exceed the sum of defined
+        loads (100 kW). ImandraX, through decomposition, finds a counterexample where
+        a high `total_load_kw` leads to a deficit large enough to shed Critical loads,
+        even with abundant renewable energy. This highlights the LLM's failure in
+        exploring the full range of possible input conditions, especially those that
+        might lead to an edge case refuting its initial hypothesis.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:09'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 6
+        reasoning: LLM estimated 6 distinct scenarios based on the execution paths
+          outlined in its answer. The exact number derived from ImandraX's decomposition
+          also confirms there are 6 scenarios.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of conditions based
+          on the paths it described. The branching structure reflects accurate use
+          of the if-else construct, short-circuit behaviors are correctly anticipated,
+          and no safety checks were incorrectly overridden.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Deficit exactly at boundaries (10kW, 40kW, 80kW)
+        - Complete blackout scenario for deficits exceeding 80 kW
+        total_edge_cases: 3
+        reasoning: The edge cases involve significant thresholds that represent the
+          various operational constraints and requirements of the microgrid, which
+          were identified in the scenarios.
+        edge_case_count: 2
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_soc < 30
+        - renewable_kw >= 50
+        - renewable_kw < 80
+        - load_deficit == 0
+        - load_deficit in [1-10, 11-40, 41-80, 81-100, >= 100]
+        thresholds_from_decomp:
+        - battery_soc < 30
+        - renewable_kw >= 50
+        - renewable_kw < 80
+        - load_deficit in [0, 1-10, 11-40, 41-80, 81-100, 100+]
+        reasoning: The LLM successfully identified several key thresholds but missed
+          directly stating the boundaries for the deficit that would trigger different
+          responses.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The outcomes provided in LLM's response matched exactly with the
+          relevant thresholds and conditions mentioned in the ImandraX decomposition.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM concluded correctly regarding the number of scenarios and
+          routing requirements outlined in the problem. The reasoning process logically
+          aligns with the expected operational modes and protections according to
+          the load shedding process.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covers the required scenarios based on the explicit paths
+          it has outlined in its response, matching the number of identified scenarios
+          in the decomposition.
+      overall_summary: The LLM's response closely aligns with the answers provided
+        by ImandraX. It accurately identified the essential paths and made a correct
+        estimation of the distinct load shedding scenarios. While there are areas
+        for improvement, particularly in identifying all boundary conditions explicitly,
+        the overall analysis showcased a thorough understanding of the smart microgrid
+        system.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: The LLM recognizes the branching structure correctly by identifying
+          scenarios under Emergency mode versus healthy battery conditions. However,
+          it misunderstands short-circuit behavior regarding the exclusion of battery_soc
+          in shedding decisions, leading to incorrect reasoning on its influence.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - battery_soc exactly at 50
+        - deficit at least equal to shedding load
+        total_edge_cases: 4
+        reasoning: The LLM found a scenario with the battery at the threshold of essential
+          shedding but missed other edge cases, like scenarios with battery_soc below
+          50 and multilayered conditions affecting load prioritization.
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_soc >= 50
+        thresholds_from_decomp:
+        - battery_soc < 50%
+        - battery_soc = 50%
+        reasoning: The LLM identified one threshold regarding battery_soc, but it
+          overlooked explicit distinctions made during decomposition, missing relevant
+          boundaries needed for decisions around load shedding.
+        score: 0.5
+      outcome_precision:
+        score: 0.8
+        reasoning: The response is mostly correct regarding outcomes but falls short
+          of precision, as it confines interpretation to the Emergency condition only.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The LLM correctly identified that Essential loads can be shed but
+          lacked completely thorough reasoning to consider other potential scenarios.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM acknowledged the scenario under Emergency mode but failed
+          to enumerate multiple situations where Essential loads might be shed despite
+          battery conditions.
+      overall_summary: The LLM's answer demonstrates a reasonable understanding of
+        core concepts like load shedding rules within Emergency mode but lacks comprehensive
+        scenario consideration, resulting in incomplete coverage and some inaccuracies.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: The LLM misunderstood the conditions under which Critical loads
+          can be shed. It failed to recognize that a deficit exceeding 80 can occur
+          even with abundant renewable energy when total load is substantial. While
+          it correctly identifies some constraints, the overall control flow understanding
+          is incorrect, leading to wrong conclusions.
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: The LLM did not identify the edge case where the deficit can exceed
+          80 due to high total load even with abundant renewable generation. The only
+          edge case possible was missing in the LLM's assessment.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - deficit > 80
+        reasoning: The LLM did not identify the important threshold of deficit > 80
+          that directly impacts the ability to shed Critical loads. It failed to recognize
+          that a specific total load can lead to a scenario where Critical loads can
+          indeed be shed.
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM incorrectly states that Critical loads cannot be shed with
+          abundant renewables, which contradicts the example scenario provided by
+          ImandraX.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The conclusion that Critical loads cannot be shed when renewable_kw
+          >= 80 is completely wrong based on ImandraX's counterexample, illustrating
+          a fundamental misunderstanding of the system's behavior.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM did not assess or acknowledge any scenarios in which Critical
+          loads could be shed. This demonstrates no coverage of the actual decision
+          scenarios.
+      overall_summary: The LLM's answer is fundamentally flawed, failing to grasp
+        the control structure necessary for determining load shedding in a microgrid
+        system. It incorrectly concludes that Critical loads cannot be shed while
+        abundant renewable energy is available, despite evidence presented by ImandraX
+        indicating otherwise.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:35'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM explicitly states '6 distinct scenarios' and provides clear
+          reasoning for how these 6 scenarios are derived from execution paths. The
+          ImandraX answer also confirms 6 scenarios. Since both agree on the same
+          number, the estimate is accurate (no divergence).
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies the hierarchical structure of load
+          shedding: it first checks if deficit exists (deficit == 0 as guard), then
+          applies sequential shedding logic (Deferrable → NonEssential → Essential
+          → Critical). The LLM correctly recognizes the override logic where Emergency
+          mode permits Essential shedding (overriding the usual protection), while
+          GridTied/Islanded modes cannot shed Essential (safety constraint). The precedence
+          is correctly understood: renewable_kw >= total_load_kw must be checked first
+          (short-circuit), then deficit-based thresholds are applied sequentially
+          (10, 40, 80, 100). The branching structure (if-else-if cascading through
+          deficit ranges, with nested mode checks) is properly modeled.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Deficit exactly 0 (no shedding required - boundary case)
+        - Deficit exactly 10 kW (Deferrable boundary - exact threshold)
+        - Deficit exactly 40 kW (NonEssential boundary - exact threshold)
+        - Deficit exactly 80 kW (Essential boundary, mode-dependent)
+        - Deficit > 80 kW in Emergency mode (complete blackout - critical safety state)
+        - Deficit > 40 kW in GridTied/Islanded mode (cannot shed Essential - safety
+          override)
+        total_edge_cases: 6
+        reasoning: 'The LLM identifies all key boundaries and critical cases: (1)
+          zero deficit as a guard clause, (2-4) exact load category thresholds (10,
+          40, 80 kW), (5) the safety-critical complete blackout scenario in Emergency
+          mode, and (6) the mode-dependent constraint preventing Essential shedding
+          in GridTied/Islanded modes. These align with the edge cases inherent in
+          the decomposition: boundary equalities (deficit == 0, 10, 40, 80), negation
+          of normal operation (blackout), and safety constraints (mode-specific overrides).
+          No edge cases are explicitly missed.'
+        edge_case_count: 6
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit == 0
+        - deficit 1-10 (deferrable_kw = 10)
+        - deficit 11-40 (total deferrable + non_essential = 40)
+        - deficit 41-80 (includes essential in Emergency mode)
+        - deficit > 80 (exceeds essential capacity in Emergency mode)
+        thresholds_from_decomp:
+        - battery_soc = 30
+        - renewable_kw = 50
+        - renewable_kw = 80
+        - deficit = 0
+        - deficit = 10
+        - deficit = 40
+        - deficit = 80
+        - deficit = 100
+        reasoning: 'The LLM identifies the key load-deficit thresholds (0, 10, 40,
+          80, 100+) that determine which loads to shed. However, the decomposition
+          also includes battery_soc = 30 and renewable_kw thresholds (50, 80) that
+          the LLM does not explicitly mention. While these thresholds may influence
+          the renewable_kw and deficit calculations, the LLM''s focus on deficit-based
+          thresholds (which are the direct decision boundaries for shedding logic)
+          captures the core decision structure. The LLM identifies 5 out of 8 explicit
+          thresholds from the decomposition. The missing thresholds (battery_soc and
+          renewable_kw values) may not be directly used in branching decisions within
+          determine_load_shedding itself, but their presence in the decomposition
+          suggests they are relevant context. Score: 5/8 = 0.625'
+        score: 0.625
+      outcome_precision:
+        score: 0.95
+        reasoning: 'The LLM provides precise numeric outcomes for each scenario: shed_nothing
+          (0 kW), shed_Deferrable (10 kW), shed_Deferrable+NonEssential (40 kW), shed_Deferrable+NonEssential+Essential
+          (80 kW), and shed_everything (100 kW). Each outcome includes exact load
+          amounts and clear descriptions. The reasoning for each path is grounded
+          in specific kW values and thresholds. The only minor imprecision is that
+          the LLM doesn''t explicitly state whether boundary conditions (e.g., deficit
+          == exactly 10) result in shedding that exact amount or just meeting the
+          minimum required - but this is implicit in the logic. Overall, the numeric
+          precision is very high (0.95).'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is completely correct: there are exactly
+          6 distinct load shedding scenarios. The reasoning is sound and complete:
+          (1) no deficit path, (2-4) progressive shedding paths through load categories,
+          (5) complete blackout in Emergency mode, and (6) mode-dependent constraint
+          in non-Emergency modes. The logic correctly distinguishes between scenarios
+          based on deficit ranges AND mode-specific rules (Emergency permits Essential
+          shedding; GridTied/Islanded do not). The reasoning demonstrates proper understanding
+          of the control flow and outcomes, with no logical errors or contradictions.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM explicitly enumerates all 6 scenarios with clear descriptions
+          of each. Using rubric (b) SCENARIO ENUMERATION, the LLM describes 6 distinct
+          paths/scenarios: Path 1 (no deficit), Path 2 (deferrable), Path 3 (deferrable
+          + non-essential), Path 4 (emergency mode, deferrable + non-essential + essential),
+          Path 5 (emergency mode, complete blackout), and Path 6 (non-emergency mode,
+          deferrable + non-essential). This matches the decomposition''s count of
+          6 scenarios. Full coverage achieved.'
+      overall_summary: The LLM provides an excellent answer that matches ImandraX
+        in both quantity (6 scenarios) and quality of reasoning. The LLM correctly
+        identifies all distinct load shedding scenarios through systematic path analysis,
+        with proper understanding of control flow (sequential shedding hierarchy),
+        mode-based overrides (Emergency vs. GridTied/Islanded), and boundary conditions.
+        The answer is precise in numeric outcomes (exact kW amounts for each scenario),
+        identifies all major edge cases (thresholds, safety-critical states, mode
+        constraints), and achieves complete scenario coverage. The only minor gap
+        is not explicitly referencing some decomposition thresholds (battery_soc,
+        specific renewable_kw values) that may be contextual rather than directly
+        driving shedding decisions. Overall, this is a high-quality answer with minimal
+        room for improvement.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM does not provide an explicit scenario count or range, only
+          a single illustrative example. No attempt to estimate the full scenario
+          space is made. ImandraX identifies exactly 2 scenarios. Since the LLM provides
+          no quantifiable estimate, n_llm_estimated_scenarios cannot be reliably extracted
+          and is marked as 'unknown'.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Both answers demonstrate comprehensive understanding of the control
+          flow. (1) Precedence: Both correctly identify that the deficit > capacity
+          check is evaluated before the mode check, and both understand the sequential
+          evaluation in shedding (Deferrable, then NonEssential, then Essential).
+          (2) Branching structure: Both recognize the if-else logic: ''if deficit
+          > 0 after shedding NonEssential, then check mode; if Emergency, shed Essential''.
+          (3) Short-circuit behavior: Both understand that energy_status computation
+          in classify_energy_status() is bypassed in the actual shedding logic (it''s
+          a dead code path). The LLM explicitly notes this: ''energy_status is computed
+          but has no effect on control flow.'' (4) Override logic: The GridTied mode
+          acts as a protective override preventing Essential shedding, which both
+          answers implicitly acknowledge by contrasting with Emergency mode''s permissive
+          logic. Both demonstrate correct understanding of these structural elements.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - battery_soc exactly at boundary (50)
+        - deficit barely exceeds NonEssential capacity (41 kW vs 30 kW gap)
+        - renewable_kw = 0 (no renewable generation)
+        - mode = Emergency with minimal deficit
+        total_edge_cases: 4
+        reasoning: 'The ImandraX example highlights a critical edge case: battery_soc
+          exactly at the 50 threshold with deficit just barely forcing Essential shedding
+          (41 kW total load, 0 renewable, exactly triggering the condition). This
+          demonstrates the boundary behavior. The LLM''s example with battery_soc=80
+          is also a valid edge case showing high battery state doesn''t prevent Essential
+          shedding. Both answers identify the core edge case: the counterintuitive
+          fact that a ''healthy'' battery (>= 50) does NOT protect Essential loads
+          in Emergency mode. ImandraX''s example is more edge-case-focused by using
+          the exact boundary (50 vs. 80), whereas the LLM uses a clear but less boundary-specific
+          example. Both capture the essential edge case (battery does not control
+          Essential shedding), but ImandraX''s choice of battery_soc=50 (exactly at
+          boundary) vs. LLM''s battery_soc=80 (comfortably above) shows ImandraX is
+          slightly more thorough in edge-case selection.'
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit > 0 after NonEssential shedding
+        - mode = Emergency (allows Essential shedding)
+        - battery_soc >= 50 (explicitly identified as NOT a controlling threshold)
+        thresholds_from_decomp:
+        - deficit > 0 after Deferrable shedding (10 kW)
+        - deficit > 0 after NonEssential shedding (30 kW)
+        - mode = Emergency
+        - battery_soc >= 50 (control point)
+        - grid_connected = False (Emergency mode enables when not grid-tied)
+        reasoning: 'LLM identifies the key decision thresholds: the 40 kW aggregate
+          (Deferrable 10 + NonEssential 30) and the Emergency mode condition. Critically,
+          the LLM explicitly identifies that battery_soc >= 50 is NOT a controlling
+          threshold, which is the core insight of the question. However, the LLM does
+          not enumerate all intermediate thresholds (Deferrable 10 kW, NonEssential
+          30 kW) separately. ImandraX''s example implicitly uses battery_soc = 50
+          as a test boundary (showing it does not prevent Essential shedding). The
+          decomposition has 5 distinct thresholds/decision points; LLM identifies
+          3 explicitly (one being the negative identification that battery_soc does
+          NOT control outcome). Score: 3/5 = 0.6. However, if we consider the LLM''s
+          identification of ''what does NOT matter'' as a valuable clarification of
+          decision boundaries, the answer is more nuanced. The LLM''s explicit statement
+          that battery_soc has no influence on the outcome is technically identifying
+          1 of the key thresholds (the negative one).'
+        score: 0.6
+      outcome_precision:
+        score: 1.0
+        reasoning: 'Both LLM and ImandraX provide precise numeric/conditional reasoning.
+          LLM specifies the deficit threshold (40 kW) and mode requirement (Emergency)
+          with exact values. ImandraX provides concrete numeric examples (battery_soc=50,
+          renewable_kw=0, total_load_kw=41, deficit=41). Both correctly state the
+          condition in exact terms: Essential loads are shed when deficit > capacity
+          after NonEssential AND mode = Emergency, independent of battery_soc >= 50.
+          Neither relies on vague qualitative descriptions like ''high'' or ''sufficient'';
+          both provide exact numeric reasoning. The LLM''s example with battery_soc=80
+          and deficit=50 is numerically precise, and ImandraX''s example with battery_soc=50
+          and deficit=41 is also precise.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'Both answers reach the same correct conclusion: YES, Essential
+          loads CAN be shed even when battery_soc >= 50 (in healthy state). Both provide
+          correct reasoning: the battery_soc value does not control Essential shedding
+          decisions in Emergency mode; instead, the deficit magnitude and operating
+          mode are the determining factors. Both explicitly state that battery_soc
+          is computed but has no influence on shedding (LLM: ''energy_status is never
+          actually used''; ImandraX: ''Battery level doesn''t directly control shedding'').
+          Both correctly identify Emergency mode as the enabling condition. The reasoning
+          quality is high in both cases, with concrete examples supporting the conclusion.'
+      coverage_completeness:
+        score: 0.5
+        reasoning: 'ImandraX explicitly states ''2 scenarios'' where Essential loads
+          are shed despite battery_soc >= 50. The LLM provides only 1 detailed example
+          scenario. Using rubric (b) scenario enumeration: ImandraX identifies 2 scenarios
+          explicitly; LLM identifies 1 scenario explicitly. However, the LLM''s reasoning
+          (''only in Emergency mode'') encompasses both scenarios implicitly (Emergency
+          with battery_soc >= 50). Both answers cover the same outcome category (Emergency
+          mode enabling Essential shedding), achieving 1/1 = 100% category coverage.
+          Applying the most generous rubric (c) outcome category coverage, both achieve
+          1.0. However, if evaluating by scenario count (rubric b), LLM explicitly
+          describes 1 out of 2 scenarios, yielding 0.5. The scenario count is the
+          more stringent and appropriate metric here since ImandraX explicitly quantifies
+          ''2 scenarios.'' LLM''s answer could be seen as providing the logical condition
+          that encompasses 2 scenarios, but it only explicitly enumerates 1, resulting
+          in 50% coverage by explicit enumeration.'
+      overall_summary: 'Both the LLM and ImandraX answers reach the correct conclusion
+        with strong reasoning quality. The key strengths and weaknesses are: STRENGTHS:
+        (1) Both correctly identify that Essential loads CAN be shed at battery_soc
+        >= 50, but only in Emergency mode; (2) Both correctly reason that battery_soc
+        is not a controlling factor in shedding decisions; (3) Both demonstrate excellent
+        control flow understanding, correctly identifying that energy_status is a
+        dead code path; (4) Both provide precise numeric reasoning with exact thresholds
+        (40 kW deficit threshold). WEAKNESSES: (1) LLM does not quantify the scenario
+        space (no scenario count), while ImandraX explicitly states 2 scenarios; (2)
+        LLM provides only 1 explicit example, while ImandraX provides 2 (though only
+        1 is shown); (3) ImandraX''s example uses the exact boundary (battery_soc=50)
+        which is a better edge-case test, while LLM uses battery_soc=80. OVERALL:
+        Both answers are substantially equivalent in correctness and reasoning quality,
+        with ImandraX showing slightly better rigor in scenario enumeration and edge-case
+        selection. The quality difference is marginal, with both demonstrating strong
+        understanding of the logic.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not explicitly estimate a scenario count. Instead,
+          it performs case analysis (one scenario with renewable_kw=80, total_load_kw=100).
+          The ImandraX decomposition identified at least 1 scenario refuting the LLM's
+          claim (the counterexample). Without access to the full decomposition region
+          count, this metric cannot be reliably scored. The LLM's approach was qualitative
+          reasoning rather than quantitative enumeration of the state space.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions (partial): The LLM correctly understands
+          that deficit > 80 AND mode == Emergency are conjunctive requirements. However,
+          it did not fully explore the implications of the guard clause—that renewable_kw
+          >= 80 is a condition on renewable generation, not a constraint that prevents
+          high deficits entirely. Branching structure (partial): The LLM identifies
+          the sequence: calculate deficit → check if deficit > 80 and mode == Emergency
+          → shed loads progressively. However, it fails to see that the load-shedding
+          cascade can still be triggered even with high renewable_kw if total_load_kw
+          is sufficiently large. Short-circuit behavior (partial): The LLM correctly
+          notes that shedding stops after NonEssential when sufficient load is removed,
+          but it does not trace through the scenario where the deficit remains > 80
+          after Deferrable and NonEssential are fully shed, forcing Critical shedding.
+          Override logic (correct): The LLM correctly understands that mode == Emergency
+          allows Critical shedding (overriding the protection rule in GridTied mode).'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: 'The LLM identified zero edge cases. The critical edge case here
+          is: High renewable_kw (118) combined with very high total_load_kw (199)
+          in Emergency mode, which results in deficit=81 > 80, triggering Critical
+          shedding despite abundant renewables. This edge case violates the naive
+          expectation that abundant renewables would protect all loads, and it requires
+          the conjunction of multiple constraints: (1) mode=Emergency (not GridTied
+          protection), (2) total_load_kw >> renewable_kw despite high renewable_kw,
+          and (3) deficit > 80 threshold crossed. The LLM completely missed this counterintuitive
+          scenario, which is the crux of the question.'
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit > 80
+        - renewable_kw >= 80
+        - mode == Emergency
+        - total_load_kw = 100 (sum of all loads)
+        thresholds_from_decomp:
+        - renewable_kw >= 80
+        - deficit > 80
+        - mode == Emergency
+        - total_load_kw can be arbitrary (not constrained to 100)
+        reasoning: 'The LLM identifies several thresholds but makes a critical error:
+          it assumes total_load_kw is constrained to 100 kW (the sum of predefined
+          loads). This is an assumption not enforced by the logic. The decomposition
+          shows that total_load_kw can be arbitrary, allowing total_load_kw=199 in
+          the counterexample. The LLM correctly identifies deficit > 80, renewable_kw
+          >= 80, and mode == Emergency as decision boundaries, but misses the key
+          insight that there is no upper bound on total_load_kw. Score: 3 out of 4
+          thresholds partially correct, but the missing constraint on total_load_kw
+          is critical to answering the question correctly.'
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides qualitative reasoning about the deficit calculation
+          (deficit = max(0, total_load_kw - renewable_kw)) but fails to identify the
+          key numeric threshold. ImandraX identifies a specific counterexample with
+          renewable_kw=118 >= 80, total_load_kw=199, and deficit=81. The LLM's statement
+          that 'deficit would need to exceed 80 for Critical shedding' is directionally
+          correct but incomplete—it missed that this threshold (deficit > 80) can
+          indeed be reached even with abundant renewables. The precision is low because
+          the LLM identified relevant numeric conditions but reached an incorrect
+          conclusion about achievability.
+      direction_accuracy:
+        score: 0.0
+        reasoning: 'The LLM concludes ''No, Critical loads can never be shed when
+          renewable_kw >= 80,'' but the ImandraX counterexample definitively refutes
+          this. With renewable_kw=118 >= 80, mode=Emergency, and total_load_kw=199,
+          the result is shed_critical=true. This is a completely wrong conclusion.
+          The LLM''s reasoning was sound in isolation (it correctly identified the
+          need for deficit > 80 and Emergency mode), but it made an unjustified assumption:
+          that total_load_kw is constrained to the sum of predefined load powers (100
+          kW). This assumption is not enforced by the logic—the system accepts arbitrary
+          total_load_kw values—making the LLM''s conclusion factually incorrect.'
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM examined only one scenario (renewable_kw=80, total_load_kw=100)
+          and concluded based on this limited case that Critical loads cannot be shed.
+          It failed to explore the possibility that total_load_kw could exceed the
+          sum of predefined loads. ImandraX found at least one scenario where Critical
+          is shed despite renewable_kw >= 80. The LLM's coverage is incomplete—it
+          did not enumerate decision branches that lead to different outcomes and
+          missed the critical path (Emergency mode with high deficit). Score reflects
+          0% coverage of the actual decision scenarios that produce the refuted conclusion.
+      overall_summary: 'The LLM''s answer is fundamentally incorrect. It concludes
+        that Critical loads can never be shed when renewable_kw >= 80, but the ImandraX
+        counterexample definitively refutes this with a concrete scenario: Emergency
+        mode, renewable_kw=118, total_load_kw=199, resulting in Critical shedding.
+        The LLM''s error stems from an unjustified assumption that total_load_kw is
+        constrained to the sum of predefined load categories (100 kW). While the LLM''s
+        logical reasoning about deficit thresholds and mode protection rules is sound,
+        it failed to consider the full state space—specifically, scenarios where total_load_kw
+        can exceed 100 kW. This represents a critical gap in state space exploration
+        and a misunderstanding of the input constraints. The LLM''s approach was too
+        narrow, focusing only on "reasonable" or "realistic" parameterizations rather
+        than the actual logical constraints of the system. ImandraX, by exhaustively
+        decomposing the state space, correctly identified that the LLM''s conclusion
+        is false."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:48'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 6
+        reasoning: 'The LLM explicitly states ''Total distinct scenarios: 6''. The
+          ImandraX answer confirms ''6 scenarios'', so the exact number from decomposition
+          is 6.'
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly prioritizes deficit checks sequentially
+          (no deficit, then after deferrable, after non-essential, then mode for essential),
+          with mode only relevant after initial shedding attempts. Branching: Accurately
+          models if-else chain for progressive shedding, branching on mode only when
+          deficit >40 kW. Short-circuit: Correctly identifies early stops when after_xxx
+          <=0 (e.g., no further shedding if deficit covered). Override: Properly captures
+          that non-Emergency modes override essential shedding, stopping at non-essential
+          even for large deficits.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Deficit 41-80 kW in Emergency mode (sheds Essential, complex AND condition)
+        - Deficit >80 kW in Emergency mode (complete blackout, safety-critical)
+        - Deficit >40 kW in non-Emergency mode (cannot shed Essential, negates naive
+          expectation of full coverage)
+        total_edge_cases: 3
+        reasoning: The LLM identifies three edge cases corresponding to complex mode-dependent
+          behaviors and extremes. These match the decomposition's likely edge cases
+          involving mode overrides and high deficits. No misses apparent, as the 6
+          scenarios include all such regions.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit = 0
+        - deficit = 10
+        - deficit = 40
+        - deficit = 80
+        thresholds_from_decomp:
+        - battery_soc = 30
+        - renewable_kw = 50
+        - renewable_kw = 80
+        - deficit = 0
+        - deficit = 10
+        - deficit = 40
+        - deficit = 80
+        - deficit = 100
+        reasoning: The LLM identifies the core deficit thresholds for shedding decisions
+          (0,10,40,80 kW) from the load shedding logic. It misses battery_soc=30%
+          (likely for mode trigger), renewable_kw=50 and 80 (possibly for mode or
+          deficit calc), and deficit=100 (full load threshold for 100+ range). The
+          mode=E merging is captured qualitatively but not as numeric thresholds.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides exact deficit ranges (0, 1-10, 11-40, 41-80, 81+)
+          and corresponding total_shed_kw values (0,10,40,80,100,40), matching the
+          ImandraX load_deficit_ranges ('0, 1-10, 11-40, 41-80, 81-100, 100+') precisely,
+          including operators and values.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM concludes exactly 6 distinct scenarios, matching ImandraX.
+          Reasoning correctly enumerates all paths with accurate outcomes and mode
+          dependencies, with no flawed conclusions.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using (b) SCENARIO ENUMERATION: The LLM explicitly describes 6
+          distinct paths/scenarios, matching the decomposition''s 6 scenarios exactly.'
+      overall_summary: The LLM performs excellently, matching the exact scenario count
+        of 6 and providing a detailed, accurate trace of the control flow and decision
+        paths. It covers all shedding combinations and mode interactions comprehensively.
+        Minor weakness in not identifying upstream thresholds (battery SOC and renewable
+        kW) for mode determination, assuming modes as given inputs, but this does
+        not affect the core shedding logic evaluation. Overall, superior to a naive
+        response, closely aligning with decomposed verification.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM does not provide an explicit estimate of the number of
+          scenarios; it describes the general conditions under which Essential loads
+          can be shed (Emergency mode and deficit exceeding 40 kW) and provides one
+          example, but no numeric count or range. Thus, it is marked as 'unknown'.
+          The decomposition explicitly states 2 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct - LLM accurately identifies
+          that shedding Essential loads requires both deficit >40 kW AND Emergency
+          mode, showing understanding of conjunctive conditions. Branching structure:
+          Correct - Describes the sequential shedding logic (Deferrable -> NonEssential
+          -> Essential if in Emergency), matching if-else-like structure. Short-circuit
+          behavior: Partial - Mentions the flow after shedding previous loads but
+          does not explicitly discuss early returns or guards beyond the deficit checks;
+          implies sequential evaluation without detailing short-circuits. Override
+          logic: Correct - Highlights that Emergency mode overrides protections to
+          allow Essential shedding, regardless of battery status.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency mode with healthy battery (SOC>=50) but high deficit allowing
+          Essential shedding, counter to expectation that healthy battery prevents
+          shedding
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies one key edge case: Essential shedding in Emergency
+          mode despite high battery SOC, which is counterintuitive (negation of common
+          expectation) and safety-critical in a microgrid context. The decomposition
+          has 2 scenarios, likely variations of this edge case (e.g., different deficit
+          levels). The LLM describes the general case and one example, covering the
+          core edge but not enumerating both distinctly.'
+        edge_case_count: 1
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit > 40 kW (after Deferrable + NonEssential)
+        - battery_soc >= 50 (noted as irrelevant to shedding)
+        thresholds_from_decomp:
+        - deficit > 40 kW (implied by total_load_kw=41 leading to shed_essential=true)
+        - battery_soc >= 50 (condition of question, but irrelevant)
+        reasoning: LLM correctly identifies the key shedding threshold (deficit exceeding
+          40 kW, derived from load capacities) and notes battery_soc >=50 has no effect.
+          Decomposition implies the same deficit threshold via example (41 kW). Both
+          cover the battery threshold, but emphasize its irrelevance. No misses; score
+          will be 2/2=1.0.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides a precise numeric example matching the decomposition''s
+          logic: deficit=50 kW >40 kW threshold, leading to Essential shedding with
+          exact values (e.g., after_non_essential=10 >0). This exactly matches the
+          operator and value implied in ImandraX (deficit=41 >40 equivalent). No approximation;
+          full precision on the numeric condition for the outcome.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes YES, Essential loads can be shed when
+          battery_soc >=50, specifically in Emergency mode due to high deficit, with
+          sound reasoning that battery_soc does not influence shedding (energy_status
+          unused). This aligns perfectly with ImandraX's YES and explanation that
+          battery level is irrelevant. Example reinforces correctness without flaws.
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Applied (b) SCENARIO ENUMERATION and (c) OUTCOME CATEGORY COVERAGE:
+          LLM enumerates one explicit scenario/example and covers the full category
+          (Emergency mode + deficit >40 kW), implying all such cases. Decomposition
+          has 2 specific scenarios (likely deficit variations). LLM covers the general
+          rule encompassing both but does not explicitly list 2, so partial coverage
+          at 0.75 (1 explicit + general category / 2 specific).'
+      overall_summary: The LLM answer is strong, correctly identifying the counterintuitive
+        irrelevance of battery_soc and providing a precise example that aligns with
+        decomposition. It excels in direction accuracy, control flow, and boundary
+        clarity but slightly underperforms in explicit scenario counting and edge
+        case enumeration compared to ImandraX's decomposed 2 scenarios. Overall, LLM
+        demonstrates good qualitative insight with solid numerics, while ImandraX
+        adds verification depth.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately describes the sequential shedding process (Deferrable
+          -> NonEssential -> Essential -> Critical), correctly identifies the condition
+          for Critical shedding as deficit > 80 AND mode == Emergency, notes early
+          stopping when deficit <= 0 after partial shedding, and acknowledges mode-specific
+          rules (e.g., Emergency allows more shedding). All aspects are captured without
+          errors in the control flow logic itself.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: 'The LLM considers the hypothetical of arbitrary high total_load_kw
+          > 160 but dismisses it as unrealistic within the model''s design (assuming
+          loads sum to 100 kW), and does not explicitly identify or describe any edge
+          case where Critical loads are shed under renewable_kw >= 80. The decomposition
+          provides one clear edge case: high total_load_kw (199 kW) creating deficit
+          > 80 despite abundant renewables (118 kW). Thus, the LLM found 0 out of
+          1 edge cases.'
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - deficit > 80
+        - renewable_kw >= 80
+        thresholds_from_decomp:
+        - deficit > 80
+        - renewable_kw >= 80
+        reasoning: The LLM correctly identifies the key decision boundary for Critical
+          shedding as deficit > 80 (in Emergency mode) and references the condition
+          renewable_kw >= 80 in the context of the question. The decomposition's counterexample
+          aligns with these thresholds (deficit = 81 > 80, renewable_kw = 118 >= 80),
+          with no additional thresholds mentioned. The LLM did not miss any relevant
+          numeric boundaries.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM reaches the completely incorrect conclusion that Critical
+          loads can never be shed when renewable_kw >= 80, based on the flawed assumption
+          that total_load_kw is bounded by 100 kW. The ImandraX answer refutes this
+          with a valid counterexample where shedding occurs (renewable_kw = 118, total_load_kw
+          = 199, deficit = 81 in Emergency mode), proving it is possible. The reasoning
+          is also flawed due to incorrect input constraints, leading to no recognition
+          of feasible scenarios.
+      coverage_completeness:
+        score: 0.0
+        reasoning: 'The LLM finds no decision scenarios where Critical loads are shed
+          under renewable_kw >= 80 (rubric (e) NO COVERAGE: 0.0), assuming bounded
+          inputs prevent deficit > 80. The decomposition identifies at least one such
+          scenario (high total_load_kw creating large deficit despite abundant renewables),
+          so the LLM covers 0 out of the relevant positive scenarios.'
+      overall_summary: 'The LLM demonstrates strong understanding of the control flow
+        and decision boundaries in the load shedding logic but fails critically by
+        assuming unrealistic input constraints (total_load_kw <= 100 kW), leading
+        to a completely wrong conclusion and zero coverage of feasible counterexample
+        scenarios. ImandraX excels by verifying with a concrete counterexample, highlighting
+        edge cases involving unconstrained high loads that the LLM dismissed. Strengths:
+        control flow grasp; Weaknesses: input assumption errors causing missed edge
+        cases and incorrect directionality.'

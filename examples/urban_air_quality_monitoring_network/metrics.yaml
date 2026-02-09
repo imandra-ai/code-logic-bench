@@ -6619,3 +6619,763 @@
         property antecedent, no state space quantification, low precision on outcomes.
         ImandraX excels in precise verification, proving the property holds via quorum
         logic.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:49:15'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 2989
+        reasoning: The LLM identified 7 scenarios based on its interpretation of the
+          output states. The decomposition, however, identified 2989 distinct scenarios,
+          indicating a significant underestimation by the LLM. The LLM missed the
+          combinatorial nature of the problem, focusing on high-level categories rather
+          than all granular combinations of inputs and conditions.
+        score: -10.542064542283443
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM correctly identified some conditional logic, like the 'Invalid
+          Reading' scenario and the general idea of escalation. However, it struggled
+          with the precise interaction of conditions, especially within the fault
+          escalation logic (Scenario 7) and the emergency quorum. The LLM's description
+          of overrides was imprecise; for example, it incorrectly assumed that 'drift
+          is acceptable' AND 'weather is favorable' applied to all fault escalations,
+          when it's a specific exception. The LLM also missed that 'HAZARDOUS' escalation
+          cannot go higher, which was handled correctly in the decomposition.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid Reading (dead zone or extreme drift)
+        - Fault-escalated level (Faulty sensor escalation with exceptions)
+        total_edge_cases: 4
+        reasoning: 'The LLM identified two main edge cases: invalid readings and fault
+          escalation. The decomposition implicitly covers more granular edge cases
+          due to the combinatorial explosion, such as specific combinations of sensor
+          status, drift, and weather. Specifically, the LLM missed edge cases related
+          to the exact boundaries of the ''dead zone'' and ''extreme drift'' (it captured
+          the general idea but not the precise numeric boundaries for these, especially
+          between 97-98 drift etc.). It also generalized the ''HAZARDOUS'' level not
+          escalating further, but didn''t explicitly call it an edge case within its
+          identified scenarios.'
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 148 ≤ raw_reading ≤ 152
+        - 98 ≤ drift_factor ≤ 102
+        - drift_factor < 80
+        - drift_factor > 120
+        - adjusted_reading < MODERATE weather-adjusted threshold
+        - adjusted_reading ≥ MODERATE weather-adjusted threshold AND < UNHEALTHY threshold
+        - adjusted_reading ≥ UNHEALTHY weather-adjusted threshold AND < VERY_UNHEALTHY
+          threshold
+        - adjusted_reading ≥ VERY_UNHEALTHY weather-adjusted threshold AND < HAZARDOUS
+          threshold
+        - adjusted_reading ≥ HAZARDOUS weather-adjusted threshold
+        - 90 ≤ drift_factor ≤ 110
+        - time_since_last_alert < 24
+        thresholds_from_decomp:
+        - 'drift_factor: [79, 80, 89, 90, 97, 98, 102, 103, 110, 111, 120, 121]'
+        - 'time_since_last_alert: [24]'
+        - 'raw_reading: [147, 148, 152, 153]'
+        - 'pollutant_base: PM25:[15,35,75,150] NO2:[25,50,100,200] Ozone:[100,160,240,300]
+          CO:[10,20,40,60] SO2:[20,50,100,200]'
+        reasoning: The LLM identified many key thresholds, including raw_reading,
+          drift_factor, and the general pollutant thresholds. However, it missed the
+          detailed 'off-by-one' boundaries for drift_factor and raw_reading, e.g.,
+          identifying [97,98] and [102,103] for drift factor and [147,148] and [152,153]
+          for raw_reading, which are critical for precise scenario definition. The
+          LLM also presented pollutant thresholds as ranges rather than discrete points,
+          and implicitly covered weather adjustments without listing them as distinct
+          numeric thresholds, whereas the decomposition provides the exact influencing
+          values. The LLM also missed that adjusted_reading boundaries were dynamically
+          calculated based on weather, so it could not list the exact thresholds and
+          only provided generalizations like 'MODERATE weather-adjusted threshold'.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's outcomes for each scenario are generally correct in terms
+          of the alert level, but lack precision in the 'emergency depends on quorum'
+          part. The LLM also made an error in Scenario 1 by stating 'adjusted_reading=0',
+          which may not be the case in all 'invalid reading' scenarios. The fault
+          escalation is also less precise for the 'HAZARDOUS' scenario, where the
+          LLM states 'HAZARDOUS→HAZARDOUS' but misses the nuance that the base level
+          must be HAZARDOUS for this to occur, and that this is an implicit boundary.
+      direction_accuracy:
+        score: 0.6
+        reasoning: The LLM correctly identified the general direction of behavior
+          (e.g., higher readings lead to higher alerts, faulty sensors can escalate
+          alerts). However, the accuracy is diminished by several imprecisions and
+          omissions. The fault escalation logic (Scenario 7) is partially incorrect
+          due to the misapplication of the override conditions. The emergency quorum
+          logic is also partially explained, missing the full combinatorial aspect
+          of the conditions. Overall, it captures the spirit but not the letter of
+          the system's decision-making.
+      coverage_completeness:
+        score: 0.05
+        reasoning: The LLM significantly under-covered the actual decision scenarios.
+          It identified 7 scenarios, while the decomposition found 2989. This demonstrates
+          a very low coverage score, as the LLM failed to account for the vast combinatorial
+          space created by the various conditions, pollutants, weather adjustments,
+          and their interactions, only providing general categories.
+      overall_summary: The LLM provided a high-level summary of the system's behavior,
+        identifying some key scenarios and thresholds. However, it severely underestimated
+        the total number of distinct scenarios (7 vs 2989) and lacked the precision
+        needed for a full understanding of the system's decision boundaries and control
+        flow. Critical details regarding numeric thresholds, combinatorial interactions,
+        and specific override conditions were either missed or vaguely described.
+        The LLM struggled most with enumerating the full state space and precisely
+        defining the numeric thresholds and their interactions.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM initially answered 'No' but self-corrected to 'Yes'
+        and provided a comprehensive explanation aligning with the ImandraX answer.
+        This demonstrates good self-correction capabilities and a moderately good
+        understanding of the problem. However, the initial wrong answer indicates
+        some lack of certainty or precision. Both answers agree on the possibility
+        and provide examples. The LLM provided a more detailed explanation of why
+        it was possible.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 1
+        reasoning: LLM identifies 4 violation cases, whereas decomposition proves
+          only 1 scenario where the property holds. This points to a misunderstanding
+          of the actual conditions for violation vs. satisfaction.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: incorrect
+        short_circuit_behavior: correct
+        override_logic: incorrect
+        reasoning: The LLM correctly identifies that 'apply_fault_escalation' and
+          'is_reading_valid' can override the final alert level (short-circuit behavior).
+          However, its understanding of how these overrides interact with the emergency
+          trigger conditions is flawed. It incorrectly believes hazardous readings
+          can be masked in certain scenarios (calibrating sensor, invalid reading)
+          causing a violation. The 'quorum not met' reasoning shows a partial understanding
+          of the branching structure for emergency conditions but ultimately reaches
+          an incorrect conclusion regarding violations.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - Calibrating Sensor
+        - Invalid Reading (Dead Zone)
+        - Extreme Drift Invalidation
+        total_edge_cases: 0
+        reasoning: The LLM identifies three specific scenarios as edge cases where
+          the property might be violated. The decomposition, however, asserts that
+          no such edge cases lead to a violation, implying the LLM's identified 'edge
+          cases' are not actual violations of the stated property. Thus, it detects
+          scenarios it thinks are edge cases, but which, by the decomposition, are
+          not.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - time_since_last_alert < 24
+        - raw_reading is in [148,152]
+        - drift_factor in [98,102]
+        - drift_factor < 80
+        - drift_factor > 120
+        - HAZARDOUS threshold=60 for CO
+        thresholds_from_decomp:
+        - final_alert_level=Hazardous
+        - time_since_last_alert<24
+        reasoning: The LLM identified several thresholds related to sensor status,
+          drift factor, and time since last alert. The decomposition only mentions
+          `final_alert_level=Hazardous` and `time_since_last_alert<24` as the direct
+          conditions for the property, implying the other thresholds are internal
+          to the system's determination of `Hazardous` or `valid` reading. The LLM
+          correctly identified `time_since_last_alert < 24`. It missed the explicit
+          `final_alert_level=Hazardous` condition as a primary threshold because its
+          reasoning was focused on *how* that level is determined and overridden.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's conclusion regarding violations is entirely incorrect.
+          The decomposition proves that the property 'Hazardous readings with recent
+          alerts always trigger emergency protocol' always holds, meaning the LLM's
+          predicted outcomes for its violation cases are wrong, leading to a 0.0 precision
+          score.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's core conclusion that the safety property CAN be violated
+          is directly contradicted by the ImandraX answer, which PROVES the property
+          always holds. All of its 'violation cases' are therefore incorrect, leading
+          to a 0.0 score for direction accuracy.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM completely failed to identify the correct set of scenarios.
+          It incorrectly identifies multiple scenarios where it claims the property
+          is violated when, in fact, the property holds true in all cases. This indicates
+          a complete lack of coverage of the actual decision scenarios relevant to
+          the property's validity.
+      overall_summary: The LLM completely misunderstands the safety property and its
+        underlying logic. It incorrectly identifies multiple scenarios as violations,
+        while the decomposition proves the property always holds. This indicates fundamental
+        errors in its comprehension of control flow, including override logic and
+        how conditions combine to trigger an emergency. While it does identify some
+        relevant conditions (like sensor calibration or invalid readings), it misinterprets
+        their impact on the safety property, leading to entirely incorrect conclusions.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:24'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 2989
+        reasoning: LLM provided an estimated scenario number of 7 based on its classification
+          of invalid readings and valid readings into 5 alert levels and fault escalation,
+          while ImandraX provided a count of 2989 scenarios based on a comprehensive
+          decomposition of varying thresholds.
+        score: -10.542064542283443
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM partially understands the precedence of conditions and
+          branching structure; it correctly identifies override logic but doesn't
+          fully capture the complexities involved in threshold adjustments and fault
+          conditions.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid Reading (148 ≤ raw_reading ≤ 152 AND 98 ≤ drift_factor ≤ 102)
+        - Extreme Drift (drift_factor < 80 OR drift_factor > 120)
+        total_edge_cases: 3
+        reasoning: The LLM identified some edge cases (invalid readings and extreme
+          drift), but it missed other edge cases related to safety-critical conditions
+          (e.g., exact equality checks and drift thresholds).
+        edge_case_count: 2
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'PM2.5: MODERATE=15, UNHEALTHY=35, VERY_UNHEALTHY=75, HAZARDOUS=150'
+        - 'NO2: MODERATE=25, UNHEALTHY=50, VERY_UNHEALTHY=100, HAZARDOUS=200'
+        - 'Ozone: MODERATE=100, UNHEALTHY=160, VERY_UNHEALTHY=240, HAZARDOUS=300'
+        - 'CO: MODERATE=10, UNHEALTHY=20, VERY_UNHEALTHY=40, HAZARDOUS=60'
+        - 'SO2: MODERATE=20, UNHEALTHY=50, VERY_UNHEALTHY=100, HAZARDOUS=200'
+        thresholds_from_decomp: []
+        reasoning: The LLM identified the relevant thresholds for all pollutants but
+          did not detail additional thresholds utilized in the detection process.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The numeric thresholds provided by the LLM are accurate in defining
+          the categories, but the conditions around the thresholds (like specific
+          ranges of drift factors) were not fully represented.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The conclusion that there are 7 distinct scenarios is incorrect
+          when compared to the ImandraX estimate of 2989 scenarios, indicating a fundamental
+          misunderstanding of the problem's complexity and outcome.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM provided a count of scenarios without recognizing the numerous
+          variations and conditions governing those scenarios, indicating significant
+          coverage gaps.
+      overall_summary: The LLM demonstrated a basic understanding of the problem but
+        failed significantly in estimating the true number of distinct scenarios,
+        indicating a misunderstanding of the control flow and edge cases, resulting
+        in incomplete coverage of decision scenarios.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly understands the conditional structure of the
+          functions involved: it recognizes the precedence of checking various conditions
+          for emergencies (i.e., sensors'' statuses), understands that conditions
+          can be structured as independent checks and can lead to early short-circuits.
+          It effectively identifies how overriding logic works in this context, where
+          a ''Calibrating'' status can influence alert levels.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Sensor calibrating status with varying drift factors and weather conditions
+        - Drift factor close to invalid thresholds (e.g., 89, 111)
+        - Recent alerts affecting state
+        total_edge_cases: 5
+        reasoning: The LLM manages to identify multiple conditions affecting sensor
+          performance, especially 'Calibrating' sensor edge cases, recognizing the
+          scenarios where these statuses could lead to emergency alerts. It captures
+          critical combinations that are rarely expected and reflect safety-critical
+          behavior.
+        edge_case_count: 3
+        score: 0.6
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - drift < 90
+        - drift > 110
+        - time_since_last_alert < 24
+        thresholds_from_decomp:
+        - drift < 90
+        - drift > 110
+        - validity check on drift factors
+        - time_since_last_alert < 24
+        reasoning: The LLM accurately identifies the various numeric thresholds related
+          to sensor operational statuses and their implications for activating emergencies.
+          However, it may overlook certain conditions related to drift factors that
+          directly affect validity.
+        score: 0.75
+      outcome_precision:
+        score: 0.75
+        reasoning: The LLM provides a largely accurate picture of conditions that
+          can trigger an emergency, with accurate threshold identification. However,
+          there are nuances in phrasing that may not reach exact matches, particularly
+          in terms of numerical specificity.
+      direction_accuracy:
+        score: 0.75
+        reasoning: While the LLM ultimately reaches the correct conclusion (that a
+          'Calibrating' sensor can trigger an emergency), its logic initially dismisses
+          it as impossible. The final reasoning shows some correction, but the path
+          to that conclusion includes missteps.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM identifies some decision scenarios correctly but does not
+          encompass the full range of potential scenarios that a 'Calibrating' sensor
+          could present. The explicit mention of only a few scenarios indicates partial
+          completion.
+      overall_summary: The LLM provides a comprehensive answer guided by a logical
+        progression of conditions and safeguards. However, it initially misinterprets
+        the potential of a 'Calibrating' sensor, and while it corrects its outline
+        of conditions at the end, some aspects of edge cases and coverage of total
+        scenarios remain underexplored.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM identifies various violation cases, detailing specific
+          scenarios and conditions under which the safety property can be violated.
+          The use of multiple paths to determine scenarios (CALIBRATING status, Invalid
+          readings, Extreme Drift Invalidation, and quorum checks) suggests a comprehensive
+          approach to understanding possible states. However, ImandraX's evaluation
+          of the safety property appears to determine a single outcome where the property
+          holds without exploring such paths, indicating a slight oversight.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM explains the precedence of conditions and the branching
+          structure of decision-making well. It correctly identifies that a CALIBRATING
+          sensor can override critical alerts, representing a nuanced understanding
+          of control flow. However, its explanation of how overrides are handled could
+          be clearer, hence it's rated as 'partial'.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Sensor in CALIBRATING status overrides hazardous reading
+        - Dead zone marking reading invalid, resulting in normal alert
+        - Extreme drift invalidates all readings
+        total_edge_cases: 3
+        reasoning: The LLM has identified significant edge cases that highlight vulnerabilities
+          in the monitoring logic, all of which demonstrate when hazardous conditions
+          may lead to a suppression of emergency alerts. ImandraX failed to list any
+          edge cases, indicating a lack of thorough examination in its verification.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - HAZARDOUS
+        - NORMAL
+        thresholds_from_decomp:
+        - HAZARDOUS
+        - NORMAL
+        - INVALID
+        reasoning: The LLM identifies some thresholds correctly (HAZARDOUS, NORMAL)
+          but overlooks others present in the decomposition, such as INVALID. The
+          failure to recognize all thresholds takes down its score.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provides approximate conditions under which emergencies
+          should be triggered, detailing examples clearly. However, it lacks exact
+          numeric values in certain cases which lowers the precision. For example,
+          it does mention thresholds generally but does not tie them to quantitative
+          aspects.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM provides correct reasoning for violations, but it also
+          implies scenarios where the property is violated without clearly substantiating
+          that with counterexamples that meet all conditions stated by ImandraX, leading
+          to a conclusion that's more ambiguous than clear.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM covers various paths leading to the violation of the safety
+          property, but it does not account for all decision-making scenarios that
+          could arise. This suggests an incomplete assessment compared to its more
+          stringent counterpart, ImandraX.
+      overall_summary: The LLM demonstrates detailed reasoning about the violation
+        of the safety property in the urban air quality monitoring system and how
+        conditions interplay to suppress emergency triggers. However, it falls short
+        on providing precise thresholds and fully substantiating its conclusions,
+        whereas ImandraX incorrectly claims the property always holds, missing out
+        on edge case vulnerabilities.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:58'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 2989
+        reasoning: The LLM explicitly states there are 7 distinct monitoring response
+          scenarios. The ImandraX decomposition reports exactly 2989 scenarios, indicating
+          a massive underestimation by the LLM due to not fully decomposing interactions
+          between pollutants, weather conditions, sensor statuses, drift factors,
+          and quorum conditions.
+        score: -10.542064542283443
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: 'Precedence of conditions: partial - LLM mentions weather adjustments
+          before alert classification and quorum for emergency, but doesn''t fully
+          capture the ordering of validity checks, base level classification, fault
+          escalation, and then emergency quorum. Branching structure: partial - Describes
+          main branches for validity, alert levels, and fault escalation, but treats
+          alert levels as 5 simple categories without decomposing per-pollutant and
+          weather variations into if-else chains. Short-circuit behavior: incorrect
+          - No mention of early returns or guard clauses beyond basic validity check;
+          misses potential short-circuits in fault overrides or quorum evaluations.
+          Override logic: partial - Captures fault escalation overriding base levels
+          with exceptions (e.g., for acceptable drift and favorable weather), but
+          incompletely, as it simplifies escalation without detailing all conditions
+          that trump normal operation.'
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid reading in dead zone (148 ≤ raw ≤ 152 and 98 ≤ drift ≤ 102)
+        - Extreme drift (<80 or >120)
+        - Fault-escalated levels for faulty sensors with overrides (acceptable drift
+          and favorable weather)
+        - Emergency quorum requiring ≥2 of 4 conditions aligning (e.g., HAZARDOUS
+          + FOGGY + high drift + recent alert)
+        total_edge_cases: 2989
+        reasoning: The LLM identifies 4 edge cases related to sensor validity, fault
+          escalation exceptions, and quorum alignments, focusing on rare combinations
+          like dead zones, overrides, and multi-condition triggers. However, with
+          2989 total scenarios in decomposition, many more edge cases exist, such
+          as precise boundary crossings for each pollutant-weather pair, exact equality
+          at thresholds, negations like non-favorable weather with faults, and safety-critical
+          escalations; LLM misses most, capturing only a tiny fraction.
+        edge_case_count: 4
+        score: 0.0013382402141184342
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - drift_factor < 80
+        - drift_factor > 120
+        - 98 ≤ drift_factor ≤ 102 (dead zone)
+        - 90 ≤ drift_factor ≤ 110 (acceptable for override)
+        - raw_reading 148-152 (dead zone)
+        - PM2.5 moderate=15
+        - PM2.5 unhealthy=35
+        - PM2.5 very_unhealthy=75
+        - PM2.5 hazardous=150
+        - NO2 moderate=25
+        - NO2 unhealthy=50
+        - NO2 very_unhealthy=100
+        - NO2 hazardous=200
+        - Ozone moderate=100
+        - Ozone unhealthy=160
+        - Ozone very_unhealthy=240
+        - Ozone hazardous=300
+        - CO moderate=10
+        - CO unhealthy=20
+        - CO very_unhealthy=40
+        - CO hazardous=60
+        - SO2 moderate=20
+        - SO2 unhealthy=50
+        - SO2 very_unhealthy=100
+        - SO2 hazardous=200
+        - time_since_last_alert < 24
+        - 'weather multipliers: PM2.5 foggy ×4/5, rainy ×13/10; Ozone clear ×17/20;
+          NO2 windy ×11/10'
+        thresholds_from_decomp:
+        - drift_factor 79
+        - drift_factor 80
+        - drift_factor 89
+        - drift_factor 90
+        - drift_factor 97
+        - drift_factor 98
+        - drift_factor 102
+        - drift_factor 103
+        - drift_factor 110
+        - drift_factor 111
+        - drift_factor 120
+        - drift_factor 121
+        - time_since_last_alert 24
+        - raw_reading 147
+        - raw_reading 148
+        - raw_reading 152
+        - raw_reading 153
+        - PM2.5 15
+        - PM2.5 35
+        - PM2.5 75
+        - PM2.5 150
+        - NO2 25
+        - NO2 50
+        - NO2 100
+        - NO2 200
+        - Ozone 100
+        - Ozone 160
+        - Ozone 240
+        - Ozone 300
+        - CO 10
+        - CO 20
+        - CO 40
+        - CO 60
+        - SO2 20
+        - SO2 50
+        - SO2 100
+        - SO2 200
+        reasoning: LLM identifies most base pollutant thresholds exactly, validity
+          boundaries for raw_reading and drift_factor (including dead zone and extreme),
+          time_since_last_alert <24, and even weather multipliers (though not as boundaries).
+          It misses finer-grained drift points like 79,89,97,103,111,121 and raw 147,153,
+          which likely define additional regions for adjustments or escalations. Also,
+          weather multipliers are mentioned but not broken into numeric boundaries
+          they create. Score will reflect partial coverage of all decomp thresholds.
+        score: 0.7297297297297297
+      outcome_precision:
+        score: 0.5
+        reasoning: 'LLM provides exact base thresholds for pollutants and validity
+          checks, matching decomp values precisely (e.g., PM2.5 15,35,75,150), and
+          approximates weather adjustments (e.g., ×4/5 for foggy, which is 0.8 multiplier).
+          However, it doesn''t specify exact adjusted numeric distributions post-multiplier
+          (e.g., no computation of 15*0.8=12 for moderate in foggy), treating them
+          qualitatively as ''stricter/relaxed''. Quorum outcomes are categorical without
+          numeric probs. Rubric: value correct but operator/precision approximate
+          for adjustments (0.5-0.8), averaged to 0.5 overall.'
+      direction_accuracy:
+        score: 0.0
+        reasoning: 'LLM concludes only 7 scenarios, vastly underestimating the true
+          2989 due to not decomposing per-pollutant, per-weather, per-sensor-status,
+          and per-drift interactions. Reasoning is flawed: treats 5 alert levels as
+          monolithic without multipliers creating sub-ranges, ignores full combinatorial
+          explosion in fault overrides and quorum (4 conditions yield 16 combos, but
+          multiplied by others). No counterexamples to its simplification; completely
+          wrong scale and misses core challenge of multi-factor alignment.'
+      coverage_completeness:
+        score: 0.002
+        reasoning: 'Explicit count: LLM states 7 vs 2989 decomp, ratio ~0.002. Even
+          generously via outcome category coverage: LLM identifies ~7 categories (invalid
+          + 5 levels + fault override), but decomp has thousands of fine-grained regions;
+          qualitative acknowledgment of ''combinations'' but no enumeration beyond
+          7. Rubric (a) applies directly, yielding near-0 coverage of decision scenarios.'
+      overall_summary: 'The LLM answer provides a high-level, intuitive overview of
+        the main branches and thresholds in the determine_monitoring_response logic,
+        correctly identifying core alert levels, validity checks, fault escalations,
+        and quorum basics. However, it dramatically underestimates the state space
+        complexity (7 vs 2989 scenarios), missing the combinatorial explosion from
+        5 pollutants × multiple weather types × drift ranges × sensor statuses × time
+        factors. Strengths: accurate base thresholds and partial control flow grasp.
+        Weaknesses: shallow decomposition, no edge case enumeration beyond basics,
+        incomplete boundary precision for adjustments, leading to incorrect conclusions
+        on scenario count. ImandraX excels in exhaustive verification, revealing the
+        true scale of interactions the LLM glosses over.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 247
+        reasoning: The LLM answer does not provide any explicit numerical estimate,
+          range, or approximative count of scenarios where a calibrating sensor triggers
+          an emergency. It qualitatively describes combinations of conditions (e.g.,
+          foggy + abnormal drift, abnormal drift + recent alert, foggy + recent alert)
+          and acknowledges that such cases exist, but no number is given. Thus, extraction
+          results in 'unknown'. The decomposition provides exactly 247 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - The LLM accurately describes
+          the independent evaluation of the four conditions without alert_level dependency
+          for conditions 2-4, and the quorum count >=2, with no misinterpretation
+          of AND/OR precedence within conditions (e.g., condition3 as OR). Branching
+          structure: correct - LLM captures the if-else structure in apply_fault_escalation
+          forcing NORMAL for CALIBRATING, and the separate check_emergency_conditions
+          with validity check before quorum. Short-circuit behavior: correct - LLM
+          explicitly notes the early return if drift outside [80,120] (invalid reading,
+          no emergency). Override logic: correct - LLM understands that CALIBRATING
+          overrides the alert_level to NORMAL (trumping base reading), but does not
+          override the other emergency conditions, allowing quorum via alternatives.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Calibrating status with abnormal but valid drift (e.g., 85) and foggy weather
+          (conditions 2+3)
+        - Calibrating with abnormal valid drift and recent alert (conditions 3+4)
+        - Calibrating with foggy weather and recent alert (conditions 2+4)
+        - Calibrating with all three for higher count (2+3+4)
+        total_edge_cases: 247
+        reasoning: The LLM identifies 4 descriptive edge cases, each representing
+          counterintuitive outcomes where a calibrating sensor (normally non-escalating)
+          triggers emergency via quorum of non-alert conditions, contradicting naive
+          expectation that calibration prevents any alert. These involve negations
+          (abnormal drift while valid) and boundary play (drift near 80-120 but triggering
+          >110/<90). The decomposition has 247 total scenarios where emergency triggers
+          for calibrating sensors, all of which qualify as edge cases due to being
+          rare/policy-violating (calibration fault typically de-escalates but here
+          aligns with other risks). LLM misses specific parameterizations (e.g., exact
+          pollutant variations, exact drift values leading to 247), covering only
+          high-level combinations.
+        edge_case_count: 4
+        score: 0.016194331983805668
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - drift_factor in [80,120] for validity
+        - drift_factor < 90 or > 110 for abnormal drift (condition3)
+        - time_since_last_alert < 24 for recent alert (condition4)
+        - weather = FOGGY for condition2
+        thresholds_from_decomp:
+        - drift_factor < 90 or > 110
+        - time_since_last_alert < 24
+        - weather = FOGGY
+        - drift_factor in [80,120] for validity (implied in example with 119)
+        reasoning: 'The LLM identifies all key numeric and categorical thresholds:
+          the validity range [80,120], abnormal drift boundaries at 90 and 110, time
+          threshold at 24, and exact weather match FOGGY. The decomposition example
+          highlights the same (drift=119 >110 within valid, time=23 <24, FOGGY implied),
+          and no additional thresholds are evident in the provided ImandraX output.
+          All relevant boundaries are captured without misses.'
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides no numeric distribution or count (e.g., no '247
+          scenarios' or probability), only qualitative descriptions and examples of
+          triggering conditions. However, it is directionally correct in affirming
+          that emergency can trigger (matching the YES outcome) and specifies valid
+          parameter ranges (e.g., drift in [80,89] or [111,120]), which aligns with
+          the decomposition's example (drift=119). This warrants 0.2 per rubric for
+          qualitative but directionally correct assessment, as opposed to approximate
+          values or exact matches.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion (YES, it can
+          trigger) after self-correcting from an initial error, with detailed and
+          accurate reasoning on the quorum mechanism, independence of conditions 2-4
+          from alert_level, validity constraints, and specific condition combinations.
+          This matches the ImandraX YES answer and demonstrates strong logical fidelity
+          to the control flow.
+      coverage_completeness:
+        score: 0.5
+        reasoning: 'Using (b) SCENARIO ENUMERATION rubric generously: The LLM explicitly
+          describes 4 scenario types (pairwise and triple combinations of conditions
+          2+3, 2+4, 3+4, 2+3+4) with parameter examples (e.g., drift=85, weather=FOGGY,
+          time=10), covering the structural scenarios leading to emergency. However,
+          it does not enumerate or parameterize all 247 atomic scenarios from decomposition
+          (e.g., misses variations across 5 pollutants, exact drift integers, or other
+          factors contributing to the count). This partial enumeration of key pathways
+          yields 0.5, better than pure qualitative (0.25) but short of full coverage.'
+      overall_summary: The LLM answer demonstrates strong qualitative understanding
+        and correct directionality, accurately dissecting the control flow to reveal
+        counterintuitive emergency triggers via non-alert conditions during calibration.
+        It excels in explaining boundaries, structures, and examples, self-correcting
+        to the right YES conclusion. Weaknesses include lack of quantitative state
+        space estimation or precise scenario counts (vs ImandraX's 247 verified cases),
+        leading to lower precision and coverage scores. Overall, the LLM provides
+        insightful, verifiable reasoning that aligns well with decomposition but operates
+        at a higher, non-exhaustive level without formal verification.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM accurately traces the control flow: early returns for
+          invalid readings (short-circuit), branching for sensor status (ACTIVE/CALIBRATING/FAULTY),
+          overrides for CALIBRATING forcing NORMAL, and the final quorum check as
+          a simple count without complex precedence issues mentioned. All aspects
+          are correctly understood.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Calibrating sensor forces NORMAL despite hazardous adjusted reading
+        - Dead zone invalidation for raw_reading in [148,152] and drift in [98,102]
+        - Extreme drift invalidation for drift_factor <80 or >120
+        total_edge_cases: 3
+        reasoning: The LLM identifies three key edge cases related to sensor status
+          and validity checks that could potentially lead to violations. These align
+          with rare conditions like boundary dead zones and extreme drifts. Assuming
+          the decomposition identifies these same three edge cases in the logic for
+          handling faults and validity, as they are critical boundaries in the code.
+          No misses apparent from the summary.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - time_since_last_alert < 24
+        - drift_factor < 80
+        - drift_factor > 120
+        - raw_reading in [148,152] when drift_factor in [98,102]
+        - CO hazardous threshold = 60
+        - PM2.5 high reading implying hazardous threshold (e.g., > some value for
+          500)
+        thresholds_from_decomp:
+        - time_since_last_alert < 24 hours
+        - drift_factor < 80
+        - drift_factor > 120
+        - dead zone raw_reading [148,152] and drift_factor [98,102]
+        - pollutant-specific hazardous thresholds (e.g., CO >60, PM2.5 > some WHO
+          value)
+        reasoning: 'The LLM identifies all key numeric thresholds involved in validity
+          checks, time for recent alerts, and example pollutant thresholds. The decomposition
+          likely includes exactly these: time threshold, drift extremes, dead zone
+          boundaries, and hazardous classification thresholds per pollutant. No major
+          misses; the PM2.5 threshold is implied but not explicitly numeric in LLM,
+          but others cover it. Score would be 6/5 ≈1.0.'
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes that the property can be violated in specific
+          cases (e.g., calibrating or invalid readings), interpreting 'hazardous readings'
+          as raw/adjusted values exceeding thresholds, even if the final alert level
+          is downgraded to NORMAL. However, the verified ImandraX answer proves the
+          property always holds when final_alert_level = Hazardous, reading_valid,
+          and time_since_last_alert < 24, as this triggers at least 2 conditions for
+          emergency. The LLM's conclusion is completely wrong in direction, as the
+          property refers to the system's classified hazardous level, not raw readings.
+          The provided examples do not violate the formalized property because the
+          antecedent (final hazardous) is false in those cases.
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'The LLM qualitatively acknowledges multiplicity by tracing multiple
+          paths (5 paths, 3 violation cases) but focuses on non-violating scenarios
+          under a misinterpretation. The decomposition proves no violation scenarios
+          exist (all cases where antecedent true lead to emergency=true), so LLM covers
+          0 actual violation scenarios but discusses edge cases. Using rubric (d)
+          QUALITATIVE ONLY: 0.25 for acknowledging multiplicity without explicit count
+          or full coverage of safe scenarios.'
+      overall_summary: '"The LLM demonstrates strong control flow understanding and
+        edge case detection, accurately identifying key boundaries and overrides in
+        the logic. It also pinpoints relevant numeric thresholds. However, it fundamentally
+        misinterprets the safety property by considering raw/adjusted hazardous readings
+        rather than the final classified alert level, leading to an incorrect conclusion
+        that violations exist. In contrast, ImandraX verifies that the property holds
+        whenever the final level is Hazardous and valid with recent alerts. The LLM
+        overestimates risks by including cases where the system intentionally downgrades
+        (e.g., calibrating, invalid), which do not violate the property as formalized.
+        Strengths: detailed path tracing and examples. Weaknesses: wrong direction
+        and incomplete alignment with the property''s intent."'

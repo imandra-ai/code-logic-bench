@@ -4558,3 +4558,477 @@
         reasoning on precedence, OR short-circuiting, and overrides; no weaknesses
         in direction or coverage for this simple, deterministic query. It lacks quantitative
         state space estimation, but this does not detract from the core evaluation.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:46'
+  metrics:
+    q1:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM attempted to manually trace execution paths to identify
+        distinct control decision scenarios. It correctly identified some key decision
+        paths and the resulting control decisions. However, its manual trace vastly
+        underestimated the total number of distinct scenarios (8 or 7, versus 38 actual).
+        The detailed reasoning for each identified path shows a good understanding
+        of conditional logic and short-circuiting behavior. However, it failed to
+        identify a significant portion of conditions, especially relating to sensor
+        degradation combinations and the interplay between different flight modes.
+        It also got distracted by the difference between unique output tuples vs.
+        unique paths - which are both valid interpretations of 'distinct control decision
+        scenarios'. ImandraX, on the other other hand, correctly identified all 38
+        scenarios by systematically decomposing the state space.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: Both the LLM and the decomposition correctly determined that there
+          are 0 scenarios where autonomous flight modes are approved when battery_pct
+          < 30.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the precedence of conditions (critical
+          battery takes precedence over low battery, which takes precedence over autonomous
+          mode approval). It accurately traced the branching logic for both critical
+          and low battery conditions and understood the short-circuiting nature of
+          emergency landing and battery_low checks which prevent autonomous mode approval.
+          The override logic of emergency landing taking precedence over normal operations
+          was also correctly understood.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - battery_pct < 15 (critical battery)
+        - 15 <= battery_pct < 30 (low but not critical battery)
+        total_edge_cases: 2
+        reasoning: The LLM identified both critical battery and low but not critical
+          battery as distinct edge cases leading to the blocking of autonomous modes.
+          The decomposition implicitly covers these by stating all autonomous modes
+          are blocked below 30%.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct < 30
+        - battery_pct < 15
+        thresholds_from_decomp:
+        - battery_pct < 30
+        reasoning: 'The LLM identified two distinct thresholds: ''battery_pct < 30''
+          and ''battery_pct < 15''. The decomposition statement ''battery_pct >= 30''
+          identifies a single threshold, though it implies the ''battery_pct < 30''
+          condition. The LLM provided a more granular breakdown of the thresholds
+          related to the problem.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX answers precisely stated 'No' and '0
+          scenarios' respectively, indicating a clear and accurate understanding of
+          the outcome.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX correctly concluded that autonomous flight
+          modes can never be approved when battery_pct < 30. The reasoning provided
+          by both is sound and leads to the correct conclusion.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Both answers fully covered the scenarios relevant to the question.
+          The LLM's detailed breakdown of critical vs. low battery conditions demonstrates
+          complete coverage of the decision space for battery_pct < 30.
+      overall_summary: The LLM's answer is excellent. It provides a detailed and accurate
+        explanation of why autonomous flight modes are not approved when battery_pct
+        < 30, breaking down the reasoning into critical and low battery sub-cases.
+        The LLM demonstrates strong understanding of control flow, including precedence,
+        branching, and short-circuiting behavior. It correctly identifies the relevant
+        decision boundaries and edge cases. The final conclusion aligns perfectly
+        with the ImandraX answer, which also confirms '0 scenarios'. In this case,
+        the LLM provides an even more comprehensive and insightful explanation than
+        ImandraX.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly identifies that `battery_pct < 15` always triggers
+          `force_emergency_landing=true`, matching the ImandraX answer.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM's reasoning covers all conditions that lead to `force_emergency_landing=true`
+          when `battery_pct < 15`, specifically mentioning the OR logic, the precedence
+          of the emergency check, and the immediate return. This fully covers the
+          scenario described in the question.
+      overall_summary: The LLM answer is accurate and provides a comprehensive explanation
+        that aligns perfectly with the verified ImandraX answer. The reasoning demonstrates
+        a strong understanding of the code's control flow and how different conditions
+        contribute to the final decision.  The LLM correctly identifies the critical
+        path that leads to `force_emergency_landing=true` when `battery_pct < 15`.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:02'
+  metrics:
+    q1:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM demonstrates an understanding of the control flow with
+          appropriate precedence. It correctly handles the branching structure corresponding
+          to distinct paths and acknowledges short-circuit conditions. Emergency landing
+          being a top priority showcases correct override logic. Overall, the LLM
+          displays a strong grasp of control structures.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Battery critical (<15%)
+        - Tilt extreme (>45°) and low altitude (<3m)
+        - Sensors degraded condition
+        - IMU failure (counterintuitive outcome)
+        total_edge_cases: 4
+        reasoning: The LLM identified several edge cases, including critical battery
+          levels, extreme tilt with low altitude, degraded sensors as rare conditions,
+          and counterintuitive outcomes such as IMU failure leading to emergency outcomes.
+          This covers major instances of rare conditions.
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 15%
+        - battery < 30%
+        - tilt > 45°
+        - altitude < 3m
+        thresholds_from_decomp:
+        - battery < 15%
+        - battery < 30%
+        - tilt >= 45°
+        - altitude < 3m
+        reasoning: The LLM identified key numeric thresholds for battery levels and
+          environmental conditions. It accurately captured the decision boundaries
+          based on these variables, showing a good understanding of where control
+          decisions toggle.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's precision is somewhat mixed; it correctly identified
+          most of the conditions and outputs but made some approximations in expressing
+          the decisions, such as grouping scenarios with similar outputs. However,
+          the distinct ControlDecision tuples were sometimes conflated, leading to
+          imprecision.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The LLM arrived at conclusions about the number of scenarios but
+          faltered by not accounting for overlaps correctly. It recognized essential
+          factors but didn't clearly articulate the total distinct outputs or consolidate
+          similar conditions, resulting in partially correct conclusions.
+      coverage_completeness:
+        score: 0.25
+        reasoning: The coverage of decision scenarios was limited to the LLM’s explicit
+          mentions, which means it didn't fully capture the multiplicity of paths
+          available as derived from the decomposition, as ImandraX identified many
+          more.
+      overall_summary: The LLM showed a strong understanding of control logic and
+        some recognition of critical thresholds and edge cases, but its total count
+        of distinct scenarios was inaccurately estimated, which resulted in a lower
+        coverage score. The logic and decision boundary clarity were robust, revealing
+        an overall solid comprehension yet imperfect final assessment.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM explicitly states that there are no scenarios where autonomous
+          modes can be approved under the given condition; however, it doesn't provide
+          a specific number in the answer.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the checks that lead to the blocking
+          of autonomous modes based on battery levels and details the flow of logic
+          in its reasoning.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: There are no identified edge cases since the answer pertains to
+          a clear cutoff without contradictory conditions.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM emphasizes the critical battery threshold but does not
+          detail numeric thresholds explicitly. Both answers align in understanding
+          that the decision boundary is set at 30%. The LLM fails to identify specific
+          thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM correctly concludes that no autonomous modes can be approved
+          with battery_pct < 30 and accurately explains the lack of approval under
+          those conditions.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM provided a fully correct conclusion about the blocking
+          of autonomous modes when battery_pct is below the threshold, with logical
+          reasoning supporting the conclusion.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covers the necessary decision scenario completely, emphasizing
+          that under the condition stated, no autonomous modes can be approved.
+      overall_summary: The LLM provided a correct and comprehensive answer with detailed
+        reasoning regarding the control structure and decision-making process, despite
+        lacking explicit numeric references.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM provided a definitive answer (1 scenario) implying the
+          battery percentage condition directly leads to an emergency landing in all
+          scenarios, consistent with the situation described in decomposition.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the emergency condition is checked
+          first (correct precedence), utilizes OR logic properly (correct branching),
+          explains short-circuit behavior (immediate return if emergency is required),
+          and asserts that no further conditions can override this (correct override
+          logic).
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: There are no edge cases since the LLM and ImandraX consistently
+          agree that critical battery directly dictates a necessity for emergency
+          landing without encountering any unusual or contradictory conditions.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct < 15
+        thresholds_from_decomp:
+        - battery_pct < 15
+        reasoning: Both the LLM and ImandraX identified the same threshold of 'battery_pct
+          < 15'. There were no missed boundaries.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM accurately matches the condition (battery_pct < 15 implies
+          immediate force_emergency_landing = True) based on the decomposition.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion is completely correct; it accurately aligns
+          with the decomposition that critical battery levels always compel emergency
+          landings.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM provided coverage of the specific scenario dealing with
+          critical battery, fully aligned with the single outcome verified in the
+          decomposition.
+      overall_summary: The LLM demonstrates high quality in reasoning, correctly identifies
+        the decision-making process regarding emergency landings in low battery scenarios,
+        and accurately describes the relationship of battery conditions to operational
+        logic. The answer matches the verification provided by ImandraX, suggesting
+        both methods yield reliable results.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:10'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 38
+        reasoning: The LLM explicitly states in the answer '7 distinct control decision
+          scenarios'. Although the reasoning enumerates 8 paths but notes that two
+          produce the same output tuple, leading to 7 unique outcomes, the given answer
+          is 7. The decomposition provides exactly 38 scenarios.
+        score: -3.954196310386875
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence with emergency landing
+          checked first (overriding others), then mode-specific branching for autonomous
+          vs non-autonomous, followed by sensor and battery checks. It captures short-circuiting
+          via emergency conditions and override logic where safety (e.g., emergency)
+          trumps normal operation.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - critical battery <15%
+        - dangerous tilt >45° AND altitude <3m
+        - IMU failed
+        - both IMU and GPS degraded
+        - low battery in autonomous mode with OK sensors
+        total_edge_cases: 10
+        reasoning: The LLM identifies several edge cases involving critical thresholds
+          and sensor failures, such as emergency triggers and severe degradation.
+          Assuming decomposition has around 10 such complex/rare cases out of 38 total
+          (e.g., conjunctive conditions like tilt+altitude, equalities if any, negations
+          like failed sensors, counterintuitive approvals in degraded states, safety-critical
+          emergencies), the LLM found 5.
+        edge_case_count: 5
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 15%
+        - battery >=15% and <30%
+        - battery >=30%
+        - tilt >45°
+        - altitude <3m
+        thresholds_from_decomp:
+        - battery <15%
+        - battery >=15% and <30%
+        - battery >=30%
+        - tilt >45°
+        - altitude <3m
+        reasoning: 'The LLM clearly identifies all key numeric thresholds from the
+          logic: battery levels at 15% and 30%, tilt at 45°, altitude at 3m for emergency
+          conditions. No misses; sensor states are qualitative but thresholds match
+          decomposition.'
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM's conclusion of 7 scenarios is numerically far from the
+          actual 38, indicating a wrong overall count. However, it identifies relevant
+          factors like mode distinctions, battery thresholds, sensor degradations,
+          and emergency overrides, showing partial understanding but incomplete exploration
+          of combinations leading to underestimation.
+      coverage_completeness:
+        score: 0.21
+        reasoning: 'Using rubric (b) SCENARIO ENUMERATION: The LLM explicitly describes
+          8 distinct scenarios (paths), out of 38 in decomposition, so proportion
+          8/38 ≈ 0.21. This is generous as they enumerated specific paths, though
+          missed full combinatorial explosion from variables like flight modes, sensor
+          states (healthy/degraded/failed for IMU/GPS), and conditions.'
+      overall_summary: '"The LLM demonstrates solid control flow understanding and
+        identifies all key decision boundaries but severely underestimates the state
+        space (7 vs 38), likely missing combinatorial interactions across multiple
+        variables (e.g., full sensor combinations, modes). Coverage is low (~21%),
+        with some edge cases detected but not comprehensively. Directionally, it grasps
+        core logic but fails on scale, while ImandraX provides exhaustive decomposition
+        for precision."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM concludes there are 0 scenarios where autonomous modes
+          are approved when battery_pct < 30, implying a state space estimation of
+          0 relevant approving scenarios. The ImandraX decomposition explicitly states
+          '0 scenarios' for this condition, matching exactly.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly describes the precedence: emergency landing
+          check (battery <15) happens before autonomous mode logic. Branching structure
+          is accurately captured as entering autonomous branch only after emergency
+          passes, then checking battery low (<30). Short-circuit behavior is understood
+          via early return on emergency. Override logic is clear: safety (emergency
+          or low battery) trumps autonomous approval.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical battery (<15%) forcing emergency landing regardless of mode
+        - Low battery (15-30%) blocking autonomous modes while allowing manual
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies two key edge cases related to battery thresholds:
+          the critical <15% case which overrides everything, and the 15-30% case which
+          specifically blocks autonomous modes. These match the decomposed sub-cases,
+          assuming 2 total edge cases in the decomposition for battery-related safety
+          violations under low battery.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct < 15
+        - 15 ≤ battery_pct < 30
+        thresholds_from_decomp:
+        - battery_pct < 15 (emergency)
+        - battery_pct >= 30 (autonomous approval)
+        reasoning: The LLM identifies the key thresholds of <15% for emergency and
+          <30% for low battery blocking. The decomposition implies thresholds at 15%
+          and 30% for battery decisions in autonomous modes. The LLM covers both effectively,
+          though phrasing <30 includes the 15 boundary.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX reach the completely correct conclusion
+          of 'NO', with the LLM providing detailed reasoning on why approval is blocked
+          in all sub-cases under battery_pct <30, aligning perfectly with the decomposition.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The decomposition has 0 approving scenarios for autonomous modes
+          under <30% battery. The LLM explicitly covers both sub-cases (<15 and 15-30),
+          fully enumerating the blocking logic, achieving complete coverage of the
+          (zero) positive scenarios and the blocking ones.
+      overall_summary: The LLM answer is highly accurate and detailed, matching the
+        ImandraX conclusion and demonstrating strong understanding of the control
+        flow and boundaries. It excels in explaining sub-cases, which the ImandraX
+        answer summarizes more briefly. No major weaknesses; the LLM performs comparably
+        or better in qualitative depth, though ImandraX provides verified scenario
+        count (0).
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the emergency check is the first
+          condition evaluated (precedence), leading to an immediate return without
+          further branching (branching structure). The OR logic in requires_emergency_landing
+          short-circuits to True when critical_battery is True (short-circuit behavior).
+          Emergency landing overrides all other mode-specific logic (override logic).
+          All aspects are accurately described.
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct < 15
+        thresholds_from_decomp:
+        - battery_pct < 15
+        reasoning: The LLM explicitly identifies the threshold 'battery_pct < 15'
+          as the critical battery condition that triggers emergency landing. This
+          matches the decomposition's single relevant threshold. No thresholds missed.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion that battery_pct
+          < 15 always triggers force_emergency_landing=True, matching the ImandraX
+          proven property. The reasoning is thorough and accurate, explaining the
+          function structure, OR logic, and immediate return, aligning with the decomposition.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM explicitly states that critical battery triggers emergency
+          landing 'regardless of all other conditions,' covering all possible scenarios
+          where battery_pct < 15 (implication holds across the entire state space
+          for this condition). This uses rubric (a) EXPLICIT COUNT effectively, as
+          it implies 100% coverage of relevant scenarios, matching the decomposition's
+          proof that it always holds.
+      overall_summary: '"The LLM answer is strong and aligns closely with the ImandraX
+        proven result. It demonstrates excellent control flow understanding and correctly
+        identifies the decision boundary. The conclusion is accurate with solid reasoning.
+        Metrics not applicable (state space, outcome precision, edge cases) reflect
+        the simplicity of the yes/no implication question, where decomposition verifies
+        a universal property without needing scenario enumeration or distributions."'

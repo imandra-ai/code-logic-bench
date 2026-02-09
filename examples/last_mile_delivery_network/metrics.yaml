@@ -5758,3 +5758,1029 @@
         no explicit scenario count or all vehicle-type edge cases, but this does not
         detract from the core property evaluation. Overall, the LLM performs equivalently
         to decomposition-based verification for this simple yet pivotal property.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:21'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 90
+        n_decomposition_exact_scenarios: 248
+        reasoning: The LLM estimated approximately 90 distinct decision scenarios,
+          whereas the decomposition identified exactly 248. The LLM significantly
+          underestimated the number of scenarios.
+        score: -6.303780748177103
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the sequential nature of the decision
+          gates (dead zone -> emergency override -> quorum) and the override logic.
+          It also understood that not all quorum combinations are reachable due to
+          prior conditions (short-circuiting). However, the specific interactions
+          and precedence of continuous parameters within the quorum conditions were
+          not fully captured, leading to an underestimation of distinct scenarios.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - battery dead zone
+        - emergency override
+        total_edge_cases: 2
+        reasoning: The LLM explicitly identified the 'battery dead zone' and 'emergency
+          override' as key edge cases, which are consistent with the problem description
+          and often represent critical branching points.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level thresholds for dead zones and emergency override (e.g., 15%,
+          20-25%, 25-35%, 15-20%)
+        - quorum score thresholds (score >=4, score =3, score <3)
+        thresholds_from_decomp:
+        - 'battery_level: 15, 20, 25, 30, 35, 40'
+        - 'capacity_utilization: 80'
+        - 'distance: 30, 50, 200'
+        - 'assignment_score: 3, 4'
+        reasoning: The LLM identified the battery level thresholds related to dead
+          zones and emergency override, as well as the quorum score thresholds. However,
+          it missed thresholds for capacity_utilization (80), and multiple distance
+          thresholds (30, 50, 200), and also some battery thresholds (30, 40) that
+          are present in the ImandraX decomposition.
+        score: 0.5
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides only approximate scenario counts and does not
+          provide precise numeric distributions of outcomes (Assigned, Waitlist, Rejected).
+          The ImandraX answer provides exact counts and percentages for each outcome.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly identified the factors influencing the assignment
+          decisions (vehicle type, package priority, weather conditions, battery,
+          capacity, distance) and the high-level decision logic (dead zone, emergency,
+          quorum). However, its quantitative estimation of the total scenarios was
+          significantly off, reducing the overall accuracy of its conclusion about
+          the 'number of distinct scenarios'.
+      coverage_completeness:
+        score: 0.36
+        reasoning: The LLM estimated around 90 scenarios, while ImandraX identified
+          248. The LLM's coverage score is 90/248 = 0.36, indicating a significant
+          underestimation of the complete set of decision scenarios.
+      overall_summary: The LLM demonstrated a good qualitative understanding of the
+        problem's control flow, identifying key decision points, overrides, and short-circuiting
+        behavior. It also correctly identified the main edge cases. However, it severely
+        underestimated the total number of distinct scenarios due to an incomplete
+        analysis of decision boundaries and continuous parameter interactions. The
+        LLM's answer lacks the precision in numeric thresholds and quantitative outcome
+        distributions that the decomposition provides. The ImandraX answer provided
+        an exact and complete count of scenarios, along with precise thresholds and
+        outcome distributions, highlighting the limitations of the LLM's manual estimation
+        for complex state spaces.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM didn't explicitly quantify the number of scenarios for
+          'Assigned' cases for Drones during Storm weather. It stated that Drones
+          can be assigned via two paths, implied multiple scenarios within each, but
+          provided no specific count. The ImandraX answer explicitly states 13 scenarios
+          for Drone + Storm -> Assigned.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identified the order of operations: dead zone
+          check, then emergency override, then quorum scoring. It accurately explained
+          how the emergency override acts as a short-circuit, bypassing subsequent
+          checks, including weather compatibility. The LLM''s detailed reasoning on
+          the quorum path also demonstrates a good understanding of how multiple conditions
+          contribute to a final decision, recognizing that weather could be ''False''
+          yet still result in ''Assigned'' if other conditions compensate and enough
+          conditions are met to pass the quorum threshold.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency override path allowing Drone assignment in Storm
+        - Quorum path allowing Drone assignment in Storm
+        total_edge_cases: 1
+        reasoning: The LLM identified two paths where Drones could be assigned during
+          a storm. The ImandraX answer frames one of these (quorum path) as a 'safety
+          bug' and the pertinent edge case, whereas the LLM seems to treat both as
+          plausible 'exceptions'. The LLM incorrectly identified the emergency override
+          as a valid edge case, whereas the decomposition indicates it correctly rejects
+          drones in storms. The correct edge case was the quorum path leading to assignment.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery > 15%
+        - battery NOT between 25% and 35%
+        - battery >= 35%
+        - distance <= 30
+        - current_load + package_weight <= capacity
+        - current_load < capacity * 80 // 100
+        - battery >= 40%
+        thresholds_from_decomp:
+        - battery_level >= 35
+        - distance <= 30
+        - battery_level >= 40
+        reasoning: The LLM identified all relevant numeric thresholds, such as battery
+          levels (emergency override, dead zone, battery_ok for quorum, urgent priority)
+          and distance. The ImandraX answer provided fewer explicit thresholds in
+          its example, but the LLM derived a more comprehensive set of boundaries
+          from the logical conditions described.
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM's precision is high, as it correctly identifies the conditions
+          under which a Drone could be assigned in a storm. While the LLM identifies
+          both the emergency override and quorum path as leading to assignment, the
+          emergency override path is specified as correctly rejecting assignments
+          (by Imandrax). The LLM clearly outlines the specific thresholds and combinations
+          of factors (e.g., battery levels, priority, other quorum conditions) that
+          lead to an 'Assigned' outcome. The LLM's interpretation of quorum allowing
+          assignment even with one fail is largely precise.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly identifies that Drones *can* be assigned deliveries
+          during a storm, aligning with the ImandraX answer. However, the LLM incorrectly
+          identifies two paths for this assignment (emergency override and quorum),
+          whereas the ImandraX analysis determines the emergency override path correctly
+          *rejects* assignment, and only the quorum path leads to the safety issue.
+          The LLM's conclusion that the emergency override can lead to assignment
+          in a storm is a significant deviation from the verified behavior.
+      coverage_completeness:
+        score: 0.8
+        reasoning: The LLM covered the core aspects of the question by identifying
+          both the emergency override and quorum paths. It correctly identified conditions
+          within both paths that could lead to an 'Assigned' outcome. Although the
+          LLM incorrectly assumed the emergency override allows assignment during
+          storms, it provided a thorough analysis of the quorum conditions, explaining
+          how enough positive conditions could overcome a 'False' weather condition.
+          This demonstrates good coverage of the decision logic, even with one factual
+          error.
+      overall_summary: The LLM correctly identified that Drones can be assigned during
+        a storm, as confirmed by ImandraX. It demonstrated strong control flow understanding,
+        accurately assessing precedence, branching, short-circuit, and override logic.
+        It also had good decision boundary clarity, identifying a comprehensive set
+        of relevant thresholds. However, the LLM overshot on edge case detection,
+        mistakenly concluding that the emergency override path would allow Drone assignment
+        in a storm, when ImandraX verified it correctly rejects such assignments.
+        This led to a lower direction accuracy score. The LLM’s reasoning for the
+        quorum path leading to assignment was, however, accurate and complete, making
+        its overall outcome precision relatively high despite the error regarding
+        the emergency override.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: Both the LLM and ImandraX answers correctly identify that vehicles
+        in their battery dead zone cannot be directly assigned to deliveries. The
+        core reasoning provided by both is the precedence of the dead zone check in
+        the control flow, which immediately returns a WAITLIST decision. The LLM's
+        explanation is more verbose and provides examples, while ImandraX presents
+        a more concise "PROVEN" verdict with a clear property statement and simplified
+        pseudocode. The critical insight about the dead zone check having the highest
+        precedence and overriding even emergency assignments is well articulated by
+        both. The LLM clearly outlines the dead zone ranges with examples of what
+        that means for outcomes. Neither answer identifies any missed scenarios with
+        respect to this specific question, likely because the question is very pinpointed.
+        Both answers are spot on and correct.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:26'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 90
+        n_decomposition_exact_scenarios: 248
+        reasoning: The LLM estimated approximately 90 distinct decision scenarios
+          based on categorical combinations, dead zones, emergency overrides, and
+          quorum paths, while ImandraX decomposed the problem to find 248 total distinct
+          scenarios.
+        score: -6.303780748177103
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: The LLM understands the precedence and structure of decision-making
+          well, capturing AND/OR logic, and correctly identifies the override logic
+          while misunderstanding short-circuit behavior as it does not fully acknowledge
+          the consequences of conditions.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Battery level exactly at thresholds (15%, 20%)
+        - Capacity utilization at threshold (80%)
+        - Exact distance thresholds (30m, 50m, 200m)
+        - Mixed priority scenarios leading to rejections
+        total_edge_cases: 4
+        reasoning: The LLM identified some edge cases such as battery constraints
+          and thresholds but did not address all possible edge cases uniformly, leading
+          to a lesser count than found during decomposition.
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Battery level thresholds
+        - Capacity thresholds
+        - Distance thresholds
+        - Assignment score thresholds
+        thresholds_from_decomp:
+        - battery_level thresholds (15, 20, 25, 30, 35, 40)
+        - capacity_utilization threshold (80)
+        - distance thresholds (30, 50, 200)
+        - assignment_score thresholds (3, 4)
+        reasoning: The LLM identified relevant thresholds but missed some specifics
+          (like all battery thresholds), leading to fewer thresholds being recognized
+          than what ImandraX detailed.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's estimates range from approximate to correct categories
+          (e.g., provided conceptual outcomes without exacting detail), thereby leading
+          to a mid-level score for precision in numeric distributions.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM's conclusions about distinct decision scenarios were wrong
+          on the total count but it did identify the relevant factors and categories
+          leading to the ultimate classifications.
+      coverage_completeness:
+        score: 0.15
+        reasoning: While the LLM acknowledged multi-dimensional outcomes, it failed
+          to cover the entirety of scenarios acknowledged by ImandraX, leading to
+          a very low score on comprehensive coverage.
+      overall_summary: The LLM had a reasonable grasp of decision structure and identified
+        some outcomes, but its estimation of distinct scenarios was significantly
+        lower than actual, missing specific numeric thresholds and edge cases, resulting
+        in poor coverage and direction accuracy.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM estimated 1 scenario through the emergency override and
+          hints at another scenario where conditions allow for quorum assignment.
+          The ImandraX decomposition explicitly identifies 13 scenarios.
+        score: -2.4594316186372973
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM misunderstands the critical precedence of the weather condition
+          (a hard constraint); it did recognize the override logic correctly but misinterprets
+          the implications of having the weather condition fail as a branch that could
+          still allow for assignment in some scenarios.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - Drones cannot be assigned during Storm up to conditions met in quorum for
+          Urgent priority.
+        - Drones cannot be assigned in Storm without emergency priority with sufficient
+          battery levels.
+        total_edge_cases: 3
+        reasoning: The LLM identified two edge cases related to Storm conditions but
+          missed a critical policy violation where Drones should never operate in
+          Storms, considering safety.
+        edge_case_count: 2
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery > 15%
+        - battery NOT in dead zone (25-35%)
+        thresholds_from_decomp:
+        - battery >= 40
+        - distance <= 30
+        reasoning: The LLM identified two critical thresholds related to battery levels
+          but failed to identify both battery and distance thresholds from the decomposition,
+          which are crucial to the decision-making process.
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM provided mostly accurate conditions with correct values
+          but was imprecise about which conditions must also be considered based on
+          the decomposition.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM's conclusion that Drones can be assigned in Storm was partially
+          correct due to the emergency override but overlooks the safety issue posed
+          by allowing assignment through the quorum path.
+      coverage_completeness:
+        score: 0.15384615384615385
+        reasoning: The LLM hints at two scenarios (one via emergency override, the
+          other through quorum) but falls short compared to the 13 detailed in the
+          decomposition—mostly due to lack of explicit enumeration.
+      overall_summary: LLM's response suggests possibilities of assignment for Drones
+        in Storm situations but misjudges safety concerns that the ImandraX evaluation
+        emphasizes through critical hard constraints and edge cases. The LLM correctly
+        identifies some decision boundaries and conditions but lacks comprehensive
+        coverage and detailed rationale behind assignments.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the dead zone check comes first
+          (high precedence) and describes its unconditional nature. It also accurately
+          explains that other checks (such as emergency overrides) should not be reached
+          if a vehicle is in the dead zone.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: There are no edge cases identified by the LLM because it does not
+          describe any complex combinations or conditions outside of the stated logic.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM does not identify any numeric thresholds as it focuses
+          solely on the logic flow without explicit threshold delineation.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides an exact match for the conclusion that dead zone
+          vehicles cannot be assigned, with appropriate reasoning and supporting details.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion is completely correct as it accurately conveys
+          the function's behavior in relation to battery dead zone vehicles.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covers all scenarios regarding the assignment status of
+          vehicles in the battery dead zone comprehensively without missing any.
+      overall_summary: The LLM answer is highly accurate, demonstrating solid understanding
+        of the control flow, decision-making priorities, outcomes, and conditions
+        involved in vehicle assignment logic.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:04'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 104
+        n_decomposition_exact_scenarios: 248
+        reasoning: 'The LLM provides an approximate range of 90-117 distinct decision
+          scenarios in its reasoning (earlier mention of 81-162, but settled on 90-117).
+          Using the midpoint of the final range as per extraction rules for ranges:
+          (90 + 117)/2 = 103.5, rounded to 104. The decomposition from ImandraX gives
+          exactly 248 scenarios.'
+        score: -6.169925001442312
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - LLM describes sequential decision
+          gates (dead zone first, then emergency override, then quorum), implying
+          correct priority ordering like AND/OR in quorum scoring. Branching structure:
+          correct - Captures if-else-if like structure with dead zone check, then
+          emergency, then quorum branching into 3 outcomes. Short-circuit behavior:
+          correct - Describes early WAITLIST for dead zone and early ASSIGNED for
+          emergency override, preventing further checks. Override logic: correct -
+          Clearly states emergency override trumps normal quorum for critical deliveries.'
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level > 15%
+        - battery_level in [20,25]% (Truck dead zone)
+        - battery_level in [25,35]% (Drone dead zone)
+        - battery_level in [15,20]% (Robot dead zone)
+        - assignment_score >= 4
+        - assignment_score = 3
+        thresholds_from_decomp:
+        - battery_level 15
+        - battery_level 20
+        - battery_level 25
+        - battery_level 30
+        - battery_level 35
+        - battery_level 40
+        - capacity_utilization 80
+        - distance 30
+        - distance 50
+        - distance 200
+        - assignment_score 3
+        - assignment_score 4
+        reasoning: 'LLM identifies battery thresholds for emergency (15%) and vehicle-specific
+          dead zones (15%,20%,25%,35%), plus quorum score thresholds (3,4). This covers
+          6 unique thresholds. Decomposition has 12 thresholds across battery (6),
+          capacity (1), distance (3), and score (2). Missed: battery 30%,40%; capacity_utilization
+          80%; distance 30,50,200.'
+        score: 0.5
+      outcome_precision:
+        score: 0.0
+        reasoning: LLM provides no numeric distributions for outcomes (e.g., no counts
+          like 108 Assigned, 77 Waitlist, 63 Rejected). Instead, it offers rough qualitative
+          breakdowns (e.g., 27 dead-zone Waitlist, 9 emergency Assigned, ~54-81 quorum
+          scenarios) that do not match or approximate the exact ImandraX outcome counts.
+          Thus, wrong or missing numeric precision.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM's conclusion of approximately 90-117 distinct scenarios
+          is incorrect compared to the exact 248 from decomposition (significant underestimate).
+          However, it correctly identifies key factors like categorical combinations
+          (27), dead zones, emergency overrides, and quorum outcomes, showing partial
+          understanding but flawed quantification leading to wrong total.
+      coverage_completeness:
+        score: 0.4
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM''s approximate count of ~100
+          scenarios (midpoint of 90-117) vs. decomposition''s 248, yielding ~100/248
+          ≈ 0.4. Alternatively, (b) SCENARIO ENUMERATION: LLM explicitly describes
+          ~27 dead-zone + 9 emergency + 54-81 quorum = ~90-117 enumerated scenario
+          classes, supporting the same proportion. Generous interpretation gives 0.4.'
+      overall_summary: '"The LLM demonstrates strong understanding of control flow
+        (sequential checks, overrides, short-circuits) and identifies several key
+        decision boundaries (battery thresholds, score), but significantly underestimates
+        the state space size (104 vs. 248), provides no precise outcome distributions,
+        and achieves only partial coverage of scenarios. It misses additional thresholds
+        (e.g., distance, capacity, higher battery levels) and does not detect or quantify
+        edge cases explicitly. Overall, qualitative insights are good, but quantitative
+        precision and completeness lag behind ImandraX''s verified decomposition."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM answer does not provide an explicit estimate of the number
+          of scenarios where Drones can be assigned during Storm weather. It describes
+          conditions qualitatively and mentions possibilities for different priorities
+          (STANDARD, URGENT, EMERGENCY) but does not count or range the total scenarios.
+          The ImandraX answer specifies exactly 13 such scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: incorrect
+        reasoning: 'Precedence of conditions: The LLM correctly identifies the sequential
+          order of checks—dead zone first, then emergency override, then quorum scoring—which
+          aligns with priority ordering. Branching structure: Partial, as the LLM
+          accurately describes the early return in override but treats the quorum
+          as a simple score without fully clarifying independent checks vs. chained
+          if-else. Short-circuit behavior: Correct, explicitly notes that emergency
+          override returns ASSIGNED immediately, bypassing further checks including
+          weather. Override logic: Incorrect, as the LLM claims emergency override
+          bypasses weather checks for Drones in Storm (allowing assignment), but ImandraX
+          indicates it correctly rejects, so the understanding of safety overrides
+          is flawed.'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Assignment via quorum path in Storm for STANDARD priority with battery >35%,
+          distance <=30, capacity ok, not overloaded
+        - Assignment via quorum path in Storm for URGENT priority with battery >=40%,
+          distance <=30, capacity ok, not overloaded
+        - 'Incorrectly identified: Assignment via emergency override in Storm for
+          EMERGENCY priority with battery >15% and not in 25-35% dead zone'
+        total_edge_cases: 13
+        reasoning: The LLM identifies edge cases related to Drone assignment in Storm
+          weather, which are policy-violating and safety-critical (contradicting naive
+          expectation that Drones never fly in storms). It finds at least two valid
+          edge cases via the quorum path for STANDARD and URGENT priorities, but incorrectly
+          includes one from the emergency override path. The decomposition (ImandraX)
+          has 13 total such edge case scenarios, so the LLM misses most specific combinations
+          (e.g., variations in battery levels, distances, loads leading to the 13).
+        edge_case_count: 3
+        score: 0.23076923076923078
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery > 15%
+        - battery not between 25% and 35%
+        - battery > 35%
+        - battery >= 40% for URGENT
+        - distance <= 30
+        - current_load + package_weight <= capacity
+        - current_load < 80% of capacity
+        thresholds_from_decomp:
+        - battery >= 35%
+        - distance <= 30
+        - current_load + package_weight <= capacity
+        - current_load < 80% of capacity
+        - battery >= 40% for URGENT priority
+        - weather = Storm (hard failure for weather_ok)
+        - priority = Urgent/STANDARD (to achieve quorum)
+        reasoning: The LLM identifies key thresholds like battery >35% (to avoid dead
+          zone and satisfy battery_ok), distance <=30, capacity constraints, and battery
+          >=40 for URGENT, which match decomposition boundaries. It also mentions
+          the 25-35% dead zone and >15% for emergency (though emergency path is misidentified).
+          However, it misses explicitly noting weather=Storm as a hard failure in
+          override path and doesn't cover all variations leading to the 13 scenarios.
+          Approximately 5/7 thresholds identified.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provides qualitative conditions for outcomes (Assigned)
+          with approximate numeric thresholds (e.g., battery >35% vs exact >=35%,
+          distance <=30 exact match), but does not specify the distribution or count
+          of scenarios (e.g., no mention of 13 cases). ImandraX gives precise example
+          values and total count. Score reflects approximate values and correct direction
+          but lacks exact distribution precision.
+      direction_accuracy:
+        score: 0.75
+        reasoning: 'The LLM correctly concludes that Drones can be assigned during
+          Storm weather (yes), aligning with ImandraX''s finding of 13 scenarios.
+          However, the reasoning is flawed: it incorrectly states that the emergency
+          override path allows assignment in Storm (bypassing weather), whereas ImandraX
+          clarifies it correctly rejects via override, with assignments only possible
+          via the buggy quorum path. The conclusion direction is right, but reasoning
+          is incomplete and partially wrong.'
+      coverage_completeness:
+        score: 0.3
+        reasoning: 'Using rubric (b) scenario enumeration: The LLM explicitly describes
+          2-3 scenario types (quorum for STANDARD/URGENT, plus incorrect EMERGENCY
+          override), acknowledging multiplicity but not enumerating all variations.
+          ImandraX decomposes into 13 specific scenarios. This covers roughly 3/13
+          proportionally, generously interpreted as partial enumeration of categories
+          (e.g., priority types) without full coverage of combinations like battery/distance/load
+          variations.'
+      overall_summary: 'The LLM answer correctly identifies that Drone assignments
+        in Storm are possible (via quorum path), matching the ImandraX conclusion
+        of ''YES'' but fails to recognize this as a safety bug and overestimates the
+        emergency override path''s permissiveness. Strengths: Good grasp of control
+        flow order, key thresholds, and exceptional cases in quorum. Weaknesses: Incorrect
+        override logic, no scenario counting, incomplete coverage of the 13 decomposed
+        cases, and misses the critical insight that this dilutes safety constraints.
+        Overall, the LLM provides a solid but flawed analysis without verification,
+        while ImandraX exposes the bug with precise decomposition.'
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the dead zone check has the highest
+          precedence, coming first in the function before emergency overrides or quorum
+          scoring. It accurately describes the branching as an immediate if-then return
+          to WAITLIST without further checks. Short-circuit behavior is well-understood
+          as an unconditional early return. Override logic is correctly noted as safety
+          (dead zone) trumping emergency assignments.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency priority package with vehicle in dead zone results in WAITLIST,
+          not ASSIGNED
+        total_edge_cases: 1
+        reasoning: The LLM identifies the key edge case where even an EMERGENCY package
+          cannot override the dead zone waitlist, which is a safety-critical contradiction
+          to naive expectations (safety trumps urgency). This matches the decomposition's
+          key insight. No other edge cases are present in this simple property proof.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'Truck: 20% ≤ battery ≤ 25%'
+        - 'Drone: 25% ≤ battery ≤ 35%'
+        - 'Robot: 15% ≤ battery ≤ 20%'
+        thresholds_from_decomp:
+        - 'Truck: 20-25% battery'
+        - 'Drone: 25-35% battery'
+        - 'Robot: 15-20% battery'
+        reasoning: The LLM explicitly lists all three vehicle-specific dead zone thresholds
+          with precise inequality boundaries (≤ and ≥ implied in ranges), matching
+          the decomposition exactly. No thresholds missed.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion ('NEVER be directly assigned') is completely
+          correct and matches the proven property from ImandraX. Reasoning is sound,
+          detailing the control flow that enforces this, with examples like the emergency
+          case, showing full understanding without flaws.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The decomposition reveals a single decision region for dead_zone=true,
+          always resulting in WAITLIST, regardless of other variables (emergency,
+          weather, etc.). The LLM explicitly covers this by stating it holds 'regardless
+          of package priority (even EMERGENCY), weather conditions, capacity, distance,
+          or any other factor,' achieving full coverage via explicit enumeration of
+          the overriding nature.
+      overall_summary: The LLM answer is highly accurate and aligns closely with the
+        ImandraX decomposition, correctly proving the property with strong control
+        flow analysis and boundary identification. It excels in direction, coverage,
+        and edge detection for this safety-critical question, with no weaknesses observed.
+        ImandraX provides formal verification, but LLM's informal reasoning is equivalently
+        precise here.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:34'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 90
+        n_decomposition_exact_scenarios: 248
+        reasoning: The LLM estimates approximately 90 distinct decision scenarios.
+          The reasoning chain identifies 27 dead-zone scenarios + 9 emergency override
+          scenarios + 54-81 quorum scenarios, arriving at a conservative estimate
+          of ~90 (with a range of 90-117). The decomposition from ImandraX provides
+          an exact count of 248 total scenarios (108 Assigned + 77 Waitlist + 63 Rejected).
+          The LLM's estimate significantly underestimates the actual state space.
+          Using the formula score = 1 - abs(log2(|90 - 248|)) = 1 - abs(log2(158))
+          ≈ 1 - 7.3 ≈ -6.3, which is clamped to a very low score. This represents
+          a substantial underestimation.
+        score: -6.303780748177103
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions (correct): The LLM correctly identifies
+          the sequential ordering of checks: (1) dead zone first → short-circuit to
+          WAITLIST, (2) emergency override second → short-circuit to ASSIGNED, (3)
+          quorum scoring third → three outcomes. This precedence is accurate. Short-circuit
+          behavior (correct): The LLM correctly recognizes that dead zone and emergency
+          override are guard clauses that bypass subsequent logic, with explicit statements
+          like ''Battery dead zone check → WAITLIST'' and ''emergency override check
+          → ASSIGNED''. Override logic (correct): The LLM correctly identifies that
+          emergency override (for EMERGENCY priority with battery >15% outside dead
+          zone) takes precedence, demonstrating understanding of safety/priority overrides.
+          Branching structure (partial): While the LLM correctly identifies the three
+          sequential decision gates, it underestimates the branching complexity within
+          the quorum-scoring path. The statement ''6 boolean conditions (weather_ok,
+          battery_ok, capacity_ok, distance_ok, priority_ok, not_overloaded) yielding
+          2^6=64 possible boolean combinations'' is partially correct but doesn''t
+          fully account for how many of these 64 combinations actually yield distinct
+          decision regions when continuous parameters are discretized. The LLM assumes
+          ''not all are reachable for every categorical combo'' but doesn''t fully
+          decompose the reachable paths.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone boundary cases: battery levels exactly at 20-25% (Truck), 25-35%
+          (Drone), 15-20% (Robot)'
+        - 'Emergency override boundary: EMERGENCY priority with battery exactly at
+          15%'
+        - 'Quorum score boundary: score exactly = 3 (WAITLIST outcome)'
+        total_edge_cases: 12
+        reasoning: 'The LLM identifies three edge cases: (1) dead zone boundaries
+          per vehicle type, (2) emergency override boundary at battery=15%, (3) quorum
+          score exactly at 3. However, the decomposition reveals additional edge cases
+          not explicitly mentioned by the LLM: multiple battery level thresholds (15,
+          20, 25, 30, 35, 40), capacity utilization threshold (80%), distance thresholds
+          (30, 50, 200), and assignment score thresholds (3, 4). The LLM misses several
+          nuanced edge cases such as: boundary interactions between multiple parameters
+          (e.g., capacity=80% AND distance>50), battery thresholds beyond the dead
+          zones (30%, 40%), and specific distance thresholds (30, 50, 200). The LLM
+          finds 3 out of an estimated 12 distinct edge cases, yielding a score of
+          3/12 = 0.25.'
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'battery_level: 15% (emergency override), 20-25% (Truck dead zone), 25-35%
+          (Drone dead zone), 15-20% (Robot dead zone)'
+        - 'assignment_score: 4 (ASSIGNED), 3 (WAITLIST), <3 (REJECTED)'
+        thresholds_from_decomp:
+        - 'battery_level: 15, 20, 25, 30, 35, 40'
+        - 'capacity_utilization: 80'
+        - 'distance: 30, 50, 200'
+        - 'assignment_score: 3, 4'
+        reasoning: 'The LLM explicitly identifies battery thresholds (15%, 20-25%,
+          25-35%, 15-20% for different vehicles) and assignment score thresholds (4,
+          3, <3), demonstrating clear awareness of decision boundaries. However, the
+          decomposition reveals additional thresholds not mentioned: battery_level
+          thresholds at 30, 35, 40%, capacity_utilization at 80%, and distance thresholds
+          at 30, 50, 200. The LLM identified 2 threshold categories (battery and assignment_score)
+          while the decomposition has 4 categories (battery, capacity_utilization,
+          distance, assignment_score). Within battery_level, the LLM identified 5
+          distinct values (15, 20, 25, 30, 35, 40 inferred from dead zones but not
+          explicitly all listed), while decomposition explicitly lists all 6. The
+          LLM''s score: 2 out of 4 threshold categories (battery+assignment_score
+          vs battery+capacity+distance+assignment_score) = 0.5, or if counting individual
+          thresholds: 6 identified (15, 20, 25, 35, 40 from dead zones + 4, 3) vs
+          11 in decomposition = 6/11 ≈ 0.55.'
+        score: 0.5
+      outcome_precision:
+        score: 0.2
+        reasoning: 'The LLM provides outcome distributions qualitatively and categorically
+          (e.g., ''27 dead-zone scenarios all WAITLIST'', ''emergency override scenarios
+          all ASSIGNED'', ''quorum outcomes: 3 possible outcomes per combo''). However,
+          ImandraX provides exact numeric distributions: 108 Assigned (44%), 77 Waitlist
+          (31%), 63 Rejected (25%). The LLM does not specify exact percentages or
+          counts for each outcome category across the state space. The reasoning is
+          directionally sound (identifying WAITLIST for dead zones, ASSIGNED for emergency
+          override, mixed outcomes for quorum), but the quantitative precision is
+          missing. The LLM''s statement ''roughly 90 distinct decision scenarios''
+          and ''54+ quorum sub-scenarios'' are approximations without exact outcome
+          distributions. This merits a 0.2 score: qualitative and directionally correct,
+          but lacking numeric precision.'
+      direction_accuracy:
+        score: 0.5
+        reasoning: 'The LLM''s reasoning direction is fundamentally sound: it correctly
+          identifies the three major decision gates (dead zone, emergency override,
+          quorum scoring) and correctly predicts their outcomes (dead zone → WAITLIST,
+          emergency override → ASSIGNED, quorum → ASSIGNED/WAITLIST/REJECTED based
+          on score). However, the LLM reaches a substantially incorrect conclusion
+          about the total number of scenarios (90 vs 248). The LLM''s analytical framework
+          is correct, but it misses significant branching complexity. The reasoning
+          demonstrates understanding of the control flow but fails to capture the
+          full combinatorial explosion of decision boundaries created by continuous
+          parameters and their interactions. The LLM''s estimate is off by a factor
+          of ~2.76x, indicating incomplete scenario enumeration rather than fundamental
+          misunderstanding of the outcome types.'
+      coverage_completeness:
+        score: 0.36
+        reasoning: 'The LLM estimates 90 scenarios while the decomposition shows 248.
+          Using rubric (a) EXPLICIT COUNT: the LLM provides an explicit number (90)
+          vs the decomposition exact count (248), yielding 90/248 ≈ 0.36 or 36% coverage.
+          The LLM explicitly enumerates three major decision categories (dead zone,
+          emergency override, quorum) and attempts to count sub-scenarios within each,
+          but the enumeration is incomplete. The LLM identifies the key branches but
+          underestimates the state space by not fully accounting for the continuous
+          parameter discretization and all possible boundary crossings within the
+          quorum-scoring path.'
+      overall_summary: >2
+
+        "The LLM demonstrates solid understanding of the control flow logic and sequential
+        decision structure (dead zone → emergency override → quorum scoring), with
+        correct precedence, short-circuit behavior, and override logic. However, it
+        significantly underestimates the total number of distinct decision scenarios
+        (90 vs 248, a 2.76x underestimation). The root cause is incomplete discretization
+        of the continuous parameter space and failure to fully enumerate all boundary
+        crossings created by battery levels, distances, and capacity thresholds. The
+        LLM's reasoning is directionally sound and identifies the major branches,
+        but lacks the systematic decomposition needed to capture the full state space.
+        Key metrics: state space estimation (0.0-0.2 range due to large underestimation),
+        outcome precision (0.2: directionally correct but qualitative), direction
+        accuracy (0.5: correct framework but wrong conclusion), coverage (0.36: roughly
+        one-third of scenarios found), control flow (0.75: mostly correct with partial
+        branching complexity), edge case detection (0.25: finds 3 of 12 edge cases),
+        decision boundary clarity (0.55: identifies ~half of all thresholds). Strengths:
+        accurate control flow understanding, correct sequential logic. Weaknesses:
+        incomplete parameter discretization, significant state space underestimation,
+        missing multiple numeric thresholds."
+
+        }
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM does not provide an explicit count of scenarios where Drones
+          can be assigned during Storm weather. It discusses the conditions qualitatively
+          (emergency override path and quorum path possibilities) but never estimates
+          a specific number of such scenarios. The decomposition found exactly 13
+          such scenarios. Since the LLM provides no numeric estimate, n_llm_estimated_scenarios
+          cannot be extracted and should be marked as 'unknown'.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly understands that dead zone check
+          (25-35%) comes before emergency override, and emergency override comes before
+          quorum scoring. However, it doesn''t fully clarify that the emergency override
+          SHORT-CIRCUITS the entire quorum logic—this is a precedence issue regarding
+          which checks execute. Branching Structure: The LLM correctly identifies
+          the three-path structure: (1) dead zone → fail, (2) emergency override →
+          ASSIGNED, (3) quorum scoring. This branching is accurately described. Short-Circuit
+          Behavior: The LLM states emergency override ''completely bypasses the weather
+          check'' but doesn''t fully explain that it bypasses ALL subsequent checks
+          including quorum. The statement is correct but incompletely articulated.
+          Also, the LLM notes that quorum path can compensate for weather_ok=False,
+          but doesn''t emphasize the safety violation this represents. Override Logic:
+          The LLM correctly identifies that EMERGENCY priority with battery>15% and
+          NOT in dead zone triggers override, beating the weather constraint. This
+          is accurate.'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Drone with battery between 15% and 25% (exclusive) in Storm with EMERGENCY
+          priority gets ASSIGNED via override
+        - Drone with battery > 35% in Storm with STANDARD priority can get ASSIGNED
+          via quorum if all other conditions pass
+        - Drone with battery >= 40% in Storm with URGENT priority can get ASSIGNED
+          via quorum if all other conditions pass
+        - Quorum path allows Storm assignment when 5 out of 6 conditions pass (weather
+          fails but others succeed)
+        total_edge_cases: 13
+        reasoning: 'The LLM identifies 4 conceptual edge cases (emergency override
+          with specific battery ranges, quorum compensation patterns). However, the
+          decomposition found exactly 13 distinct scenarios. The LLM recognizes the
+          key architectural flaw (quorum can override weather via condition compensation)
+          but doesn''t enumerate the full scenario space. The 4 cases identified represent
+          different TYPES of edge cases rather than the full combinatorial enumeration.
+          For example, the LLM recognizes ''Drone+Storm+URGENT+battery≥40% can be
+          assigned'' but doesn''t enumerate all capacity/distance/current_load combinations.
+          The 13 scenarios likely represent specific combinations of: priority (3
+          types), battery ranges (multiple), distance values (specific), capacity
+          states (multiple), current_load values (multiple). Edge case count found
+          = 4, total_edge_cases = 13, score ≈ 0.31.'
+        edge_case_count: 4
+        score: 0.3076923076923077
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery > 15%
+        - battery NOT between 25% and 35% (Drone dead zone)
+        - battery > 35%
+        - battery >= 40%
+        - distance <= 30
+        - 'capacity constraint: current_load + package_weight <= capacity'
+        - 'not_overloaded: current_load < capacity * 80 / 100'
+        thresholds_from_decomp:
+        - battery > 15%
+        - battery > 35%
+        - battery >= 40%
+        - distance <= 30
+        - 'capacity: current_load + package_weight <= capacity'
+        - 'not_overloaded: current_load < capacity * 80 / 100'
+        - 'dead_zone: 25% <= battery <= 35% (EXCLUSION)'
+        - weather = Storm (hard constraint violation)
+        - priority = EMERGENCY
+        - priority = URGENT
+        - priority = STANDARD
+        reasoning: 'The LLM identifies 7 key numeric/boolean thresholds. However,
+          the full decomposition reveals 11 thresholds/decision boundaries. The LLM
+          identifies battery-related thresholds (15%, 25-35% dead zone, 35%, 40%),
+          distance (≤30), and capacity constraints correctly. Missing from LLM: (1)
+          explicit recognition that weather=Storm should be a HARD CONSTRAINT (not
+          quorum-able), (2) the priority categories as discrete thresholds (EMERGENCY
+          vs URGENT vs STANDARD have different battery requirements), (3) the complete
+          dead zone exclusion logic. The identified thresholds are correct, but incomplete
+          representation of the decision boundary space. Score = 7/11 ≈ 0.64.'
+        score: 0.6363636363636364
+      outcome_precision:
+        score: 0.6
+        reasoning: 'The LLM identifies specific conditions for Drone assignment in
+          Storm weather with moderate precision. For the emergency override path,
+          it correctly identifies: priority=EMERGENCY, battery>15%, and NOT in dead
+          zone (25-35%). For the quorum path, it identifies specific thresholds like
+          battery>35% for battery_ok, distance≤30 for distance_ok, and for URGENT
+          priority battery≥40%. However, the answer lacks comprehensive precision
+          about all 13 scenarios. The LLM correctly identifies battery thresholds
+          (>15%, >35%, ≥40%) and distance constraint (≤30), but it doesn''t fully
+          explore all capacity, current_load, and priority combinations that produce
+          the 13 scenarios. The numeric values provided are directionally correct
+          but the complete outcome space is not fully characterized numerically.'
+      direction_accuracy:
+        score: 0.75
+        reasoning: 'The LLM reaches the correct overall direction: YES, Drones CAN
+          be assigned during Storm weather. However, the reasoning quality is incomplete
+          and somewhat misleading. The LLM correctly identifies both the emergency
+          override path AND the quorum path as enabling Storm assignments. It correctly
+          explains that weather_ok=False can be compensated by other conditions in
+          the quorum system. However, the LLM''s reasoning about the emergency override
+          is slightly inaccurate—it suggests emergency override ''completely bypasses
+          the weather check,'' which is partially true but the LLM doesn''t clearly
+          establish that 13 specific scenarios exist. The decomposition reveals this
+          is actually a SAFETY BUG (emergency override correctly rejects Drones in
+          storms, but quorum allows it if 4/6 conditions pass). The LLM does not flag
+          this as a safety concern or recognize the architectural flaw. The conclusion
+          is directionally correct (yes, assignments possible) but the framing misses
+          the critical safety implication.'
+      coverage_completeness:
+        score: 0.15
+        reasoning: 'The LLM discusses the general mechanisms (emergency override and
+          quorum paths) but provides no explicit enumeration of the 13 scenarios where
+          Drone+Storm→Assigned. Using OUTCOME CATEGORY COVERAGE: the LLM implicitly
+          identifies 2 outcome categories (emergency override assignments and quorum
+          assignments), but the decomposition reveals 13 distinct scenario combinations.
+          The LLM acknowledges ''both paths'' exist but fails to systematically enumerate
+          the specific combinations of priority, battery_level, distance, capacity,
+          and current_load that enable these 13 assignments. The answer is qualitative
+          and acknowledges multiplicity but does not approach comprehensive scenario
+          enumeration. Score reflects recognition of two high-level pathways (2 categories)
+          vs. much more granular scenario space.'
+      overall_summary: '{"summary": "The LLM correctly answers YES to whether Drones
+        can be assigned during Storm weather and identifies the two main pathways
+        (emergency override and quorum compensation). However, the analysis is significantly
+        incomplete compared to ImandraX''s decomposition. Key differences:\n\nSTRENGTHS:\n-
+        Correct directional conclusion (YES, assignments possible)\n- Correctly identifies
+        emergency override mechanism\n- Correctly understands quorum voting system\n-
+        Identifies specific battery thresholds (15%, 25-35% dead zone, 35%, 40%)\n-
+        Correct control flow understanding of precedence and branching\n\nWEAKNESSES:\n-
+        Does NOT quantify the problem: fails to identify or count the 13 specific
+        scenarios\n- Missing SAFETY BUG FRAMING: presents the quorum path neutrally
+        rather than as a design flaw\n- Incomplete edge case enumeration: identifies
+        types but not specific scenario combinations\n- Does not recognize weather
+        constraint should be HARD, not quorum-able\n- Fails to recommend any fix or
+        flag as safety-critical\n- No systematic exploration of the full condition
+        space (capacity, current_load, distance combinations)\n\nThe LLM demonstrates
+        good understanding of the mechanism but lacks the comprehensive scenario decomposition
+        that reveals the safety violation. ImandraX explicitly flags this as a safety
+        bug requiring a hard constraint, while the LLM treats it as an interesting
+        quirk of the quorum system. This represents a critical gap in security/safety
+        reasoning."}'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM answer focuses on a specific property (dead zone behavior)
+          rather than providing a scenario count estimate. No explicit scenario enumeration
+          is provided by the LLM. Since this is a yes/no property verification question
+          rather than a scenario counting exercise, an exact state space count is
+          not applicable to the LLM's response model.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly identifies that the dead zone check
+          has highest precedence - it executes BEFORE the emergency override check.
+          This is explicitly stated: ''The dead zone check is the very first check
+          in the function, executed before the emergency override check.'' Branching
+          structure: The LLM correctly understands the if-then-else structure where
+          the dead zone check is a guard clause that short-circuits all other logic.
+          The early return prevents any downstream branches from executing. Short-circuit
+          behavior: The LLM perfectly captures short-circuit semantics: ''The code
+          is: if in_dead_zone: return AssignmentDecision.WAITLIST — this is an immediate
+          return with no exceptions.'' This demonstrates understanding that the return
+          statement prevents subsequent code execution. Override logic: The LLM correctly
+          identifies that the emergency override does NOT override the dead zone check
+          due to precedence. The explicit example of an EMERGENCY package still hitting
+          the dead zone check first proves this understanding.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - EMERGENCY priority package with vehicle in dead zone - returns WAITLIST
+          not ASSIGNED despite emergency status
+        - Drone at exactly 30% battery (within 25-35% dead zone) with any package
+          type - returns WAITLIST
+        - Vehicle at exact boundary (e.g., Truck at exactly 20% or exactly 25%) -
+          included in dead zone
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies the most critical edge case: emergency override
+          being overridden by dead zone precedence. This is a counterintuitive case
+          that violates naive expectation (one might assume EMERGENCY would bypass
+          all checks). The LLM also demonstrates understanding of boundary conditions
+          by noting the specific percentage thresholds. However, the decomposition
+          likely contains additional edge cases involving combinations with other
+          constraints (quorum requirements, capacity, weather), which the LLM does
+          not explicitly enumerate. The LLM focuses on the dead zone aspect exclusively
+          rather than exploring interactions with other conditions.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'Truck: 20-25% battery'
+        - 'Drone: 25-35% battery'
+        - 'Robot: 15-20% battery'
+        thresholds_from_decomp:
+        - 'Truck: 20% ≤ battery ≤ 25%'
+        - 'Drone: 25% ≤ battery ≤ 35%'
+        - 'Robot: 15% ≤ battery ≤ 20%'
+        reasoning: The LLM identifies all three critical battery threshold boundaries
+          with exact precision. The thresholds are stated clearly with both endpoints
+          specified (20-25%, 25-35%, 15-20%). These match exactly with the decomposition
+          thresholds using inclusive inequality notation (≤). The LLM additionally
+          notes the semantic meaning (Robot has narrowest zone, Drone has wider safety
+          margin) showing deeper understanding of the boundary significance. All relevant
+          decision boundaries are identified; no thresholds are missed.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides extremely precise numeric boundaries for the
+          dead zones: Truck (20-25%), Drone (25-35%), Robot (15-20%). These exact
+          thresholds are explicitly stated and are correct. The answer also precisely
+          characterizes the outcome as WAITLIST (exact status value, not approximate).
+          The LLM correctly identifies that the dead zone check returns WAITLIST with
+          no exceptions or approximations. This matches perfectly with the ImandraX
+          verification of these exact ranges.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM conclusion is completely correct and reaches the right
+          direction: vehicles in dead zone NEVER get ASSIGNED (result != Assigned).
+          The reasoning is also sound - the LLM correctly identifies that the dead
+          zone check has highest precedence and executes before emergency override.
+          The example provided (Drone with battery=30% and EMERGENCY package still
+          returning WAITLIST) directly supports the conclusion. The reasoning chain
+          is logical and verifiable: precedence → unconditional return → no exceptions.
+          This perfectly aligns with ImandraX''s proven property.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: While this is a property verification question rather than a scenario
+          enumeration, the LLM demonstrates complete coverage of the relevant decision
+          logic. The answer covers all vehicle types (Truck, Drone, Robot), all dead
+          zone ranges, identifies the precedence structure, and explicitly rules out
+          exceptions (emergency override, priority, weather, capacity, distance).
+          The LLM shows awareness that this is the absolute boundary case that matters
+          - coverage here means identifying all aspects that could theoretically override
+          the dead zone check (and proving none do).
+      overall_summary: 'The LLM answer demonstrates exceptional quality in answering
+        this property verification question. The response is completely correct (matching
+        ImandraX''s proven property), provides precise numeric thresholds, and shows
+        deep understanding of control flow precedence and short-circuit behavior.
+        Strengths: (1) Correct absolute conclusion with zero exceptions, (2) Perfect
+        identification of all dead zone boundaries with exact percentages, (3) Excellent
+        reasoning about precedence ensuring dead zone check executes before emergency
+        override, (4) Concrete counterexample demonstrating the property, (5) Complete
+        coverage of all vehicle types and factors that could theoretically override
+        the dead zone. The answer correctly emphasizes that this is a hard constraint
+        with no conditional branches or exceptions. Compared to ImandraX, the LLM
+        provides equally rigorous verification with more detailed explanation of the
+        logic flow. Minor consideration: The answer doesn''t explore interactions
+        between dead zone and other constraints (though this is not necessary for
+        answering the binary question posed), and state space estimation metrics are
+        not applicable to this type of property query. Overall, this represents exemplary
+        LLM performance on program verification tasks.'

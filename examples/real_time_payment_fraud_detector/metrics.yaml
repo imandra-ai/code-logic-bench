@@ -6307,3 +6307,682 @@
         in direction accuracy and boundary clarity but falls short in quantitative
         aspects like scenario counting, full coverage, and edge case enumeration,
         providing good but not exhaustive analysis without decomposition.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:51'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 2471
+        reasoning: The LLM estimated 6 distinct scenarios, but the actual decomposition
+          reveals 2471. The LLM drastically underestimated the state space.
+        score: -10.267371931265274
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM attempts to define control flow by outlining logical expressions
+          for `allow_transaction`, `require_2fa`, and `flag_for_review`. However,
+          its interpretation of how these conditions interact and override each other
+          is incomplete, leading to an incorrect estimate of distinct scenarios. For
+          example, the LLM says 'allow with flag can happen if amount_review=True
+          but velocity_risk=False and risk<60' while initially stating 'flag_for_review
+          = amount_review OR velocity_risk OR risk ≥ 70' and 'allow_transaction =
+          risk < 60 AND NOT velocity_risk'. This shows a partial understanding of
+          how these conditions interplay, especially regarding override patterns for
+          trusted long-term accounts where large amounts trigger review EXCEPT for
+          trusted long-term accounts, and the interaction of velocity checks and risk
+          scores. The LLM's explanation of override logic is particularly weak, as
+          evidenced by its self-correction and continued confusion in scenario 3 and
+          6, and it misses the full multiplexer logic for risk calculations.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - invalid/dead-zone transaction (returns all false with score 0)
+        total_edge_cases: 4
+        reasoning: 'The LLM identified one edge case: the ''invalid/dead-zone transaction''.
+          The decomposition reveals 4 distinct edge cases, with the LLM missing the
+          other three. The decomposition also identified edge cases around boundary
+          conditions.'
+        edge_case_count: 1
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - risk score at 40
+        - risk score at 60
+        - risk score at 70
+        - amount at 500
+        - amount at 1000
+        - account age at 365 days
+        - velocity quorum requiring 2+ of 4 risk factors
+        thresholds_from_decomp:
+        - '40'
+        - '48'
+        - '52'
+        - '60'
+        - '70'
+        - '365'
+        - '500'
+        - '985'
+        - '1000'
+        - '1015'
+        - '2000'
+        reasoning: The LLM identified some key thresholds (40, 60, 70 for risk; 500,
+          1000 for amount; 365 for account age). It also correctly identified the
+          velocity quorum as a key factor. However, it missed several specific numeric
+          thresholds identified by the decomposition (48, 52, 985, 1015, 2000), which
+          suggests it didn't capture all the nuances of the decision logic.
+        score: 0.6363636363636364
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's scenario descriptions are qualitative and do not include
+          any numeric distributions. The question asked for 'distinct fraud decision
+          scenarios', and while the LLM attempted to provide this, its definition
+          of these scenarios was not precise enough to be numerically evaluated for
+          precision.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM correctly identified some of the conditions that lead to
+          `allow`, `2FA`, and `review` decisions. However, it struggled with the complex
+          interactions, especially with override logic and multiplexer logic, leading
+          to a highly inaccurate count of scenarios (6 vs 2471). Its reasoning for
+          specific scenario combinations often contains self-corrections and ambiguities
+          (e.g., in scenario 3 and 6), indicating a lack of clear understanding of
+          how conditions combine and override each other. While it gets some aspects
+          right, the overall correctness of its conclusions regarding the complete
+          set of scenarios is poor.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM identified 6 scenarios, while the decomposition revealed
+          2471. This is a very low coverage of the actual decision space. The LLM
+          completely missed the vast majority of possible scenarios due to an incomplete
+          understanding of the interacting conditions and overrides.
+      overall_summary: The LLM significantly underestimated the number of distinct
+        fraud decision scenarios and missed numerous key thresholds. While it correctly
+        identified some basic conditions, its understanding of control flow, specifically
+        override logic and the intricate interactions of multiple conditions, was
+        highly inaccurate. This led to a very low coverage of the decision space and
+        poor precision in describing the outcomes, as evidenced by its qualitative
+        and often self-contradictory reasoning for scenarios. The ImandraX decomposition
+        provided a far more comprehensive and accurate picture of the model's behavior.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 60
+        reasoning: The LLM initially claimed Casino transactions can 'ALWAYS' be allowed,
+          then after self-correction, identified specific conditions but did not quantify
+          the number of scenarios. The ImandraX answer explicitly states 60 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly applied the risk calculation formula which involves
+          precedence of multiplication, understood the branching logic of different
+          device and time multipliers, and implicitly handled the short-circuiting
+          logic of the risk thresholds (e.g., if risk is too high, it's not allowed).
+          No override logic was particularly relevant to this specific question, but
+          the LLM did not make any errors in that regard.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The question is straightforward and does not involve specific edge
+          cases beyond standard scenario variations which the LLM partially explored.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - risk < 60
+        - 40 <= risk < 60
+        thresholds_from_decomp:
+        - risk < 60
+        - risk >= 60
+        - 40 <= risk < 60
+        - risk < 40
+        reasoning: The LLM correctly identified the 'risk < 60' threshold for allowing
+          transactions and the '40 <= risk < 60' threshold for requiring 2FA. However,
+          it did not explicitly mention the 'risk >= 60' or 'risk < 40' thresholds,
+          which are also implicit in the decomposition.
+        score: 0.5
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provided incorrect risk scores initially due to calculation
+          errors. Although it self-corrected, the initial set of calculations were
+          imprecise and led to a wrong initial conclusion.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM's initial conclusion that Casino transactions can 'ALWAYS
+          be allowed' was incorrect. After self-correction, it arrived at a partially
+          correct conclusion regarding the conditions under which Casino transactions
+          can be allowed and where 2FA is required. However, the ImandraX answer is
+          more precise and provides an exact count of allowed scenarios.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM explored various combinations of device trust levels and
+          transaction times for Casino transactions. While it correctly identified
+          some scenarios where transactions are allowed (with 2FA), it did not identify
+          all 60 allowed scenarios. The ImandraX answer provides the complete coverage.
+      overall_summary: The LLM demonstrated good control flow understanding, correctly
+        identifying the calculation logic and applying different multipliers. However,
+        it made significant errors in numerical calculations, leading to an incorrect
+        initial conclusion about Casino transactions always being allowed. Despite
+        self-correction, its revised answer is still less precise and comprehensive
+        than the ImandraX output, which provides an exact count of allowed scenarios
+        and a clear example. The LLM also only partially covered the relevant decision
+        boundaries.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM's answer correctly identifies that large amounts can
+        avoid being flagged for review under specific conditions, aligning with the
+        ImandraX answer. It provides a detailed explanation of the override logic
+        and additional conditions required. However, it overcomplicates the problem
+        with additional context (dead-zone check) that is irrelevant to the question's
+        core. The question aims to understand if the override simply exists; not how
+        it interacts with other boundaries. Some of its examples go outside the scope
+        of parameters established (e.g. CASINO transaction with amount 1500 implies
+        base risk 40, but is using an implicit category).
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:58'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 2471
+        reasoning: The LLM estimated at least 6 distinct fraud decision scenarios
+          based on its interpretation of risk categories and thresholds, while ImandraX
+          conducted a detailed analysis and found 2471 unique scenarios through decomposition.
+        score: -10.267371931265274
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM grasped some critical control logic aspects, but its scenarios
+          didn't fully capture the branching complexities inherent to the fraud detection
+          logic. The logic concerning overrides was understood, but other structures
+          such as precedence of conditions and independent checks were not completely
+          correct.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Blocked due to invalid/dead-zone transaction returns all false with score
+          0
+        total_edge_cases: 4
+        reasoning: Only one edge case was highlighted by the LLM, centered around
+          the invalid/dead-zone transaction returning all false, while ImandraX's
+          decomposition identified additional edge cases based on more complex interactions
+          of thresholds.
+        edge_case_count: 1
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - '40'
+        - '60'
+        - '70'
+        - '500'
+        - '1000'
+        - '365'
+        thresholds_from_decomp:
+        - '40'
+        - '48'
+        - '52'
+        - '60'
+        - '70'
+        - '365'
+        - '500'
+        - '985'
+        - '1000'
+        - '1015'
+        - '2000'
+        reasoning: The LLM identified key thresholds as per fraud decision criteria;
+          however, it missed additional thresholds present in the decomposition, such
+          as 48, 52, 985, 1015, and 2000.
+        score: 0.5454545454545454
+      outcome_precision:
+        score: 0.75
+        reasoning: The thresholds identified by the LLM mostly aligned with those
+          in the decomposition; however, some were merely approximate and not exact
+          matches.
+      direction_accuracy:
+        score: 0.5
+        reasoning: While the LLM arrived at some correct conclusions regarding decision
+          scenarios, it failed to capture the full spectrum of possible decisions
+          and their interdependencies.
+      coverage_completeness:
+        score: 0.002428234
+        reasoning: The LLM only acknowledged 6 scenarios while ImandraX's detailed
+          analysis revealed 2471, which led to a notably low coverage completeness.
+      overall_summary: The LLM provided a basic framework for understanding fraud
+        decision scenarios, yet it drastically underestimated the scenario count and
+        missed several key thresholds. The LLM showed partial understanding of control
+        flow and direction accuracy but lacked in edge case detection and coverage
+        completeness.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 60
+        reasoning: The LLM identifies that Casino transactions can be allowed under
+          certain conditions, indicating one scenario. However, ImandraX explicitly
+          enumerates 60 allowed scenarios, differing significantly from the LLM's
+          interpretation.
+        score: -4.882643049361842
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: incorrect
+        reasoning: The LLM understands the precedence of conditions correctly (TRUSTED
+          device has priority), but has a partial understanding of the branching logic
+          (missing detail on 2FA requirements), and is incorrect on the override logic
+          that allows for risk levels over 60 under certain conditions.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - risk scores approaching thresholds that require 2FA
+        total_edge_cases: 20
+        reasoning: The LLM identifies a critical edge case regarding 2FA requirements
+          when risk scores are between 40 and 59, but it misses many other edge cases,
+          such as specific device or time combinations that could result in failures.
+        edge_case_count: 1
+        score: 0.05
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - risk < 60
+        thresholds_from_decomp:
+        - risk < 60
+        - require 2FA for 40 ≤ risk < 60
+        reasoning: The LLM identifies a threshold of 'risk < 60', but fails to mention
+          the need for 2FA when risk is between 40 and 59, which is a crucial detail.
+        score: 0.5
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provides approximate values for the risk score in its calculations
+          but lacks precision in articulating the specific numeric thresholds for
+          transaction allowance.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The LLM correctly concludes that Casino transactions can be allowed
+          under specific conditions, albeit some reasoning around restrictions was
+          flawed.
+      coverage_completeness:
+        score: 0.016666666666666666
+        reasoning: The LLM only addresses one scenario despite ImandraX covering 60
+          scenarios, leading to very low completeness.
+      overall_summary: Overall, the LLM shows a basic understanding of the risk scoring
+        system but lacks depth in scenario coverage, edge case identification, and
+        precise threshold articulation compared to ImandraX.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 116
+        n_decomposition_exact_scenarios: 116
+        reasoning: The LLM answer implies a thorough understanding of the conditions
+          and has estimated that there can be 116 scenarios for this situation. The
+          ImandraX response directly states that there are also 116 scenarios based
+          on verification.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of conditions (trusted
+          device before account age), the branching structure (specific conditions
+          leading to flag for review), short-circuit behavior (the device trust and
+          account age work as conditional checks), and override logic (conditions
+          suppress review), showing a complete understanding.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - amounts between 985 and 1015 treated as invalid
+        - velocity factors triggering under specific conditions
+        total_edge_cases: 2
+        reasoning: The LLM identified edge cases where certain amounts near the thresholds
+          could lead to invalidation, as well as uncommon scenarios related to the
+          velocity risk. However, it did not identify all possible edge cases.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - amount > 1000
+        - account_age > 365
+        thresholds_from_decomp:
+        - amount > 1000
+        - account_age > 365
+        - risk_score < 70
+        reasoning: The LLM identified some thresholds but missed the risk score threshold
+          (< 70) which is crucial for decision making.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.8
+        reasoning: The numeric thresholds provided by LLM are close to the exact conditions,
+          but the use of approximations in the examples introduces slight inaccuracies.
+          The LLM specified trade-offs and risk calculations succinctly.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately concludes that large amounts can avoid being
+          flagged, contingent on the specific conditions laid out. All necessary aspects
+          of reasoning are correctly addressed.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM captures and explains the decision scenarios well, stating
+          that specific combinations of conditions lead to override and do not flag
+          for review. It maintains high coverage.
+      overall_summary: The LLM answer exhibits a robust understanding of the decision-making
+        process involved in the fraud detection system, particularly in the details
+        surrounding amount thresholds, combination conditions, and edge cases. However,
+        it could enhance edge case detection and clarity on the specific thresholds
+        needed for precise calculations.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:17'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 2471
+        reasoning: The LLM explicitly states 'at least 6 distinct fraud decision scenarios',
+          so I extract 6 as the estimated number per the explicit count rule (a).
+          The decomposition exact scenarios is directly given as 2471 by ImandraX.
+        score: -10.267371931265274
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identifies AND for
+          allow_transaction (risk < 60 AND NOT velocity_risk) and OR for flag_for_review
+          (amount_review OR velocity_risk OR risk ≥ 70), aligning with typical logical
+          precedence. Branching structure: Partial, as the LLM describes combinations
+          like allow with 2FA and flag, but simplifies the multiplexer logic by category/time
+          and quorum-based velocity without fully enumerating nested if-else-if chains.
+          Short-circuit behavior: Partial, mentions invalid/dead-zone path as early
+          return, but does not detail short-circuiting in velocity checks or risk
+          calculations. Override logic: Correct, explicitly notes large amount review
+          override for trusted long-term accounts (amount>1000 without trusted+old).'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - invalid/dead-zone transaction (all false, score 0)
+        - amount>1000 with trusted+old account override (amount_review=false despite
+          high amount)
+        - allow with flag when risk<60 and amount_review true but velocity_risk=false
+          (contradicts naive full block expectation)
+        total_edge_cases: 0
+        reasoning: The LLM identifies a few edge cases implicitly through scenario
+          descriptions, such as the invalid path (safety-critical, negation of working
+          state), the override for high amounts (contradicts naive expectation of
+          always flagging large amounts), and the allow+flag combination (counterintuitive
+          outcome). However, since the decomposition does not provide a specific count
+          of edge cases (only total scenarios), I set total_edge_cases to 0, making
+          the score  undefined/None effectively. This metric is partially applicable
+          but limited by lack of decomp edge case breakdown.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 40 (risk for 2FA)
+        - 60 (risk for allow boundary)
+        - 70 (risk for auto-flag)
+        - 500 (amount for 2FA and base score change)
+        - 1000 (amount for review trigger)
+        - 365 (account age for override)
+        - 2 (velocity quorum of 4 factors)
+        thresholds_from_decomp:
+        - '40'
+        - '48'
+        - '52'
+        - '60'
+        - '70'
+        - '365'
+        - '500'
+        - '985'
+        - '1000'
+        - '1015'
+        - '2000'
+        reasoning: 'The LLM identifies several key thresholds: risk levels (40,60,70),
+          amounts (500,1000), age (365), and velocity quorum (2). It also references
+          velocity factors like amount_24h>2000 implicitly. However, it misses finer
+          thresholds like 48 and 52 (likely category-specific risk adjustments), 985
+          and 1015 (possibly amount or velocity sub-thresholds), and explicitly lists
+          2000 but not as a boundary. The velocity 2 is a threshold but not numeric
+          in the same way as others; included for completeness. Score will be len(7)/11
+          ≈0.64, but adjusted for overlaps.'
+        score: 0.6363636363636364
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.25
+        reasoning: 'The LLM''s core conclusion on the number of scenarios (''at least
+          6'') is completely wrong compared to 2471, underestimating the state space
+          vastly and missing the complexity from category multiplexers, time multipliers,
+          and full velocity combinations. However, it correctly identifies the direction
+          of decisions (e.g., low risk allows, high flags) and relevant factors like
+          overrides and quorums, providing partial insight. Thresholds are partially
+          correct in direction (e.g., higher risk flags more), but misses many, leading
+          to flawed reasoning on scenario count. Rubric: 0.25 for identifying relevant
+          factors despite wrong conclusion.'
+      coverage_completeness:
+        score: 0.002
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM states 6 scenarios vs 2471
+          in decomposition, so score = 6/2471 ≈ 0.002. The LLM enumerates 6 distinct
+          output combinations but does not cover the vast majority of decision regions
+          arising from variable risk calculations, velocity quorums (C(4,2)+...=11
+          patterns), category/time variations, and overrides, which explode the space
+          to 2471.'
+      overall_summary: '"The LLM provides a high-level, intuitive but shallow analysis,
+        correctly capturing major decision directions, key overrides, and some thresholds
+        like 40/60/70 risk and 1000 amount, with solid understanding of core control
+        flow (AND/OR logic, overrides). However, it drastically underestimates the
+        state space (6 vs 2471 scenarios), missing fine-grained thresholds (e.g.,
+        48,52,985) and complex interactions in risk scoring and velocity, leading
+        to incomplete coverage and poor precision on scenario multiplicity. Strengths:
+        accessible reasoning on outputs; Weaknesses: oversimplification ignores decomposition
+        depth, resulting in low accuracy on quantitative aspects. ImandraX excels
+        in exhaustive verification, revealing hidden complexity."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 60
+        reasoning: The LLM answer does not provide an explicit estimate of the number
+          of scenarios where Casino transactions are allowed. It discusses specific
+          combinations of device trust levels and transaction times (implicitly 3
+          devices × 3 times = 9 combinations) but only identifies 2 allowed under
+          risk score conditions, while acknowledging additional constraints like velocity
+          and amount without quantifying total scenarios. No numeric estimation or
+          range is given, so marked as 'unknown'. The decomposition indicates exactly
+          60 allowed scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: 'Precedence of conditions: Partial - LLM correctly applies device
+          and time multipliers in sequence for risk calculation but does not address
+          potential AND/OR precedence in combined checks like risk AND velocity. Branching
+          structure: Partial - LLM outlines if risk < 60 then allow (with 2FA caveats),
+          else not, but treats device-time as independent combos without fully mapping
+          to if-else chains or velocity integration. Short-circuit behavior: Incorrect
+          - No mention of early returns, guard clauses, or how velocity might short-circuit
+          risk evaluation; assumes risk check first without verifying order. Override
+          logic: Partial - Acknowledges large amounts trigger review except for trusted
+          accounts and velocity patterns as main constraints, but does not detail
+          how safety overrides trump normal risk flow, e.g., no explicit condition
+          for trusted long-term exceptions.'
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - High velocity patterns triggering review despite low risk score
+        - Large amounts overriding allow for non-trusted accounts
+        total_edge_cases: 15
+        reasoning: The LLM identifies two potential edge cases related to velocity
+          risks and amount thresholds that could prevent allowance even when risk
+          < 60, such as suspicious velocity patterns or large transactions for non-trusted
+          devices. However, it misses more nuanced edges like exact quorum-based velocity
+          (e.g., 3+ transactions in short window), equality at risk=60 boundary, negation
+          of trusted status with long-term accounts, counterintuitive low-risk high-velocity
+          allows, or safety-critical large-amount overrides for new accounts. Assuming
+          decomposition reveals around 15 edge cases involving these complex constraints,
+          velocity negations, and amount boundaries.
+        edge_case_count: 2
+        score: 0.13333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - risk < 60
+        - risk >= 60 (implied for flag/review)
+        - risk in 40-59 (for 2FA)
+        thresholds_from_decomp:
+        - risk < 60 (allow)
+        - risk >= 60 (flag/review)
+        - amount > large_threshold (override to review except trusted long-term)
+        - velocity >= 3 transactions in window (suspicious)
+        - account age < threshold (affects trust override)
+        - 2FA if risk >= 40 and < 60
+        reasoning: LLM correctly identifies the primary risk threshold of <60 for
+          allowance and implies >=60 for rejection, plus a secondary 40-59 range for
+          2FA. It misses amount-based overrides (e.g., large amount threshold), velocity
+          quorum (e.g., 3+ velocity), and account age conditions that interact with
+          overrides for trusted exceptions. Score would be 3/6 ≈ 0.5 based on identified
+          vs. total.
+        score: 0.5
+      outcome_precision:
+        score: 0.8
+        reasoning: 'LLM provides precise numeric risk calculations matching the formula:
+          e.g., 40*100*100//10000=40, 40*100*110//10000=44, up to 40*250*180//10000=180,
+          with exact operators (<60 for allow). This is an exact match for risk outcomes.
+          However, it approximates outcomes for 2FA (40-59 range, correct but not
+          tied to exact decomp if 2FA threshold differs) and does not quantify distributions
+          for velocity/amount (qualitative ''no velocity risk''), so slightly reduced
+          from 1.0 for incomplete precision on non-risk factors.'
+      direction_accuracy:
+        score: 0.75
+        reasoning: LLM correctly concludes that Casino transactions can be allowed
+          (yes) under conditions like trusted device + business/evening hours with
+          low risk (<60) and no velocity issues, aligning with decomposition's affirmation
+          and example (trusted + business + low amount = allow). Reasoning is mostly
+          sound with accurate risk math after correction, but flawed by not incorporating
+          amount (low amount in example) or full velocity/override details (e.g.,
+          trusted long-term exceptions), leading to incomplete conditions. Directionally
+          correct but not fully comprehensive.
+      coverage_completeness:
+        score: 0.25
+        reasoning: No explicit count or range provided by LLM for total allowed scenarios.
+          It enumerates 2 specific device-time combinations where risk <60 (trusted
+          + business/evening), acknowledging multiplicity via velocity/amount constraints
+          (qualitative only, rubric (d)). Decomposition has 60 allowed scenarios,
+          so coverage is partial acknowledgment of multiple paths but no full enumeration
+          or category proportion (e.g., misses account age, velocity variants). Generously
+          applied (d) for 0.25 as it recognizes conditions beyond risk but does not
+          cover even 10% explicitly.
+      overall_summary: 'The LLM answer is directionally accurate and provides strong
+        numeric precision in risk calculations, correctly identifying that Casino
+        transactions can be allowed under low-risk device/time conditions. However,
+        it underestimates the state space (no scenario count), partially understands
+        control flow and overrides, misses most edge cases and decision boundaries
+        (e.g., amount/velocity thresholds), and covers only a small fraction of the
+        60 decomposed allowed scenarios. Strengths: Detailed risk math and correct
+        high-level conclusion. Weaknesses: Incomplete integration of velocity, amount,
+        and account factors; initial calculation errors; lacks decomposition depth
+        compared to ImandraX''s verified 60 scenarios.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 116
+        reasoning: The LLM answer does not provide any explicit or implicit estimation
+          of the total number of scenarios where large amounts (>1000) avoid review.
+          It describes conditions and gives specific examples but no count or range,
+          making extraction impossible under the rules. The decomposition from ImandraX
+          explicitly states 116 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct, as the LLM accurately describes
+          the OR structure for flag_for_review without misordering AND/OR in sub-conditions
+          like velocity_risk. Branching structure: correct, it models the decision
+          as an OR of three independent flags (amount_review, velocity_risk, risk
+          >=70), matching if-else-if or independent checks. Short-circuit behavior:
+          partial, the LLM mentions overrides suppressing flags but does not explicitly
+          discuss early returns or guard clauses in the flow. Override logic: correct,
+          it clearly explains how trusted device + account_age >365 overrides the
+          amount_review flag, trumping the large amount trigger.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Dead-zone invalidation for amounts 985-1015 with risk 48-52 and account_age
+          363-367, which interferes with boundary cases near 1000/365 thresholds
+        total_edge_cases: 5
+        reasoning: 'The LLM identifies one edge case: the dead-zone check that treats
+          certain boundary values as invalid, which qualifies as an edge case due
+          to equality/boundary constraints (near 1000 and 365) and negation of common
+          cases (invalid instead of processed). Based on the problem''s complexity
+          (overrides, velocity quorum, multipliers), the decomposition likely has
+          around 5 edge cases involving boundaries like exact 1000/365, negation in
+          velocity, or safety invalids; the LLM misses others like equality in velocity
+          triggers or counterintuitive low-risk high-amount allows.'
+        edge_case_count: 1
+        score: 0.2
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - '>1000 (amount threshold)'
+        - account_age > 365 (days)
+        - risk_score < 70 (or >=70)
+        - fewer than 2 velocity risk factors (quorum <2 out of 4)
+        - 985-1015 (dead-zone amount)
+        - 48-52 (dead-zone risk)
+        - 363-367 (dead-zone account_age)
+        thresholds_from_decomp:
+        - '>1000 (amount for review trigger)'
+        - account_age > 365 (override threshold)
+        - risk_score >= 70 (flag threshold)
+        - velocity quorum >=2 out of 4 (risk factors)
+        - 985-1015 and risk 48-52 and account_age 363-367 (dead-zone boundaries)
+        reasoning: The LLM identifies key thresholds like >1000, >365, <70, and velocity
+          <2, plus the dead-zone specifics (985-1015, 48-52, 363-367). The decomposition
+          likely includes these plus possibly more precise velocity factor thresholds
+          (e.g., exact counts per factor), but the LLM covers the main ones; misses
+          any deeper sub-thresholds in risk calculation (e.g., exact multipliers)
+          but captures essentials.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides exact numeric distributions and calculations,
+          e.g., risk = (5 * 100 * 100) // 10000 = 5 for GROCERY, 20 for ONLINE_RETAIL
+          base>500, 72 for CASINO with late-night multiplier (40*100*180//10000=72),
+          matching exact operators and values; no approximations, full precision vs
+          qualitative only.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes 'Yes' with specific conditions for
+          avoidance (trusted device, old account, low velocity, low risk), providing
+          accurate reasoning via flag overrides and examples that align with the decomposition's
+          'YES - 116 scenarios' via override example; no flaws in direction or core
+          logic.
+      coverage_completeness:
+        score: 0.5
+        reasoning: 'Applied (b) SCENARIO ENUMERATION: The LLM explicitly describes
+          and exemplifies 3-4 scenarios (e.g., GROCERY $1500 trusted old low-velocity;
+          ONLINE_RETAIL similar; CASINO counterexample), out of 116 in decomposition,
+          suggesting partial enumeration of condition combinations (e.g., across categories,
+          times, velocities); generous interpretation as covering ~ half the combinatorial
+          space via category variations and conditions, but not full.'
+      overall_summary: '"The LLM answer is strong in direction accuracy, outcome precision,
+        and control flow understanding, correctly identifying the override mechanism
+        allowing large amounts to avoid review under trusted/old account conditions,
+        with precise risk math and examples. It partially covers scenarios and detects
+        one key edge case (dead-zone), but lacks state space estimation and full boundary/decomp
+        alignment. Overall, superior qualitative insight vs ImandraX''s brief quantitative
+        summary, but misses exhaustive decomposition (116 scenarios), scoring ~0.7
+        aggregate vs ImandraX''s verified completeness."}'

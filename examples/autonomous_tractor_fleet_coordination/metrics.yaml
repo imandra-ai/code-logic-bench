@@ -5408,3 +5408,533 @@
         of non-violation, the LLM's analysis is flawed in core logic interpretation,
         resulting in low scores across most metrics, highlighting the value of formal
         decomposition for safety properties.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:00'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 9
+        n_decomposition_exact_scenarios: 173
+        reasoning: The LLM identified 9 distinct scenarios based on return points,
+          while the decomposition found 173. The LLM's understanding of a 'scenario'
+          is limited to direct code paths rather than combinations of input parameters.
+        score: -6.357552004618084
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM correctly identified the order of precedence for conditions
+          like collision override and critical zone checks. The branching structure
+          was mostly understood, with each 'return point' being treated as a distinct
+          scenario. However, the LLM partially understood short-circuit behavior,
+          as it enumerated each return point as a scenario incorrectly assuming they
+          were mutually exclusive and did not consider how upstream conditions could
+          short-circuit later ones based on input values. The override logic was correctly
+          identified for critical zone and collision override conditions.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Critical Zone (Dead Zone)
+        - Collision Override
+        - Weather Incompatibility
+        - Low Fuel Critical
+        - High Maintenance Critical
+        total_edge_cases: 5
+        reasoning: 'The LLM successfully identified all 5 critical edge cases: Critical
+          Zone, Collision Override, Weather Incompatibility, Low Fuel Critical, and
+          High Maintenance Critical. These directly correspond to the ''Dead Zone''
+          and ''Override'' patterns mentioned in the ImandraX answer.'
+        edge_case_count: 5
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level between 18–22
+        - maintenance_hours between 195–205
+        - distance_to_nearest_tractor < 50
+        - fuel_level < 15
+        - maintenance_hours > 200
+        - fuel_level ≥ 30
+        - maintenance_hours < 180
+        - fuel_level < 30
+        - maintenance_hours ≥ 180
+        thresholds_from_decomp:
+        - task_type
+        - weather
+        - fuel_level (10% increments)
+        - maintenance_hours (increments of 1)
+        - has_equipment
+        - task_deadline_ok
+        - distance_to_nearest_tractor (1 meter increments)
+        - collision_active
+        reasoning: The LLM correctly identified all the numeric thresholds explicitly
+          defined in the problem description (e.g., fuel_level < 15, distance < 50).
+          However, it missed the implicit thresholds and ranges that define the state
+          space of the problem, such as the ranges for fuel_level, maintenance_hours,
+          and distance_to_nearest_tractor, as well as the categorical thresholds for
+          task_type, weather, has_equipment, and task_deadline_ok, which are crucial
+          for defining the 173 distinct scenarios. The ImandraX answer implicitly
+          derives these from the decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM did not provide any numeric distributions, only a count
+          of scenarios/return points, thus the precision score is 0.0.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly identified the implications of certain conditions
+          (e.g., collision active leading to ABORT_COLLISION) and the overall direction
+          of the logic for its 9 identified scenarios. However, it failed to grasp
+          the full complexity of the state space, leading to a significant underestimation
+          of total scenarios. The LLM's understanding of the 'Readiness Quorum' was
+          also somewhat superficial, missing the combinatorial aspect that leads to
+          more scenarios.
+      coverage_completeness:
+        score: 0.05
+        reasoning: The LLM identified 9 out of 173 possible decision scenarios. This
+          results in a coverage score of 9/173 ≈ 0.05. The LLM's approach of enumerating
+          return statements as scenarios significantly undercounts the actual decision
+          scenarios, which arise from combinations of all input parameters and their
+          respective thresholds/ranges.
+      overall_summary: The LLM demonstrated a good understanding of the explicit control
+        flow and hardcoded numeric thresholds, successfully identifying key edge cases
+        and the general direction of the logic for its identified scenarios. However,
+        it severely underestimated the total number of distinct scenarios by focusing
+        solely on return points rather than the combinatorial state space defined
+        by all input parameters and their respective ranges/categories. The LLM's
+        reasoning is based on code paths, whereas the ImandraX decomposition considers
+        the entire input domain, leading to a much more accurate scenario count. The
+        LLM missed the implicit thresholds and the combinatorial nature of the problem,
+        particularly regarding the 'Readiness Quorum' and the various ranges for continuous
+        variables like fuel_level and maintenance_hours. It also failed to provide
+        any numeric distributions.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: Both the LLM and ImandraX correctly identified that a 'Spraying'
+        task cannot be assigned when the weather is 'Rainy'. The LLM provided a more
+        detailed reasoning, explaining the function calls and priority levels.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM incorrectly identified a violation of the safety property.
+        It failed to understand the precedence of the collision override, which is
+        the highest priority decision and ensures the safety property holds. The LLM's
+        reasoning for the supposed violation is based on a misunderstanding of control
+        flow within the `determine_task_assignment` function.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:06'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 9
+        n_decomposition_exact_scenarios: 173
+        reasoning: The LLM initially reported 8 distinct scenarios but ultimately
+          identified 9 distinct return points after further consideration. The ImandraX
+          answer provided a thorough decomposition resulting in 173 distinct scenarios,
+          based on combinations of multiple factors. This suggests a substantial difference
+          between the LLM's estimations and the actual, verified count.
+        score: -6.357552004618084
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM shows correct precedence in understanding conditions (AND
+          before OR). However, the branching structure is partially understood as
+          the LLM only lists return points without fully explaining dependencies.
+          Short-circuit behavior is appropriately recognized (like in collision checks),
+          but the override logic related to tasks and conditions is only partially
+          captured.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - fuel_level exactly at 15
+        - fuel_level exactly at 30
+        - maintenance_hours exactly at 200
+        total_edge_cases: 10
+        reasoning: The LLM identified edge cases such as fuel levels at boundaries
+          and maintenance thresholds, but only detected 3 edge cases, compared to
+          the decomposition which identified 10 total edge cases, covering a broader
+          range of specific conditions (like conjunctive constraints).
+        edge_case_count: 3
+        score: 0.3
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level < 15
+        - fuel_level between 18-22
+        - fuel_level >= 30
+        - distance_to_nearest_tractor < 50
+        - maintenance_hours > 200
+        - maintenance_hours between 195-205
+        thresholds_from_decomp:
+        - fuel_level < 10%
+        - fuel_level < 15%
+        - fuel_level > 30%
+        - distance_to_nearest_tractor < 50 m
+        - maintenance_hours < 180 hrs
+        - maintenance_hours > 200 hrs
+        - has_equipment states
+        - task_deadline states
+        - spraying in rain
+        reasoning: The LLM identified several specific numeric thresholds correctly,
+          but compared to the decomposition which included several ranges and states,
+          it failed to identify some broader thresholds and states relating to task
+          types and weather conditions.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.75
+        reasoning: The numeric thresholds provided by the LLM are mostly accurate,
+          with only minor discrepancies in phrasing (e.g., 'between 18-22' is precise
+          in context, but not as direct as 'exactly at 20'). Overall, the numeric
+          values are mostly correct, thus justifying a score of 0.75.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes with 9 scenarios identified, but the actual total
+          is 173 distinct regions, meaning its core conclusion regarding the number
+          of scenarios is fundamentally incorrect.
+      coverage_completeness:
+        score: 0.05
+        reasoning: The LLM's coverage of scenarios compared to the decomposition is
+          minimal. The LLM captures a very small fraction of the actual scenarios
+          identified (9 scenarios out of 173), essentially covering only a basic part
+          of the overall output.
+      overall_summary: The LLM's response is limited by incorrect scenario counts
+        and a narrow understanding of task assignment in the model. It captures certain
+        branches and thresholds but significantly underrepresents the complexity of
+        task parameters and conditions as detailed in the ImandraX decomposition.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly understands the order of checks: it correctly
+          identifies that the weather compatibility check occurs after critical zone
+          and collision checks, reflecting an accurate grasp of control flow. Each
+          condition''s check is performed in proper order, confirming a strong understanding
+          of branching structure, short-circuit behavior, and override logic.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: No edge cases were identified by the LLM, as it focused on the
+          specific hard constraint of weather compatibility rather than exploring
+          potential edge cases related to operational conditions.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - 'weather compatibility check: RAINY with SPRAYING -> false'
+        reasoning: The LLM did not explicitly identify any decision boundaries or
+          thresholds; it focused instead on the rule that a Spraying task cannot proceed
+          in Rainy weather. Thus, it missed acknowledging the specific rule that serves
+          as a decision boundary.
+        score: 0.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's final answer correctly states that can_proceed will always
+          be false in the given conditions, aligning with the precise technical constraints.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion that a Spraying task cannot be assigned when
+          weather is Rainy is entirely accurate and corroborated by logical reasoning.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM failed to identify the granularity of conditions under
+          which tasks could be assigned, instead asserting a blanket rule without
+          acknowledging that other conditions (if they weren't weather-related) may
+          influence decisions.
+      overall_summary: Both LLM and ImandraX answers conclude that a Spraying task
+        cannot be assigned in Rainy weather. However, ImandraX provides a more detailed
+        explanation that highlights the hierarchical function calls to weather compatibility.
+        The LLM's reasoning is sound but lacks the detail of edge cases and decision
+        thresholds, which slightly weakens its response.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly recognizes the control structures in terms of
+          checks and orders. It acknowledges the critical zone and confirms the appropriate
+          order of conditions where the collision checks take precedence. ImandraX
+          also shows a robust understanding of the control flow, highlighting the
+          prioritization of collision checks over others.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - in critical zone with all conditions met
+        total_edge_cases: 1
+        reasoning: The LLM identifies a specific scenario where safety may be compromised
+          (the critical zone), which is critical for decision making. It highlights
+          the conditions for violation. ImandraX does not explore such scenarios.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance < 50
+        - fuel_level between 18 and 22
+        - maintenance_hours between 195 and 205
+        thresholds_from_decomp:
+        - collision_active
+        - distance < 50
+        - fuel_level between 18 and 22
+        - maintenance_hours between 195 and 205
+        reasoning: Both answers identify key thresholds and conditions; however, LLM
+          provides explicit numeric boundaries, which enhances clarity. ImandraX focuses
+          on the higher priority collision checks without detailing other thresholds.
+        score: 0.75
+      outcome_precision:
+        score: 0.0
+        reasoning: LLM claims the safety property can be violated under specific conditions.
+          However, ImandraX firmly states it cannot be violated, meaning LLM’s reasoning
+          leads to incorrect conclusions regarding the property, significantly impacting
+          numeric outcome precision.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes that a violation can occur, which contradicts
+          ImandraX indicating the property is proven to hold. This is a complete misalignment
+          with expected outcomes.
+      coverage_completeness:
+        score: 0.5
+        reasoning: LLM identifies conditions and states they lead to a violation but
+          fails to cover all decision scenarios present in the overall analysis, as
+          ImandraX evaluated the overriding check effectively.
+      overall_summary: The LLM presents a reasonable understanding of critical conditions
+        that could violate the collision safety property. However, its conclusion
+        contradicts the confirmed priority and validity of the safety property as
+        established in ImandraX's answer. The LLM is proficient in context understanding
+        and scenario mapping but falters drastically concerning conclusion accuracy
+        and overall correctness.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:21'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 9
+        n_decomposition_exact_scenarios: 173
+        reasoning: The LLM initially states 8 distinct scenarios but lists 9 return
+          points in the detailed breakdown and notes the discrepancy, so the estimated
+          number is extracted as 9 using the explicit count from the reasoning. The
+          decomposition provides the exact number as 173 regions.
+        score: -6.357552004618084
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct, as the LLM traces the sequential
+          order of checks (critical zone first, then collision, weather, etc.), aligning
+          with likely if-else chain priority. Branching structure: partial, as it
+          captures the main sequential branches but misses how inputs like task types,
+          weather, and states combinatorially expand the regions beyond simple returns.
+          Short-circuit behavior: correct, explicitly mentions early returns for each
+          check. Override logic: correct, identifies overrides like collision and
+          weather trumping other conditions.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead Zone: fuel_level 18-22 AND maintenance_hours 195-205 (conjunctive
+          constraints)'
+        - 'Collision Override: collision_active=True AND distance < 50 (safety-critical
+          conjunction)'
+        - Quorum not met with specific failures (e.g., low fuel or high maintenance,
+          contradicting naive readiness expectation)
+        total_edge_cases: 12
+        reasoning: 'The LLM implicitly identifies a few edge cases through detailed
+          scenarios: the conjunctive dead zone, collision override (safety-critical),
+          and quorum failures (counterintuitive partial readiness). Assuming the decomposition
+          has around 12 edge cases based on complex patterns mentioned (Dead Zone,
+          Override with weather, Quorum combinations, plus boundaries like exact equality
+          in ranges, negations for equipment/deadline, and storm interactions), the
+          LLM found 3. Missed others like exact boundary equalities, multiple negations
+          (e.g., no equipment + overdue deadline + stormy), and full combinatorial
+          safety violations.'
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level < 15
+        - fuel_level 18-22 (inclusive)
+        - fuel_level >= 30
+        - fuel_level < 30
+        - maintenance_hours > 200
+        - maintenance_hours >= 180
+        - maintenance_hours < 180
+        - maintenance_hours 195-205 (inclusive)
+        - distance_to_nearest_tractor < 50
+        thresholds_from_decomp:
+        - fuel_level < 15
+        - fuel_level 18-22 (inclusive)
+        - fuel_level >= 30
+        - fuel_level < 30
+        - maintenance_hours > 200
+        - maintenance_hours >= 180
+        - maintenance_hours < 180
+        - maintenance_hours 195-205 (inclusive)
+        - distance_to_nearest_tractor < 50
+        reasoning: 'The LLM identifies all key numeric thresholds from the control
+          flow: fuel thresholds (15, 18, 22, 30), maintenance thresholds (180, 195,
+          200, 205), and distance (50). The decomposition likely uses exactly these
+          thresholds to split the state space into 173 regions, combined with categorical
+          variables (task types, weather, booleans). No additional thresholds are
+          mentioned in the ImandraX explanation (ranges like 10-100 are overall domains,
+          not decision boundaries), so all are identified.'
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM's conclusion on the number of scenarios (9) is completely
+          wrong compared to 173, missing the combinatorial explosion from variables
+          like 4 task types, 3 weather conditions, and boolean states. However, it
+          correctly identifies relevant factors (thresholds, quorum logic) and directions
+          for aborts/assignments. Thresholds part is directionally correct (exact
+          matches), but the core count conclusion is flawed, warranting a low score
+          acknowledging partial relevance.
+      coverage_completeness:
+        score: 0.052
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: The LLM states 9 scenarios vs.
+          173 in decomposition, so proportion 9/173 ≈ 0.052. No range or enumeration
+          covers more; it''s a direct underestimation ignoring input combinations.'
+      overall_summary: 'The LLM provides a solid but shallow analysis, correctly tracing
+        the core control flow and identifying all key numeric thresholds and override
+        logics, but fails dramatically on state space size by overlooking combinatorial
+        inputs (task types, weather, distances, etc.), treating it as simple branches
+        instead of 173 regions. Strengths: precise thresholds and flow understanding.
+        Weaknesses: no decomposition of variables, leading to tiny scenario count
+        and incomplete coverage. ImandraX excels in exhaustive verification, revealing
+        the true complexity.'
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly describes the sequential order of checks: critical
+          zone first, then collision, then weather compatibility, which acts as an
+          early return (short-circuit) blocking progression to the quorum evaluation.
+          This shows proper understanding of precedence (weather check after initial
+          safety checks), branching as an if-else chain with early aborts, short-circuit
+          via immediate returns on failure, and override logic where weather incompatibility
+          trumps fuel/equipment readiness.'
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion that a Spraying
+          task cannot be assigned (can_proceed=false) in Rainy weather, regardless
+          of full fuel and equipment availability. The reasoning is thorough and accurate,
+          detailing the control flow and why the weather check blocks assignment before
+          quorum evaluation, aligning perfectly with the ImandraX explanation.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The question focuses on a single specific decision scenario (Spraying
+          in Rainy weather with full fuel/equipment). The LLM fully covers this by
+          explicitly stating it is impossible under any conditions, matching the decomposition's
+          identification of this as a hard-block path. Using rubric (a) or (b), the
+          coverage is complete (1/1 scenario addressed).
+      overall_summary: '"The LLM answer is highly accurate and detailed, correctly
+        capturing the control flow and hard constraints of the system, matching the
+        ImandraX conclusion without errors. It demonstrates strong understanding of
+        the decision logic for this specific query, though it includes extraneous
+        details (e.g., critical zone specifics not relevant to full fuel). No major
+        weaknesses; superior to a basic ImandraX in explanatory depth but equivalent
+        in correctness. Metrics like state space, outcomes, edges, and boundaries
+        are not applicable due to the binary, non-numeric nature of the query."'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM does not provide an explicit numerical estimate of the
+          number of violating scenarios, only describes a specific set of conditions
+          defining a 'small but real window.' Decomposition verifies 0 violating scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: 'Precedence of conditions: incorrect - LLM assumes critical zone
+          (maintenance/fuel) check has higher precedence than collision, but ImandraX
+          states collision override is highest priority. Branching structure: incorrect
+          - LLM describes critical zone as short-circuiting before collision branch,
+          but actual structure places collision first. Short-circuit behavior: incorrect
+          - LLM believes critical zone causes early return before collision evaluation,
+          opposite to verified flow. Override logic: incorrect - LLM thinks maintenance
+          overrides collision safety, but collision trumps all other checks including
+          maintenance.'
+        score: 0.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical zone (fuel 18-22 and maintenance 195-205) combined with collision_active=True
+          and distance<50
+        total_edge_cases: 0
+        reasoning: LLM identifies one potential edge case for violation, but decomposition
+          proves no violations exist, so total edge cases for policy violation is
+          0. The identified case is a false positive due to control flow misunderstanding;
+          no actual edge cases violate the property.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_nearest_tractor < 50
+        - fuel_level between 18 and 22 inclusive
+        - maintenance_hours between 195 and 205 inclusive
+        thresholds_from_decomp:
+        - distance_to_nearest_tractor < 50
+        - fuel_level in [18,22]
+        - maintenance_hours in [195,205]
+        reasoning: LLM correctly identifies the exact numeric thresholds involved
+          in the supposed violation path, matching those in the decomposition for
+          the relevant checks (collision distance and critical zone boundaries). No
+          thresholds missed, though the path does not lead to violation.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: LLM provides exact numeric values and operators for the conditions
+          (e.g., distance < 50, fuel_level between 18-22 inclusive, maintenance_hours
+          195-205 inclusive) and precise outcomes (returns MAINTENANCE_REQUIRED instead
+          of ABORT_COLLISION). This matches the rubric for exact match (value and
+          operator), even though the overall conclusion is incorrect.
+      direction_accuracy:
+        score: 0.0
+        reasoning: LLM reaches completely wrong conclusion that the safety property
+          can be violated, directly contradicting the verified ImandraX result that
+          it cannot be violated and holds proven. Reasoning is flawed due to incorrect
+          control flow assumption, leading to a false identification of violation
+          conditions.
+      coverage_completeness:
+        score: 0.0
+        reasoning: 'Actual decision scenarios for violation: 0 (per decomposition).
+          LLM describes non-existent violating scenarios, so proportion of actual
+          scenarios covered is 0. Rubric (e) NO COVERAGE: 0.0 applies, as the identified
+          scenarios do not exist.'
+      overall_summary: 'The LLM answer demonstrates a fundamental misunderstanding
+        of the control flow, incorrectly prioritizing the critical zone check over
+        the collision override, leading to a false conclusion that the safety property
+        can be violated. While it precisely identifies relevant numeric thresholds
+        and provides detailed (though erroneous) conditions, it fails on direction,
+        coverage, edge cases, and control flow metrics. In contrast, ImandraX correctly
+        verifies the property holds universally due to the highest-priority collision
+        check. Strengths: precise boundary description. Weaknesses: incorrect conclusion
+        and poor scenario coverage (false positives only).'

@@ -5705,3 +5705,1047 @@
         without needing verification tools. It excels in clarity, precision, and identification
         of key overrides/edges, providing a complete and accurate analysis for this
         specific query. Minor strength: detailed code tracing; no significant weaknesses.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:26'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 340
+        reasoning: The LLM initially estimated 972 scenarios but then revised it to
+          640. The decomposition reveals 340 distinct scenarios. The LLM's estimate
+          was significantly higher than the actual count due to an overestimation
+          of unique behavioral classes, particularly in how visibility thresholds
+          and short-circuiting logic simplify the actual state space. The LLM struggled
+          to correctly identify which combinations of conditions truly lead to distinct
+          decision paths rather than just distinct input combinations.
+        score: -7.228818690495881
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM correctly identified some precedence (e.g., dead zone short-circuits
+          other checks) and the basic branching structure (emergency override, quorum
+          logic). However, it struggled with the full implications of short-circuiting
+          and how certain conditions override others (e.g., dead zone overriding spacing
+          logic, or how `visibility > 200` impacts `EMERGENCY` vessels differently
+          across different visibility ranges that otherwise have similar spacing outcomes).
+          This led to an overestimation of distinct scenarios by not fully collapsing
+          behaviorally identical branches.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - FOG + visibility 450-550 (dead zone)
+        - EMERGENCY vessel activation conditions (>200 visibility)
+        total_edge_cases: 2
+        reasoning: The LLM correctly identified the 'dead zone' for FOG conditions
+          and the 'emergency override' based on visibility as key edge cases. These
+          align with the critical logic identified in the decomposition.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility <=200
+        - visibility 201-449
+        - visibility 450-550
+        - visibility 551+
+        - visibility > 200
+        - visibility >= 500
+        - fuel_level >= 30
+        thresholds_from_decomp:
+        - 'visibility: 200'
+        - 'visibility: 450'
+        - 'visibility: 500'
+        - 'visibility: 550'
+        - 'fuel_level: 30'
+        - 'vessel_priority_scores: 1'
+        - 'vessel_priority_scores: 2'
+        - 'vessel_priority_scores: 3'
+        - 'vessel_priority_scores: 4'
+        - 'weather_capacity_reduction: 0'
+        - 'weather_capacity_reduction: 1'
+        - 'weather_capacity_reduction: 2'
+        - 'entry_score: 2'
+        - 'entry_score: 3'
+        reasoning: The LLM successfully identified the critical visibility thresholds
+          (200, 450, 500, 550) and the fuel level threshold (30). However, it did
+          not explicitly mention the thresholds related to `vessel_priority_scores`,
+          `weather_capacity_reduction`, or `entry_score` that are crucial for determining
+          the final decision within the quorum logic. While some of these were implicitly
+          considered through binary 'ok' flags like `priority_ok`, the underlying
+          numeric thresholds were not fully enumerated.
+        score: 0.5
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM demonstrated a reasonable understanding of the problem's
+        core logic, identifying key parameters, control flow structures like dead
+        zones and emergency overrides, and crucial decision boundaries for visibility
+        and fuel. However, despite multiple attempts at systematic enumeration, its
+        final estimate of distinct scenarios (640) was significantly higher than the
+        actual number (340) revealed by decomposition. This suggests a 'partial' understanding
+        of how various conditions interact and lead to a more consolidated set of
+        unique behavioral outcomes. The LLM struggled with the detailed nuances of
+        how control flow (especially short-circuiting) and the interdependence of
+        parameters (like `spacing_ok` with visibility) reduce the effective state
+        space. While it correctly identified several important edge cases, it missed
+        a full enumeration of all underlying numeric thresholds that drive the decision-making
+        process, particularly those related to priority, capacity reduction, and the
+        final entry score beyond the 'ok' flags.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 5
+        reasoning: The LLM does not explicitly state a number of scenarios. It describes
+          general conditions rather than discrete scenarios. ImandraX identifies 5
+          specific scenarios leading to approval.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that 'capacity_ok = False' does not
+          immediately lead to rejection due to the quorum-based approval system. It
+          correctly infers that emergency override does not apply and handles the
+          storm capacity reduction effectively. The LLM accurately assesses how individual
+          conditions contribute to the overall quorum score.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - reduced capacity limit
+        - quorum compensation
+        total_edge_cases: 1
+        reasoning: The LLM identifies that being 'at the reduced capacity limit' is
+          a key condition that needs careful evaluation. It then correctly identifies
+          that the quorum system allows for 'quorum compensation' where other conditions
+          can make up for the capacity limit being reached. The ImandraX response
+          points out one edge case, which is that of 'quorum compensation'.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - current_vessel_count < effective_capacity
+        - vessel_priority ≥ 1
+        - fuel_level ≥ 30
+        - visibility ≥ 500
+        - score ≥ 3
+        - speed ≤ 40% of base limit
+        thresholds_from_decomp:
+        - current_vessel_count < effective_capacity
+        - vessel_priority ≥ 1
+        - fuel_level ≥ 30
+        - visibility ≥ 500
+        - score ≥ 3
+        - speed ≤ 40% of base limit
+        reasoning: The LLM accurately identifies all the key numerical thresholds
+          and conditions, such as `current_vessel_count < effective_capacity`, `vessel_priority
+          ≥ 1`, `fuel_level ≥ 30`, `visibility ≥ 500`, and the quorum `score ≥ 3`.
+          It also identifies the `speed ≤ 40% of base limit` due to storm conditions.
+          ImandraX confirms these same thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's outcome precision is high. It correctly identifies whether
+          different configurations of the remaining 4 conditions (speed_ok, priority_ok,
+          fuel_ok, spacing_ok) lead to APPROVAL, DELAYED, or DENIED based on the quorum
+          score. It is precise in distinguishing between 'score ≥ 3', 'score = 2',
+          and 'score < 2'.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes that Cargo vessels CAN enter the lane
+          under the specified conditions. It accurately determines that even if 'capacity_ok'
+          is false, the quorum system allows for approval if other conditions compensate.
+          This aligns perfectly with the ImandraX answer.
+      coverage_completeness:
+        score: 0.8
+        reasoning: The LLM successfully identifies that 'Yes, approval is possible
+          if at least 3 of the 5 conditions (excluding capacity_ok) are satisfied'.
+          It lists the specific conditions, demonstrating a strong understanding of
+          the system's logic. However, the ImandraX answer explicitly states *5 scenarios*
+          where this approval occurs while the LLM does not enumerate specific scenarios,
+          thus it has slightly less coverage than ImandraX.
+      overall_summary: The LLM provides an excellent and comprehensive answer. It
+        correctly identifies that despite being at the reduced capacity limit, approval
+        is possible due to the quorum system. It meticulously traces the logic, identifies
+        all the relevant conditions and thresholds, and accurately determines the
+        outcome. The LLM's reasoning for capacity reduction during storms, the non-applicability
+        of dead zones and emergency overrides, and the quorum calculations are all
+        spot on. The only minor difference is that ImandraX explicitly quantifies
+        the number of scenarios (5) where this approval occurs, which the LLM does
+        not, making the ImandraX answer slightly more complete in terms of enumeration.
+        However, the LLM fully grasps the core logic and conditions for these scenarios.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM's reasoning closely mirrors the ImandraX answer, correctly
+        identifying the precedence of the dead zone check and its impact on emergency
+        overrides and quorum-based approvals. Both answers clearly state that entries
+        cannot be directly approved in the dead zone. The LLM's detailed breakdown
+        of the control flow through the `determine_lane_entry` function and `in_visibility_dead_zone`
+        is excellent.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:37'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 972
+        n_decomposition_exact_scenarios: 340
+        reasoning: The LLM estimated 972 scenarios based on the breakdown of vessel
+          types, weather conditions, and visibility regions, while the ImandraX decomposition
+          detailed a total of 340 scenarios, classifying them into specific outcomes
+          (Approved, Delayed, Denied). To obtain the LLM's estimate, it considered
+          the combination of various parameters but may have overestimated due to
+          the intricate conditions of merging various parameters into effective zones.
+        score: -8.303780748177102
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM demonstrates a good understanding of how parameters affect
+          decision-making but is not precise in identifying short-circuit cases and
+          does not predict the merging behavior of visibility regions correctly. It
+          recognizes the need for emergency override checks (correct), identifies
+          branching scenarios for weather and vessel types (partial), and acknowledges
+          the behavior of spacing checks (partial) but lacks nuanced detail on how
+          some scenarios behave identically under different conditions.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Visibility at exact thresholds (200, 450) that may lead to different outcomes
+        - Emergency vessel scenarios entering during dead zone conditions
+        total_edge_cases: 5
+        reasoning: The LLM identified specific scenarios where precise values lead
+          to distinct decisions, like thresholds for visibility affecting approval
+          status. However, it did not fully capture all edge cases that occur in the
+          decision-making process concerning overlapping conditions or interactions
+          among vessel types and operational boundaries.
+        edge_case_count: 2
+        score: 0.4
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility at 200
+        - visibility at 450
+        - visibility at 500
+        - fuel level at 30
+        thresholds_from_decomp:
+        - 'visibility: 200'
+        - 'visibility: 450'
+        - 'visibility: 500'
+        - 'fuel_level: 30'
+        - 'vessel_priority_scores: 1, 2, 3, 4'
+        - 'weather_capacity_reduction: 0, 1, 2'
+        - 'entry_score: 2, 3'
+        reasoning: The LLM identified key thresholds, especially for visibility and
+          fuel levels. However, it missed multiple thresholds, particularly related
+          to vessel priority scores and weather capacity, which are fundamental to
+          decision-making in ImandraX's assessment.
+        score: 0.5714285714285714
+      outcome_precision:
+        score: 0.75
+        reasoning: While the LLM provided a distinct count of scenarios (972), it
+          did not specify outcomes clearly, which led to a mismatch with the 340 scenarios
+          defined by ImandraX. That said, it captured most of the relevant assessment
+          by recognizing primary thresholds, leading to slightly less than perfect
+          precision.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM reached a conclusion around the number of scenarios, but
+          its overestimations skewed the correctness of the final insights. It correctly
+          identified some contributing factors but failed to effectively handle the
+          complexities resulting in a lower accuracy score.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM provided a scenario count much higher than actual by assuming
+          distinct combinations without rigorously verifying their unique outcomes.
+          It covered various combinations and conditions but lacked full understanding
+          of how some conditions would have merged scenarios, leading to an inflated
+          number of identified scenarios.
+      overall_summary: The LLM provided a detailed answer but struggled with accurate
+        scenario evaluation, leading to significant overestimation. Its understanding
+        of control structures was reasonable, but it misjudged the merging of conditions
+        and failed to capture key elements from the model that shape distinct decision
+        outcomes. Overall, while the LLM demonstrated engagement with the parameters,
+        the depth of accuracy and specificity suffered, particularly in conditions
+        impacting decision-making.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM answers correctly understood the precedence of conditions
+          (AND before OR) regarding how quorum decisions work, captured the branching
+          structures needed to evaluate the Cargo vessel entry conditions, recognized
+          that the emergency override does not apply, but partially understood short-circuit
+          behavior since it didn't explicitly indicate that if capacity_ok is false,
+          the quorum condition might still lead to approval if enough other conditions
+          are satisfied.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - current_vessel_count = effective_capacity
+        - Cargo vessels at max capacity during storm conditions
+        total_edge_cases: 2
+        reasoning: The LLM identified relevant edge cases regarding the conditions
+          under which approvals could be made despite being at capacity, but could
+          have further emphasized counterintuitive scenarios (e.g., cargo vessels
+          should normally be denied at effective capacity).
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility ≥ 500m
+        - speed ≤ 40% of base limit
+        thresholds_from_decomp:
+        - visibility ≥ 500m
+        - speed ≤ (speed_limit × 40) // 100
+        - fuel_level ≥ 30
+        - priority ≥ 1
+        reasoning: The LLM identified critical decision thresholds regarding visibility
+          and speed; however, it missed citing fuel level and priority thresholds
+          directly.
+        score: 0.5
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's values regarding some outcomes were approximate; it stated
+          vessel speed-related conditions correctly (speed ≤ 40%), but slightly misrepresented
+          visibility by not specifying dependency on storm visibility.
+      direction_accuracy:
+        score: 0.75
+        reasoning: While the LLM identified that approval is possible with conditions
+          met, it inaccurately stated that Cargo vessels cannot enter when at reduced
+          capacity without clearly explaining that conditional outcomes could lead
+          to entry approval.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM acknowledged the quorum-based approach but didn't capture
+          all possible decision scenarios available regarding Cargo vessels at capacity
+          during storms.
+      overall_summary: The LLM displayed a well-reasoned approach but overlooked some
+        nuances in edge cases, validation rigor, and the total procedural framework
+        outlined by ImandraX. It understood the core decision flow yet partially miscommunicated
+        the true nature of conditional approvals.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM demonstrates a correct understanding of the precedence
+          of conditions by clarifying that the dead zone check occurs first, which
+          effectively bypasses any further checks for the emergency override logic.
+          The branching structure is effectively described; there are no independent
+          checks that would allow an override once the visibility condition is met.
+          The LLM accurately captures short-circuit behavior by stating that if the
+          visibility is in the dead zone, the function returns 'DELAYED' and does
+          not evaluate further. Additionally, the override logic is addressed accurately,
+          emphasizing that safety checks take precedence over normal operations.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Vessel entries during marginal fog conditions
+        - Emergency vessels in dead zone
+        total_edge_cases: 2
+        reasoning: The LLM identifies edge cases related to the failure of emergency
+          vessels to override in the visibility dead zone, which is a critical safety
+          constraint in fog. The other edge case pertains to the inherent safety risks
+          posed by marginal fog visibility.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility = 450m
+        - visibility = 550m
+        thresholds_from_decomp:
+        - visibility <= 450m
+        - visibility >= 550m
+        reasoning: The LLM correctly identifies the thresholds for the visibility
+          dead zone as 450m and 550m, but it does not encapsulate the complete decision
+          boundaries as noted in the decomposition, which includes conditions that
+          define unsafe and safe thresholds as well.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides precise outcomes stating that no entries are approved
+          in the specified visibility range, which is an exact match to the logic
+          in the decomposition.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes that vessel entries cannot be approved
+          during the dead zone, fully aligning with the findings of the decomposition
+          and supporting reasoning.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM identifies the relevant scenarios and correctly details
+          the logic leading to the delayed outcome. It captures the critical paths
+          assessed in the decomposition.
+      overall_summary: The LLM's response aligns closely with the ImandraX answer
+        overall, exhibiting a strong grasp of control structures, edge case identifications,
+        and precise outcome reasoning, resulting in a high-quality answer. The only
+        minor area of improvement lies in fully articulating the complete decision
+        boundaries.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:50'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 972
+        n_decomposition_exact_scenarios: 340
+        reasoning: The LLM explicitly states '972 distinct lane entry decision scenarios'
+          at the beginning of its answer. Despite the reasoning exploring other numbers
+          like 640 and 960, the official answer provided is 972. The decomposition
+          from ImandraX gives exactly 340 scenarios.
+        score: -8.303780748177102
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identifies the priority
+          ordering - dead zone check first, then emergency override, then quorum evaluation,
+          which aligns with the control flow. Branching structure: Accurately describes
+          the if-else chain for dead zone, emergency, and then the quorum score-based
+          decisions (if score >=3 approve, =2 delay, <2 deny). Short-circuit behavior:
+          Explicitly notes early returns for dead zone (DELAYED) and emergency override
+          (APPROVED), preventing further checks. Override logic: Correctly captures
+          that emergency vessels override normal logic when visibility >200 and not
+          in dead zone, trumping other safety checks.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - FOG weather with visibility 450-550 (dead zone, safety-critical regardless
+          of other params)
+        - Emergency vessel with visibility exactly 200 or <=200 (boundary for override,
+          potential negation of expectation)
+        - Visibility exactly 500 (boundary for spacing_ok in non-dead zone)
+        - Quorum score exactly 2 (delayed, counterintuitive borderline case)
+        - Fuel level exactly 30 (boundary for fuel_ok)
+        total_edge_cases: 12
+        reasoning: 'The LLM identifies several edge cases implicitly through its discussion
+          of boundaries and special paths: dead zone as a safety-critical override,
+          visibility thresholds like 200 and 500 for override and spacing, and mentions
+          of exact conditions like quorum logic implying score=2 as borderline. It
+          also touches on fuel_ok at 30. However, it misses some like exact equality
+          in priority scores (1-4 per vessel type), weather reduction levels creating
+          tight capacity, or negation like sensor failures (if applicable, though
+          not mentioned). Total edge cases in decomposition estimated at 12 based
+          on key thresholds (4 visibility +1 fuel +4 priority +3 weather reductions)
+          each defining 1-2 edge regions with equality or complex conjuncts (e.g.,
+          quorum=2 requires exactly 2/5 booleans true, a complex combination). Found
+          5 out of 12.'
+        edge_case_count: 5
+        score: 0.4166666666666667
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility > 200 (emergency override)
+        - visibility 450-550 (dead zone in FOG)
+        - visibility >= 500 (spacing_ok)
+        - fuel_level >= 30
+        - weather capacity reduction levels 0,1,2
+        - quorum entry score >=3 (approve)
+        - quorum entry score =2 (delay)
+        thresholds_from_decomp:
+        - visibility 200
+        - visibility 450
+        - visibility 500
+        - visibility 550
+        - fuel_level 30
+        - vessel_priority_scores 1
+        - vessel_priority_scores 2
+        - vessel_priority_scores 3
+        - vessel_priority_scores 4
+        - weather_capacity_reduction 0
+        - weather_capacity_reduction 1
+        - weather_capacity_reduction 2
+        - entry_score 2
+        - entry_score 3
+        reasoning: The LLM identifies key visibility thresholds (200, 450-550 encompassing
+          450 and 550, 500), fuel at 30, weather reductions (0,1,2), and entry_score
+          boundaries (2 for delay, 3 for approve). It misses the specific vessel_priority_scores
+          (1,2,3,4 per type) as granular thresholds, treating priority_ok more abstractly.
+          Decomp lists 14 distinct thresholds. LLM identifies 7 effectively matching
+          or covering them (e.g., 450-550 covers 450 and 550). Score = 7/14 = 0.5.
+        score: 0.5
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides no numeric distribution of outcomes (e.g., no
+          breakdown like 162 Approved, 109 Delayed, 69 Denied from ImandraX). It only
+          estimates total scenarios without any outcome counts or percentages, making
+          it missing/wrong on this aspect.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes 972 distinct scenarios, which is significantly
+          incorrect compared to the verified 340 from decomposition. The reasoning
+          shows confusion and overestimation due to over-granular visibility regions
+          and not fully collapsing equivalent behavioral classes, leading to a completely
+          wrong total.
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'The LLM does not explicitly enumerate or list decision scenarios
+          but acknowledges multiplicity through combinatorial reasoning (e.g., ''4
+          × 10 × 16 = 640'' explorations, visibility regions, boolean combos). This
+          qualifies as qualitative acknowledgment of numerous paths without specific
+          coverage, so rubric (d) applies: 0.25. No explicit count match or scenario
+          enumeration to use higher rubrics.'
+      overall_summary: '"The LLM demonstrates strong qualitative understanding of
+        the control flow, short-circuits, overrides, and key decision boundaries,
+        correctly identifying major paths like dead zone, emergency override, and
+        quorum scoring. However, it severely overestimates the total number of distinct
+        scenarios (972 vs 340) due to overly granular visibility zoning without collapsing
+        equivalent behaviors and potentially double-counting inputs in short-circuit
+        paths. It misses outcome distributions entirely and provides only partial
+        coverage through estimation rather than decomposition. Edge case detection
+        is decent but incomplete, focusing on visibility and dead zone but overlooking
+        priority score granularities. Overall, the LLM excels in structural comprehension
+        but fails in quantitative precision and verification, where ImandraX provides
+        exact, verified counts and breakdowns."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 5
+        reasoning: The LLM implicitly estimates 5 scenarios by describing situations
+          where at least 3 out of the 4 non-capacity conditions are true (C(4,3)=4
+          for exactly 3, plus 1 for all 4, totaling 5). This matches the ImandraX
+          decomposition which explicitly states '5 scenarios'.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: No complex AND/OR precedence issues; quorum is a simple
+          sum of conditions, correctly understood. Branching: LLM correctly traces
+          sequential checks (emergency false -> no dead zone -> quorum evaluation),
+          recognizing the if-else structure. Short-circuit: No early returns or guards
+          beyond the main flow, which LLM follows accurately (e.g., emergency and
+          dead zone as initial filters). Override: Correctly identifies emergency
+          override not applicable for Cargo vessels, and capacity as a soft constraint
+          in quorum rather than hard override.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Quorum compensation allowing approval at exact capacity limit (current_vessel_count
+          == effective_capacity) during Storm for Cargo vessels, contradicting naive
+          hard capacity enforcement
+        total_edge_cases: 5
+        reasoning: The LLM identifies the core edge case of quorum-based approval
+          despite being at the capacity boundary (equality constraint, contradicts
+          expectation of strict denial, involves complex combination of 4 conditions
+          for compensation). ImandraX decomposes this into 5 specific scenarios (variations
+          of which 3+ conditions are satisfied), all qualifying as edge cases due
+          to boundary equality, multi-constraint satisfaction, and counterintuitive
+          outcome. LLM covers this conceptually, equivalent to finding all 5.
+        edge_case_count: 1
+        score: 0.2
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'current_vessel_count == effective_capacity (Storm: max_capacity - 2)'
+        - vessel_speed ≤ (speed_limit × 40) // 100
+        - vessel_priority ≥ 1
+        - fuel_level ≥ 30
+        - visibility ≥ 500
+        thresholds_from_decomp:
+        - 'current_vessel_count == effective_capacity (Storm: max_capacity - 2)'
+        - vessel_speed ≤ (speed_limit × 40) // 100
+        - vessel_priority ≥ 1
+        - fuel_level ≥ 30
+        - visibility ≥ 500
+        reasoning: 'LLM identifies all key thresholds: the capacity boundary (equality
+          at reduced limit), storm-adjusted speed, priority minimum, fuel threshold,
+          and visibility for spacing. These match the decomposition''s example and
+          implied conditions exactly; no misses.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: LLM provides exact numeric thresholds and operators matching the
+          decomposition (e.g., fuel ≥ 30, visibility ≥ 500m, speed ≤ 40% of limit),
+          with precise outcome distribution via quorum score (e.g., score ≥ 3 → Approved,
+          exactly 4/5 in example). Full match in value and operator.
+      direction_accuracy:
+        score: 1.0
+        reasoning: LLM correctly concludes YES with accurate reasoning on quorum compensation
+          allowing approval despite capacity_ok=false, mirroring ImandraX's insight
+          and example. Reasoning is complete and flawless, tracing all relevant conditions.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'LLM enumerates all decision scenarios via ''at least 3 of the
+          other 4 conditions'' (implicitly covering the 5 combinations: 4 ways for
+          exactly 3 + 1 for all 4), matching the decomposition''s 5 scenarios exactly.
+          Applied SCENARIO ENUMERATION rubric generously.'
+      overall_summary: 'The LLM answer demonstrates strong performance, closely aligning
+        with the ImandraX decomposition in conclusion, reasoning, and coverage. It
+        accurately captures the quorum mechanism as a soft constraint, identifies
+        all key thresholds and conditions, and implicitly covers the full state space
+        of 5 scenarios without explicit enumeration. Minor initial ambiguity (starting
+        with ''No'' before correcting to ''YES'') does not detract from overall correctness.
+        Strengths: Precise boundary identification and control flow tracing. Weaknesses:
+        None significant; lacks explicit scenario count but equivalent in depth to
+        verified decomposition.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not explicitly state a scenario count but implies
+          a single uniform outcome (always DELAYED) for all cases in the dead zone,
+          regardless of other variables, estimating 1 effective decision region. The
+          ImandraX decomposition focuses on a single property/region where in_dead_zone
+          implies not Approved, confirming 1 scenario in the decomposed state space
+          for this specific condition.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: LLM correctly identifies dead zone check as first/highest
+          precedence before emergency override or quorum (AND-like safety guard before
+          other conditions). Branching: Accurately describes if-else structure where
+          dead zone branches to immediate DELAYED, else proceeds to other logic. Short-circuit:
+          Explicitly notes immediate return on dead zone true, preventing evaluation
+          of later checks. Override: Correctly explains dead zone overrides/trumps
+          emergency logic as it occurs first.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency vessel in dead zone (450-550m fog) still delayed, no override
+        total_edge_cases: 1
+        reasoning: The LLM identifies the key edge case of emergency vessels being
+          blocked despite override logic, which is safety-critical and contradicts
+          naive expectation (emergency should approve). This matches the decomposition's
+          key insight. No other edge cases mentioned or relevant in decomp; assumes
+          1 total.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - weather == FOG
+        - 450 <= visibility <= 550
+        thresholds_from_decomp:
+        - weather = Fog
+        - visibility ∈ [450, 550]
+        reasoning: 'LLM precisely identifies the exact boundaries: Fog weather and
+          visibility between 450-550m inclusive. No misses; fully matches decomp definition.'
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: LLM conclusion ('No, cannot be directly approved; always DELAYED')
+          exactly matches ImandraX ('PROVEN - Never directly approved'). Reasoning
+          is complete and correct, tracing control flow accurately without flaws.
+      coverage_completeness:
+        score: 1.0
+        reasoning: LLM fully covers the single decision scenario in the decomposition
+          (dead zone implies DELAYED, no approval paths). Uses explicit enumeration
+          of the condition and outcomes, matching (a) or (b) rubric for 100% coverage.
+      overall_summary: 'The LLM answer demonstrates excellent alignment with the ImandraX
+        decomposition, correctly capturing the control flow precedence, safety override,
+        and uniform outcome in the dead zone. It identifies key thresholds, the critical
+        edge case for emergencies, and reaches the precise conclusion with solid reasoning.
+        No numeric distributions are involved, making outcome_precision inapplicable.
+        Strengths: Thorough control flow tracing and safety implication insight. Weaknesses:
+        None apparent; matches verified decomposition closely without over- or under-estimating
+        complexity.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:38'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 340
+        reasoning: 'The LLM initially calculated 972 scenarios, then revised to 640
+          after detailed reasoning about visibility zones and parameter combinations.
+          The LLM''s approach: 4 vessel types × 10 (weather, visibility) pairs × 2^4
+          (4 boolean conditions) = 640. The decomposition gives 340 total scenarios.
+          The LLM overestimated by a factor of approximately 1.88x. The discrepancy
+          likely stems from the LLM treating all 2^4 boolean combinations as equally
+          distinct, when in reality the decomposition reveals that many parameter
+          combinations are impossible or collapse due to control flow short-circuits
+          (dead zones, emergency override paths) and dependent relationships between
+          parameters that the LLM did not fully account for. The LLM''s reasoning
+          was systematic but missed that not all boolean combinations are reachable
+          in all contexts.'
+        score: -7.228818690495881
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identified emergency
+          override as a short-circuit check that applies before quorum logic. However,
+          the LLM struggled with the precise precedence of dead zone checks relative
+          to other conditions. The reasoning shows awareness of short-circuiting but
+          the analysis is convoluted and initially incorrect about when dead zones
+          apply. Branching structure: The LLM recognized that FOG weather creates
+          a dead zone path (vis 450-550 → DELAYED regardless of other factors) and
+          emergency override is a special path for EMERGENCY vessels with vis>200.
+          However, the LLM did not clearly articulate the if-else-if structure—it
+          treated these as nested checks that create distinct scenarios rather than
+          understanding they form an ordered decision tree that eliminates branches.
+          Short-circuit behavior: The LLM explicitly mentioned short-circuiting (e.g.,
+          ''all 450-550 in FOG → DELAYED regardless'') but then incorrectly treated
+          all 2^4 boolean combinations as equally reachable even for short-circuited
+          paths. This is a contradiction—the LLM acknowledged the short-circuit but
+          still counted unreachable combinations. Override logic: The LLM correctly
+          understood that emergency vessel override (vessel_type=EMERGENCY && visibility>200)
+          bypasses quorum checks and leads directly to APPROVED.'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - FOG weather with visibility 450-550 (dead zone) forcing DELAYED regardless
+          of other conditions
+        - EMERGENCY vessel type with visibility>200 leading to immediate APPROVED
+          bypass
+        total_edge_cases: 8
+        reasoning: 'The LLM identified 2 edge cases out of 8 total. The two found
+          were: (1) FOG dead zone—a special region where visibility 450-550 triggers
+          visibility dead zone check, returning DELAYED before other logic runs; (2)
+          Emergency override—EMERGENCY vessels with visibility>200 bypass quorum logic
+          entirely. However, the LLM missed: (3) FOG dead zone for visibility exactly
+          at boundaries (450, 500, 550); (4) Score exactly equal to 2 (borderline
+          decision); (5) Fuel level exactly at 30 (boundary condition); (6) Visibility
+          exactly at 200 (boundary for emergency override eligibility); (7) Visibility
+          exactly at 500 (spacing threshold); (8) Multiple vessel types in constrained
+          scenarios. The LLM did not distinguish between ''at boundary'' vs ''inside
+          region'' cases, which is critical for edge case detection. The recognition
+          of 2/8 edge cases yields limited coverage.'
+        edge_case_count: 2
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility > 200 (emergency override eligibility)
+        - visibility >= 500 (spacing_ok threshold)
+        - visibility 450-550 (dead zone for FOG)
+        - capacity thresholds (effective_capacity)
+        - speed limit (adjusted_limit)
+        - priority score
+        - fuel level >= 30
+        thresholds_from_decomp:
+        - visibility 200
+        - visibility 450
+        - visibility 500
+        - visibility 550
+        - fuel_level 30
+        - vessel_priority_scores 1, 2, 3, 4
+        - weather_capacity_reduction 0, 1, 2
+        - entry_score 2, 3
+        reasoning: 'The LLM identified 7 thresholds: visibility>200, visibility>=500,
+          visibility 450-550 (zone), capacity thresholds, speed limit, priority score,
+          fuel>=30. The decomposition identifies 8 specific thresholds: visibility
+          at 200, 450, 500, 550; fuel_level at 30; vessel_priority_scores at 1,2,3,4;
+          weather_capacity_reduction at 0,1,2; entry_score at 2,3. The LLM correctly
+          identified the critical visibility thresholds (200, 500, 450-550) and fuel
+          at 30, but did not precisely articulate: (1) visibility as discrete points
+          (200, 450, 500, 550) rather than ranges; (2) entry_score thresholds (2,
+          3) from quorum logic; (3) vessel_priority_scores as specific integers (1,2,3,4);
+          (4) weather_capacity_reduction tiers (0,1,2). The LLM''s description was
+          conceptually correct but lacked precision in threshold specification. Score:
+          5/8 thresholds clearly identified.'
+        score: 0.875
+      outcome_precision:
+        score: 0.4
+        reasoning: 'The LLM provided only qualitative descriptions of outcomes (APPROVED,
+          DELAYED, DENIED) without precise numeric distributions. The LLM correctly
+          identified the three outcome categories and explained the conditions leading
+          to each (score>=3→APPROVED, score=2→DELAYED, score<2→DENIED), but did not
+          provide exact counts or percentages. The ImandraX answer provides precise
+          numeric distributions: 162 Approved (48%), 109 Delayed (32%), 69 Denied
+          (20%), totaling 340 scenarios. The LLM made no attempt to quantify the distribution
+          across outcomes, only listing the logical conditions. This is qualitative
+          but directionally correct reasoning about score thresholds. Score of 0.4
+          reflects: correct direction (thresholds 2 and 3 for entry_score are correct)
+          but complete lack of numeric precision or distribution counts.'
+      direction_accuracy:
+        score: 0.5
+        reasoning: 'The LLM''s core conclusion is that 640 distinct scenarios exist.
+          The ImandraX decomposition shows 340 actual scenarios. The LLM''s reasoning
+          about the decision logic is partially correct—it correctly identifies: (1)
+          Emergency override bypasses quorum logic; (2) Dead zone in FOG (vis 450-550)
+          forces DELAYED; (3) Quorum scoring with thresholds at 2 and 3. However,
+          the LLM''s fundamental error is overestimating the scenario count by counting
+          all 2^4 boolean combinations as reachable in all contexts, when many are
+          constrained or impossible. The LLM''s direction is correct (distinct scenarios
+          exist based on combinations of parameters) but the magnitude is significantly
+          wrong (640 vs 340, off by ~1.88x). The reasoning quality is mixed: thorough
+          exploration of visibility regions and branching structure, but failure to
+          recognize that not all parameter combinations are truly independent or reachable.
+          The LLM explicitly acknowledged short-circuits but then violated that reasoning
+          in the final calculation.'
+      coverage_completeness:
+        score: 0.47
+        reasoning: 'Using rubric (c) OUTCOME CATEGORY COVERAGE: The LLM identifies
+          the three outcome categories (APPROVED, DELAYED, DENIED) correctly, matching
+          the decomposition. However, the LLM does not enumerate distinct scenarios—it
+          derives a single estimate of 640. The decomposition breaks down into 340
+          scenarios with specified outcome distributions (162 Approved, 109 Delayed,
+          69 Denied). The LLM''s coverage of outcome categories is 3/3 (100%), but
+          the coverage of distinct scenario enumeration is significantly incomplete.
+          If we interpret coverage as ''did the LLM identify the decision logic paths,''
+          the LLM identifies: (1) Dead zone path (FOG, vis 450-550); (2) Emergency
+          override path; (3) Quorum path with score-based decisions. That''s 3 major
+          paths identified, but the decomposition reveals 340 distinct scenario nodes.
+          Using qualitative interpretation: the LLM acknowledges multiplicity and
+          combinatorial complexity (many combinations), scoring at least 0.25. Using
+          outcome category coverage: 3 categories / 3 = 1.0. However, scenario-level
+          coverage (distinct nodes) is much lower. A balanced score: 0.47 reflects
+          correct outcome categorization but incomplete scenario enumeration.'
+      overall_summary: '{"text": "The LLM''s answer demonstrates systematic combinatorial
+        reasoning but significantly overestimates the scenario count (640 vs. actual
+        340). Strengths: (1) Correctly identifies key thresholds and branching logic
+        (emergency override, dead zone, quorum); (2) Recognizes three outcome categories
+        (APPROVED, DELAYED, DENIED); (3) Attempts to decompose parameter space systematically;
+        (4) Understands emergency override as a short-circuit and override logic.
+        Weaknesses: (1) Overestimates by ~1.88x by naively multiplying factor combinations
+        without accounting for actual reachability; (2) Fails to recognize dependent
+        relationships between parameters that constrain the true scenario count; (3)
+        Provides only qualitative outcomes without numeric distribution; (4) Identifies
+        only 2/8 edge cases; (5) Does not articulate precise numeric thresholds (e.g.,
+        entry_score at 2, 3); (6) Contradicts itself by acknowledging short-circuits
+        but still counting unreachable boolean combinations. ImandraX advantage: Provides
+        exact scenario count (340), outcome distribution (162/109/69 Approved/Delayed/Denied),
+        and precise thresholds. The core issue is that the LLM treats all 2^4 boolean
+        outcomes as independent and reachable in each context, when the actual logic
+        has control flow that makes many combinations impossible or irrelevant. The
+        LLM''s reasoning is partially sound but incomplete in its execution."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 5
+        reasoning: The LLM answer does not provide an explicit count of decision scenarios.
+          It discusses the conditions qualitatively and explains the quorum logic
+          but does not enumerate or estimate the total number of possible scenarios
+          where Cargo vessels can enter during Storm at reduced capacity. The ImandraX
+          answer explicitly identifies 5 scenarios. Since the LLM provides no quantitative
+          estimate, n_llm_estimated_scenarios is marked as 'unknown'.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly understands the control flow: (1) Precedence
+          is correct - it recognizes that emergency override is checked first and
+          returns early if True (short-circuit behavior). (2) Branching structure
+          is correct - the LLM properly identifies the quorum pattern: capacity_ok
+          is ONE of 5 conditions, and approval requires score >= 3. (3) Short-circuit
+          behavior is correct - the LLM identifies that emergency_override would return
+          False for Cargo vessels, preventing early approval. (4) Override logic is
+          correct - the LLM properly notes that Cargo vessels are not EMERGENCY type,
+          so no override applies. The model uses a quorum pattern where capacity is
+          one soft constraint among five, allowing compensation when other conditions
+          satisfy the threshold of 3/5.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Cargo vessel at exactly reduced capacity limit during Storm (current_vessel_count
+          == effective_capacity) - capacity_ok = FALSE but quorum compensation still
+          allows approval if 3+ other conditions met
+        - Scenario with effective_capacity = max_capacity - 2 (Storm reduction) and
+          current_count = max_capacity - 2 (at boundary)
+        - Approval possible with only 4/5 conditions true when capacity_ok is false
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies the key edge case: Cargo vessels at the exact
+          reduced capacity limit (current_vessel_count == effective_capacity) during
+          Storm where capacity_ok = FALSE yet approval is still possible through quorum
+          compensation. This is a boundary condition (equality constraint) and a safety-critical
+          case that contradicts naive expectation (capacity at limit but still approved).
+          The LLM also implicitly addresses the scenario where only 2 of 4 remaining
+          conditions are true (score = 2, DELAYED). However, the answer does not exhaustively
+          enumerate all 5 distinct approval scenarios that ImandraX identified. The
+          edge case understanding is qualitatively sound but incomplete in coverage.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - current_vessel_count < effective_capacity (capacity boundary)
+        - vessel_speed <= (speed_limit × 40) / 100 (Storm speed limit)
+        - vessel_priority >= 1 (Cargo priority threshold)
+        - fuel_level >= 30 (fuel threshold)
+        - visibility >= 500 (spacing/visibility threshold)
+        - score >= 3 (quorum threshold)
+        thresholds_from_decomp:
+        - current_vessel_count < effective_capacity
+        - vessel_speed <= (speed_limit × 40) / 100
+        - vessel_priority >= 1
+        - fuel_level >= 30
+        - visibility >= 500
+        - score >= 3
+        - max_capacity - 2 (Storm reduction = 2)
+        reasoning: The LLM identifies 6 of the 7 thresholds. It correctly identifies
+          the capacity boundary condition, Storm speed limit percentage (40%), Cargo
+          priority threshold (1), fuel threshold (30), visibility threshold (500m),
+          and the quorum score threshold (>= 3). The LLM missed explicitly stating
+          the Storm capacity reduction value of 2 (it is implied in the calculation
+          but not stated as a discrete threshold). All identified thresholds are exact
+          and directionally correct.
+        score: 0.8571428571428571
+      outcome_precision:
+        score: 0.9
+        reasoning: 'The LLM provides precise numeric values for most outcomes: Storm
+          capacity reduction = max_capacity - 2; Storm speed adjustment = 40% of base
+          limit; Cargo priority >= 1; fuel threshold >= 30; visibility threshold >=
+          500m; quorum score threshold >= 3. These are stated as exact thresholds
+          with correct operators. The answer also correctly specifies that capacity_ok
+          = False when current_vessel_count == effective_capacity. The only minor
+          imprecision is that the Storm reduction value (2) is not explicitly stated
+          as a discrete constant, though it is calculable from context. Overall, the
+          numeric precision is very high, with exact values and operators provided
+          for nearly all critical conditions.'
+      direction_accuracy:
+        score: 0.95
+        reasoning: 'The LLM''s conclusion is substantially correct: YES, Cargo vessels
+          CAN enter at the reduced capacity limit during Storm, BUT only if at least
+          3 of the other 4 quorum conditions are met. This aligns with the ImandraX
+          answer showing 5 approval scenarios. The reasoning is logically sound: (1)
+          capacity_ok = FALSE at the limit is correctly identified; (2) the quorum
+          compensation mechanism is correctly explained; (3) the threshold of 3/5
+          for approval is correctly stated; (4) the conditions for DELAYED (score
+          = 2) and DENIED (score < 2) are mentioned. The answer demonstrates correct
+          understanding of the ''soft constraint'' nature of capacity in the quorum
+          pattern. There is minor ambiguity in whether the answer addresses ALL scenarios
+          or just the highest-scoring scenario, but the core conclusion and reasoning
+          are accurate.'
+      coverage_completeness:
+        score: 0.6
+        reasoning: 'Using rubric (c) OUTCOME CATEGORY COVERAGE: The LLM identifies
+          3 outcome categories: APPROVED (when score >= 3), DELAYED (when score =
+          2), and DENIED (when score < 2). These correspond to the actual possible
+          outcomes, achieving reasonable coverage. However, using rubric (b) SCENARIO
+          ENUMERATION: The LLM does not explicitly enumerate the 5 distinct scenarios
+          that ImandraX identified. Instead, it provides a qualitative description
+          of conditions leading to approval (3+ of 4 non-capacity conditions must
+          be true). The answer acknowledges multiple scenarios indirectly by discussing
+          ''if 3 or more of these are True'' and ''if only 2 of these 4 are True'',
+          showing awareness of scenario multiplicity but not explicit enumeration.
+          The coverage score reflects the gap between identifying outcome categories
+          (strong) versus enumerating actual scenarios (weak).'
+      overall_summary: '{"summary": "The LLM answer demonstrates strong conceptual
+        understanding of the quorum-based approval mechanism and correctly identifies
+        that Cargo vessels CAN enter at the reduced capacity limit during Storm if
+        3+ other conditions are met. The control flow logic is correctly traced, numeric
+        thresholds are precisely identified, and the direction of the conclusion is
+        accurate. However, the answer has two key weaknesses: (1) it does not enumerate
+        or estimate the specific number of decision scenarios (ImandraX identifies
+        5 explicit approval scenarios); (2) it provides qualitative scenario coverage
+        rather than explicit enumeration of each scenario. The reasoning quality is
+        high - the LLM correctly explains the Storm capacity reduction, the false
+        capacity_ok condition, and the quorum compensation mechanism. The answer would
+        be strengthened by explicit scenario enumeration and a quantitative state
+        space analysis. Overall, ImandraX provides more comprehensive and precise
+        scenario decomposition, while the LLM provides strong high-level logical reasoning."}'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM does not provide an explicit scenario count. They focus
+          on tracing control flow to demonstrate that dead zone entries always result
+          in DELAYED. No enumeration of scenarios is attempted.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'LLM correctly identifies that the dead zone check has highest
+          precedence and occurs FIRST (lines 68-70 equivalent). The branching structure
+          is properly understood: if dead zone → DELAYED (immediate return, short-circuit).
+          The override logic is correctly identified as coming SECOND, meaning it
+          cannot override the dead zone. The LLM explicitly states ''This is never
+          reached when in the dead zone because the dead zone return happens first''
+          which accurately captures short-circuit behavior. All four aspects are correctly
+          assessed.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency vessels blocked despite override capability when in dead zone
+          (450-550m fog)
+        - Dead zone check prevents approval even for priority/high-fuel vessels
+        - Dead zone boundaries at 450m and 550m create forced delay state
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies the critical edge case: Emergency vessels cannot
+          use their override when in the dead zone despite having override capability.
+          This is a safety-critical edge case (violates normal override logic). The
+          LLM also implicitly covers the fact that all other vessel attributes (capacity,
+          speed, priority, fuel) are irrelevant in the dead zone. The decomposition
+          emphasizes this as a key insight. Three edge cases are identifiable: (1)
+          emergency override being negated, (2) other priority/capacity factors being
+          overridden by dead zone, (3) the specific boundary conditions creating a
+          forced delay zone. The LLM captures at least the first and most critical
+          edge case explicitly.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - visibility 450-550m during Fog
+        - 450m (lower bound)
+        - 550m (upper bound)
+        thresholds_from_decomp:
+        - visibility < 450m (clearly unsafe)
+        - visibility 450-550m (dead zone)
+        - visibility > 550m (clearly safe)
+        reasoning: 'LLM identifies the dead zone threshold (450-550m during Fog) and
+          mentions the boundaries explicitly. LLM also notes the implicit safety rationale:
+          below 450m is ''clearly unsafe'', above 550m is ''clearly safe'', and 450-550m
+          is uncertain. The LLM identifies 3 thresholds. The decomposition references
+          3 thresholds as well. The LLM correctly identifies the key decision boundary
+          (450-550m) and the boundary values themselves. Score: 3/3 = 1.0'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric precision: ''visibility is between
+          450-550m inclusive'' during Fog, always resulting in DELAYED. The operator
+          and numeric ranges are exactly correct. The LLM states: ''weather == FOG
+          and 450 <= visibility <= 550'' (using inclusive bounds). This matches the
+          decomposition dead zone definition perfectly. No approximation, no ambiguity.
+          The outcome is also precisely stated: ''DELAYED'' with ''absolutely no path
+          to APPROVED in the dead zone''. This achieves 1.0 for exact match on both
+          value and operator.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is completely correct: ''vessel entries
+          cannot be directly approved when visibility is in the dead zone (450-550m
+          during Fog).'' The reasoning is also flawless: (1) identifies the dead zone
+          check as FIRST in the function, (2) correctly traces the logic that shows
+          immediate DELAYED return, (3) explains why emergency override cannot apply
+          (it comes second), (4) clarifies this applies to ALL vessel types without
+          exception. The LLM correctly identifies this as a deliberate safety feature.
+          This matches the ImandraX PROVEN answer exactly. Both conclusion and reasoning
+          are sound.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Rubric (a) EXPLICIT COUNT applies: The question asks a binary
+          yes/no question about a specific scenario (dead zone entry). The LLM provides
+          an explicit, unambiguous answer: ''No''. The LLM covers the complete decision
+          outcome space relevant to this question: (1) dead zone entries result in
+          DELAYED (not APPROVED), (2) this applies universally to all vessel types
+          and conditions. The decomposition confirms this is a PROVEN property with
+          100% coverage of the dead zone region. The LLM''s answer fully addresses
+          the question''s scope.'
+      overall_summary: 'Both the LLM answer and ImandraX answer reach the identical,
+        correct conclusion: dead zone entries (450-550m during Fog) are NEVER directly
+        approved; they are unconditionally DELAYED. The LLM demonstrates excellent
+        control flow understanding by explicitly tracing the precedence of the dead
+        zone check, explaining why it short-circuits all downstream logic including
+        emergency override. The reasoning is precise, citing exact code structure
+        and inclusive bounds [450, 550]. The LLM identifies the safety rationale behind
+        this design. Metrics show strong performance: direction accuracy (1.0 - correct
+        conclusion and reasoning), outcome precision (1.0 - exact numeric bounds),
+        decision boundary clarity (1.0 - all thresholds identified), coverage completeness
+        (1.0 - complete answer to the binary question), control flow understanding
+        (1.0 - all aspects correct), and edge case detection (1.0 - identifies the
+        critical emergency override negation). The LLM answer is comprehensive, accurate,
+        and well-reasoned, matching the ImandraX PROVEN property with excellent supporting
+        logic.'

@@ -5184,3 +5184,510 @@
         coverage of the 27 scenarios. Strengths: precise on quorum condition and examples.
         Weaknesses: no scenario enumeration, misses edge cases and numeric thresholds
         beyond the basic one, resulting in partial control flow grasp.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:54'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 729
+        n_decomposition_exact_scenarios: 273
+        reasoning: The LLM estimated 729 scenarios based on multiplying the number
+          of categories for each input. The decomposition provided 273 exact scenarios.
+        score: -7.832890014164741
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - '9800'
+        - '10200'
+        thresholds_from_decomp:
+        - '83'
+        - '85'
+        - '87'
+        - '95'
+        - '98'
+        - '9800'
+        - '10200'
+        reasoning: The LLM identified the altitude thresholds (9800, 10200) but missed
+          the other numeric thresholds (83, 85, 87, 95, 98) which are likely related
+          to internal calculations or conditions not explicitly stated in the LLM's
+          understanding of the inputs.
+        score: 0.2857142857142857
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness:
+        score: 0.375
+        reasoning: The LLM identified 243 discrete combinations, correctly identifying
+          the discrete inputs. It then incorrectly categorized altitude into 3 zones,
+          leading to 729 scenarios. The true number is 273 scenarios. The coverage
+          score is calculated as 273/729 = 0.375. The LLM's categorization of altitude
+          was incorrect, leading to an overestimation of scenarios.
+      overall_summary: The LLM overestimated the number of distinct control scenarios
+        due to an incorrect categorization of the continuous 'altitude' parameter.
+        While it correctly identified the discrete inputs and their combinations,
+        its understanding of how the continuous input influences the number of distinct
+        scenarios was flawed. It also missed several key numeric thresholds present
+        in the decomposition.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: Both LLM and ImandraX correctly answer "Yes" to the question.
+        The LLM provides a comprehensive and accurate reasoning for its conclusion,
+        correctly identifying the conditions under which pilot intervention is not
+        required during the Landing phase. The LLM demonstrates a strong understanding
+        of the control flow and override logic. ImandraX also provides the correct
+        answer and highlights a specific scenario that overrides the pilot requirement,
+        which aligns with the LLM's detailed reasoning.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 27
+        reasoning: LLM indicates 'yes' without quantifying how many scenarios lead
+          to this outcome. ImandraX identifies 27 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM correctly identifies quorum as the primary condition and explains
+          how individual computer statuses contribute to fulfilling it. It also explains
+          how the 'use_x and quorum' logic behaves.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 1 FAILED and 1 DEGRADED (quorum fails)
+        - 1 FAILED and 2 OPERATIONAL (quorum met, computers used)
+        total_edge_cases: 2
+        reasoning: LLM explicitly addresses the edge case where a FAILED computer
+          exists, and also when a FAILED and DEGRADED computer exist. Both scenarios
+          align with the expected edge cases for this question.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity: null
+      outcome_precision:
+        score: 0.0
+        reasoning: LLM does not provide any numeric distributions. ImandraX indicates
+          there are 27 scenarios where the answer is 'yes'.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both LLM and ImandraX correctly conclude that the system can use
+          computers even with one failed computer, provided the quorum is met. The
+          LLM's reasoning is sound and aligns with the system logic.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM answer is partially complete in terms of coverage. While
+          it correctly identifies the 'yes' outcome and provides a valid example reasoning,
+          it doesn't enumerate all the scenarios that lead to this outcome. ImandraX
+          specifies that there are 27 such scenarios, indicating a more comprehensive
+          understanding of the state space for this specific question.
+      overall_summary: The LLM correctly answers 'Yes' and provides good reasoning
+        based on the quorum rules. It identifies relevant edge cases (`1 FAILED and
+        1 DEGRADED`) and correctly explains how the system decides to use computers.
+        However, it completely misses the quantitative aspect of how many such scenarios
+        exist, which ImandraX provides (27 scenarios). This suggests the LLM has a
+        good qualitative understanding of the logic but lacks the ability to quantify
+        the extent of the state space leading to a particular outcome.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:57'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 729
+        n_decomposition_exact_scenarios: 273
+        reasoning: The LLM estimated 729 scenarios based on discrete combinations
+          of computer states, flight phase, agreement, and altitude categories, while
+          the actual decomposition provided 273 distinct scenarios due to more specific
+          conditions and thresholds not captured in the LLM's reasoning.
+        score: -7.832890014164741
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: LLM understands conditions but does not fully capture the implications
+          of altitude on control decisions, treating it overly simplistically without
+          acknowledging critical phase override logic.
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found:
+        - altitude = 9800 (critical phase entrance)
+        - altitude > 10200 (transitional phase)
+        - altitude < 0
+        - sensor disagreement in dead zone
+        total_edge_cases: 6
+        reasoning: The LLM identified some edge cases related to altitude but missed
+          other specific interactions based on flight phase and computer states.
+        edge_case_count: 4
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - '9800'
+        - '10200'
+        thresholds_from_decomp:
+        - '>= 83'
+        - <= 85
+        - '>= 87'
+        - < 95
+        - < 98
+        - '9800'
+        - '10200'
+        reasoning: The LLM identified relevant altitude thresholds but missed several
+          critical numeric thresholds specified in the ImandraX decomposition.
+        score: 0.2857142857142857
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provided a quantitative estimate of scenarios, but the
+          reasoning contained flaws, yielding only a directionally correct assessment.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM arrived at a wrong conclusion regarding the total number
+          of scenarios, although it identified some factors affecting the outcomes.
+      coverage_completeness:
+        score: 0.34
+        reasoning: The LLM acknowledged the multiplicitous nature of scenarios but
+          did not enumerate distinct scenarios leading to undercoverage compared to
+          the ImandraX answer.
+      overall_summary: The LLM's estimate vastly overshot the correct number of scenarios
+        due to a misunderstanding of control conditions and their implications. Although
+        it demonstrated some understanding of scenario combinations, it failed to
+        capture crucial thresholds, edge cases, and logical relationships, culminating
+        in a fundamentally flawed conclusion.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 7
+        reasoning: LLM estimated that landing could operate without pilot intervention
+          under certain conditions, implying only one scenario, while the ImandraX
+          answer identified 7 explicit scenarios that outline the conditions.
+        score: -1.584962500721156
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly applied conditions and identified the override
+          logic structure necessary for autonomous operation in the Landing phase.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Landing phase with partial sensor agreement
+        - Landing with sensor failure
+        - Landing with only 1 operational computer
+        total_edge_cases: 4
+        reasoning: The LLM did not identify critical edge cases that involve sensor
+          agreement uncertainties and what happens when the quorum is not met. ImandraX
+          identified clearer edge cases.
+        edge_case_count: 3
+        score: 0.75
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - agreement == SensorAgreement.FULL_AGREEMENT
+        - _has_quorum() returns True
+        thresholds_from_decomp:
+        - _has_quorum() returns True
+        - agreement == SensorAgreement.FULL_AGREEMENT
+        reasoning: The LLM identified thresholds for the decision-making conditions
+          but did not specify all possible numeric thresholds, missing mention of
+          the explicit need for 2+ operational computers.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's answer correctly identified the key parameters leading
+          to the conclusion that pilot intervention is not required under certain
+          conditions.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM concluded correctly that the Landing phase can operate
+          without pilot intervention, given the right conditions.
+      coverage_completeness:
+        score: 0.14
+        reasoning: The LLM focused on a single scenario while ImandraX identified
+          7 distinct scenarios that provide a broader view of the conditions investigated.
+      overall_summary: The LLM provided a correct answer regarding pilot intervention
+        in the Landing phase, demonstrating solid control flow understanding and outcome
+        precision. However, it lacked depth in scenario coverage and edge case identification
+        when compared to the ImandraX response.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies and articulates the quorum-based operation
+          logic, the status checks of operational computers, and how decisions are
+          made based on those conditions. Each control structure is aligned with established
+          rules of precedence and branching.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 1 operational + 1 degraded + 1 failed
+        - 2 operational + 1 failed
+        total_edge_cases: 4
+        reasoning: The LLM identifies scenarios involving one failed computer and
+          combinations with operational and degraded statuses, while missing additional
+          edge cases such as scenarios with all computers operational or all degraded.
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 2 OPERATIONAL
+        thresholds_from_decomp:
+        - quorum = 2
+        - degradation thresholds
+        reasoning: The LLM identifies the critical threshold for operational computers
+          but misses explicit references to other thresholds discussed in the decomposition.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides an exact match for the condition of at least 2
+          operational computers as being mandatory for a quorum, demonstrating precise
+          understanding.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM arrives at the correct conclusion that the system can use
+          computers with 1 failed computer, reinforcing its reasoning with clear examples.
+      coverage_completeness:
+        score: 0.74
+        reasoning: The LLM identifies the general scenario of 1 Failed + 2 Operational
+          but does not enumerate all possible scenarios nor the full coverage of edge
+          cases available, leading to a modest count.
+      overall_summary: The LLM shows strong understanding of control flow, decision
+        thresholds, and accuracy with precise outcomes, but lacks full edge case enumeration
+        and threshold identification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:12'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 729
+        n_decomposition_exact_scenarios: 273
+        reasoning: The LLM explicitly states '729 distinct control scenarios' based
+          on a Cartesian product of 3 values each for comp_a, comp_b, comp_c, flight_phase,
+          agreement, and 3 altitude categories, yielding 3^6 = 729. The decomposition
+          from ImandraX provides the exact count of 273 scenarios.
+        score: -7.832890014164741
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: The LLM's reasoning does not analyze the control flow structure
+          of the determine_flight_control function. It simply performs a naive Cartesian
+          product of input parameters without considering branches, guards, condition
+          precedence, short-circuits, or override logic (e.g., quorum requirements,
+          phase-specific rules, or safety overrides). No evidence of understanding
+          the actual if-else structure, conjunctions/disjunctions, or priority ordering
+          in the code.
+        score: 0.0
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 9800-10200
+        thresholds_from_decomp:
+        - '83'
+        - '85'
+        - '87'
+        - '95'
+        - '98'
+        - '9800'
+        - '10200'
+        reasoning: 'The LLM identifies only the altitude dead zone threshold (9800-10200)
+          as creating behavioral zones. It misses all the percentage-based thresholds
+          (likely related to sensor agreement or confidence levels: 83, 85, 87, 95,
+          98) present in the decomposition. Thus, 1 out of 7 thresholds identified.'
+        score: 0.14285714285714285
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides a single numeric estimate of 729 scenarios, which
+          is completely wrong compared to the decomposed count of 273. No precision
+          in numeric distribution; it's an overestimation without matching values
+          or operators relevant to the actual regions.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion of 729 scenarios is entirely incorrect compared
+          to the verified 273 from decomposition. The reasoning is flawed, relying
+          on unchecked input combinations rather than logical regions defined by the
+          control flow, leading to a complete misunderstanding of the state space.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM does not enumerate or describe any specific scenarios;
+          it only provides a high-level total estimate based on input dimensions (rubric
+          (e) NO COVERAGE). No acknowledgment of the actual decomposed regions or
+          categories, so coverage is none compared to the 273 scenarios.
+      overall_summary: 'The LLM''s answer severely overestimates the number of distinct
+        control scenarios by treating the problem as a simple Cartesian product of
+        input parameters (729), ignoring the complex logic, thresholds, and reduced
+        effective state space from conditions like quorum, phase rules, and sensor
+        agreements. This results in poor performance across metrics: zero direction
+        accuracy and coverage, no control flow understanding, misses most decision
+        boundaries, and low precision. ImandraX''s decomposition reveals a more nuanced
+        273 scenarios, highlighting the LLM''s failure to decompose and verify the
+        logic properly.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 7
+        reasoning: The LLM does not provide any explicit or implicit numerical estimate
+          of the number of scenarios; it qualitatively describes the conditions under
+          which pilot intervention is not required but does not count or approximate
+          the total scenarios. The decomposition provides exactly 7 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identifies the AND
+          condition between full sensor agreement and quorum for the override (agreement
+          AND has_quorum). Branching structure: The LLM accurately describes the branching
+          for critical phase leading to an initial need for pilot, then an exception
+          check for override, which aligns with if-else logic. Short-circuit behavior:
+          The LLM does not mention or address any early returns, guard clauses, or
+          short-circuiting in the flow, so it is not assessed. Override logic: The
+          LLM correctly captures how the full agreement + quorum overrides the safety
+          requirement for pilot intervention in the critical landing phase.'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Landing is critical phase but full sensor agreement + quorum of 2+ operational
+          computers allows operation without pilot intervention (contradicts naive
+          expectation of always requiring pilot in landing)
+        total_edge_cases: 1
+        reasoning: The LLM identifies the key counterintuitive edge case where the
+          critical landing phase does not require pilot intervention due to override
+          logic, which fits the definition (contradicts naive expectation). The decomposition
+          highlights this as counterintuitive, suggesting it is the primary or only
+          edge case in the 7 scenarios; no other edge cases (e.g., complex conjunctives,
+          equalities, negations, or safety-critical failures) are explicitly indicated
+          in the provided ImandraX summary.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - at least 2 operational computers (quorum)
+        thresholds_from_decomp:
+        - at least 2 operational computers (quorum)
+        reasoning: The LLM correctly identifies the quorum threshold of 2+ operational
+          computers as the key decision boundary for allowing override in landing.
+          The decomposition example implies the same threshold, with no additional
+          numeric thresholds (e.g., no altitude or other metrics mentioned for landing
+          phase pilot intervention). No thresholds missed.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion that landing
+          phase can operate without pilot intervention, with accurate and detailed
+          reasoning tracing the control flow, override conditions, and final computation
+          of require_pilot_intervention as False under full agreement and quorum.
+          This matches the ImandraX affirmative answer and example scenario.
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'The LLM does not explicitly count or enumerate scenarios (no use
+          of rubric (a) or (b)), nor does it categorize multiple outcome types proportionally
+          (c). It acknowledges multiplicity qualitatively by stating ''under the right
+          conditions'' with specific conditions (full agreement + 2+ computers), which
+          implies coverage of multiple computer combinations but does not detail them.
+          Thus, rubric (d) applies: 0.25 for acknowledging multiplicity without quantitative
+          breakdown, versus the 7 scenarios in decomposition.'
+      overall_summary: The LLM answer correctly identifies the possibility of operating
+        without pilot intervention in the landing phase by accurately understanding
+        and explaining the override logic, leading to a strong direction accuracy
+        and control flow comprehension. It detects the key counterintuitive edge case
+        and the relevant decision boundary (quorum threshold). However, it lacks decomposition
+        into the full state space, providing only qualitative coverage of scenarios
+        rather than enumerating or estimating the 7 scenarios from ImandraX, resulting
+        in lower completeness. No numeric outcomes are present, so precision is irrelevant.
+        Overall, the LLM performs well on qualitative reasoning but misses the exhaustive
+        verification depth of ImandraX.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 27
+        reasoning: The LLM answer does not provide any explicit or implicit estimation
+          of the number of scenarios where the system can use computers with 1 failed
+          computer. It discusses conditions qualitatively but does not count or range
+          the possibilities. The decomposition has exactly 27 such scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: incorrect
+        reasoning: 'Precedence of conditions: The LLM correctly identifies the primary
+          condition as quorum (operational count >= 2) before selecting computers,
+          with no complex AND/OR mentioned, but simple priority is accurate. Branching
+          structure: Correctly describes if quorum met then use non-failed computers,
+          else pilot intervention, matching if-else logic. Short-circuit behavior:
+          Partially captures early decision via quorum check preventing use if failed,
+          but does not discuss any guard clauses or early returns in detail. Override
+          logic: Does not mention any override for critical phases or safety checks
+          trumping normal operation, focusing only on status quorum, so incorrect
+          given the system''s phase-specific overrides.'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - '1 Failed + 1 Operational + 1 Degraded: quorum fails (only 1 operational),
+          pilot intervention required'
+        total_edge_cases: 5
+        reasoning: The LLM identifies one edge case where quorum is not met despite
+          only 1 failed (due to degraded status), highlighting dependency on other
+          statuses. Assuming decomposition has multiple edge cases (e.g., boundary
+          with exactly 2 operational, interactions with degraded, phase overrides,
+          sensor disagreements), total estimated at 5 based on complexity; LLM misses
+          others like phase-specific failures or sensor edges.
+        edge_case_count: 1
+        score: 0.2
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - operational_count >= 2 (quorum)
+        - number_failed = 1 (with other 2 operational)
+        thresholds_from_decomp:
+        - operational_count >= 2
+        - exactly 1 failed (implying 2 non-failed, but specifically 2 operational
+          for quorum)
+        - phase-specific confidence thresholds (not directly tied but potentially
+          overriding)
+        reasoning: LLM correctly identifies the key quorum threshold of 2 operational
+          computers and the condition of exactly 1 failed with others operational.
+          Misses potential decomposition thresholds related to phases, altitude, or
+          sensor agreement that could affect usage even with 1 failed, as the system
+          has broader logic.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 1.0
+        reasoning: The outcome is a binary yes/no on system usage, with LLM providing
+          exact condition matching the decomposition's core (quorum met with 2+ operational
+          despite 1 failed). No numeric distributions beyond count thresholds, but
+          precision on the decision is exact, so full score.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion 'yes' with accurate
+          reasoning on quorum, matching the ImandraX affirmative answer. It qualifies
+          the conditions properly (depends on other computers being operational),
+          avoiding overgeneralization.
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'LLM provides qualitative acknowledgment of multiplicity (''depends
+          on status of other two'') and gives 2 example scenarios (2 op +1 failed:
+          yes; 1 op +1 deg +1 failed: no), but does not enumerate or categorize all
+          possibilities. Rubric (d) applies: 0.25 for acknowledging multiplicity,
+          as no explicit count or full enumeration vs 27 scenarios in decomposition.'
+      overall_summary: 'The LLM answer is directionally correct and demonstrates good
+        understanding of the core quorum logic for the specific question, but lacks
+        depth in covering the full state space (no scenario count, limited examples)
+        and ignores broader system aspects like flight phases, sensor agreement, and
+        potential overrides mentioned in the context. It identifies key thresholds
+        and one edge case but misses comprehensive coverage and verification provided
+        by ImandraX''s decomposition into 27 scenarios. Strengths: precise on basic
+        conditions; Weaknesses: incomplete control flow (ignores overrides), low coverage.'

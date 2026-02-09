@@ -6519,3 +6519,1157 @@
         **Overall Assessment**: The LLM answer is of high quality, with perfect accuracy
         on all measured metrics. It would provide strong confidence in the safety
         property to an engineer reviewing the HVAC system.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:59'
+  metrics:
+    q1:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM failed to accurately estimate the number of distinct
+        HVAC control decision scenarios, significantly undercounting them (17 vs.
+        612). While it did identify many of the critical numeric thresholds, it missed
+        one ('external_power' being a boolean rather than a numeric threshold) and
+        did not provide all thresholds for different variables. The LLM's scenario
+        list is also a mix of granular scenarios and higher-level states, indicating
+        a less precise understanding of the complete state space compared to the decomposition.
+        It correctly identified most of the main variables and conditions involved
+        but struggled to combine them exhaustively to correctly determine the full
+        set of scenarios.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 180
+        reasoning: LLM estimated 2 scenarios (Emergency selected / Emergency prevented).
+          Decomposition found 180 scenarios. LLM did not provide a numerical estimation
+          of the total scenarios where Emergency is selected, but rather identified
+          the conditions for selection vs. prevention. The LLM provided a correct
+          breakdown of the emergency states into 2 sub-conditions based on `battery_level`
+          and `maintenance_hours`. So I used 2 as its estimated scenarios.
+        score: -6.475733430966398
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the `AND` and `OR` conditions for
+          the sub-exception to the `FIRE_ALARM` state, demonstrating correct precedence
+          understanding. The branching structure of `if emergency_state == EmergencyState.FIRE_ALARM`
+          with a nested `if battery_level < 10 AND maintenance_hours > 10000` was
+          correctly interpreted. The LLM also correctly identified that `Emergency
+          mode, once selected, is immune to energy constraint downgrading`, which
+          is a form of short-circuiting or guard clause. Finally, the LLM correctly
+          identified the override behavior for `FIRE_ALARM` and its sub-exception.
+          It also correctly reasoned about the `requires_override` flag being set
+          to true for the sub-exception case.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical battery and overdue maintenance preventing Emergency mode in Fire
+          Alarm
+        total_edge_cases: 1
+        reasoning: The LLM identified the critical edge case where `battery_level
+          < 10` AND `maintenance_hours > 10000` prevents Emergency mode during a `FIRE_ALARM`,
+          forcing the system into Off mode instead. This was the primary override
+          exception identified in the decomposition. No other specific edge cases
+          were described in the ImandraX response beyond this one.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        - battery_level >= 10
+        - maintenance_hours <= 10000
+        - battery_level >= 50
+        - maintenance < 9000
+        thresholds_from_decomp:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        reasoning: The LLM correctly identified the key thresholds `battery_level
+          < 10` and `maintenance_hours > 10000` as determining the sub-exception to
+          Fire Alarm. It also correctly identified their complements for when Emergency
+          mode IS selected. Additionally, it recognized other thresholds related to
+          `MaintenanceMode` (`battery_level >= 50` and `maintenance < 9000`) showing
+          a broader understanding of the system's thresholds. The ImandraX output
+          only explicitly listed the two thresholds for the override exception.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM did not provide any numeric distributions. It focused on
+          the qualitative conditions for entering or being prevented from entering
+          Emergency mode.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM accurately identified all conditions under which Emergency
+          mode is selected (`FIRE_ALARM` AND NOT (sub-exception)) and when it is prevented
+          (the sub-exception itself: `FIRE_ALARM` AND `battery_level < 10` AND `maintenance_hours
+          > 10000`). It correctly identified that `MaintenanceMode` and `NoEmergency`
+          do not produce Emergency mode. It also correctly noted that Emergency mode
+          is immune to energy constraint downgrading. The reasoning is thorough and
+          accurate, aligning perfectly with the core logic described.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM fully covered the question by identifying all scenarios
+          where Emergency mode is selected and the sub-cases where it is prevented.
+          It accurately described the primary trigger (`FIRE_ALARM`) and the single
+          override exception. The LLM's explanation matches the ImandraX answer's
+          identified conditions and exceptions, even noting the effect on the `requires_override`
+          flag.
+      overall_summary: The LLM demonstrated an excellent understanding of the complex
+        logic for 'Emergency mode', including its overriding conditions and sub-exceptions.
+        It accurately identified the exact conditions for both entry and prevention
+        of Emergency mode, along with the relevant thresholds and control flow. While
+        it did not provide a numerical estimation of scenarios (which was not explicitly
+        asked for in a quantitative manner), its qualitative breakdown was thorough
+        and correct. The LLM also correctly identified an important edge case and
+        displayed a good grasp of multiple decision boundaries within the system.
+        The quality of its directional accuracy and coverage completeness is very
+        high.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM correctly identifies that the property cannot be violated,
+        matching the ImandraX answer. It provides a detailed, step-by-step logical
+        proof and examines several relevant edge cases, demonstrating strong understanding
+        of the system's control flow and conditions. However, the LLM hallucinates
+        an 'Off with manual override required' state, which is not an output of the
+        `determine_hvac_control` function directly, but an interpretation of two distinct
+        outputs ('Off' and 'requires_override = true'). While the meaning is effectively
+        the same, it's not a direct output and introduces a slight imprecision where
+        the ImandraX output is more precise.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:11'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 17
+        n_decomposition_exact_scenarios: 612
+        reasoning: The LLM estimated 17 distinct scenarios based on various factors
+          like occupancy and temperature thresholds, while ImandraX's decomposition
+          revealed a much larger count of 612 scenarios, which indicates a significant
+          discrepancy.
+        score: -8.216745858195306
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: The LLM correctly captures some precedence in conditions (e.g.,
+          emergency states handled before energy constraints). However, it partially
+          understands the branching structure, as it did not recognize all unique
+          paths leading to different final modes. Short-circuit behavior wasn't accurately
+          identified, especially regarding critical overrides during emergencies.
+          It partially captures override logic but does not fully elaborate on when
+          these override conditions are considered.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone threshold (temp_diff == 3) causing downgrades
+        - Emergency thresholds with specific battery & maintenance constraints
+        - Energy constraints leading to operational downgrades
+        total_edge_cases: 5
+        reasoning: The LLM identified several edge cases but missed some potential
+          ones, especially related to complex combinations of conditions that could
+          yield rare scenarios. The identified edge cases focus on misinterpretation
+          of temperature dead zones and emergency overrides.
+        edge_case_count: 3
+        score: 0.6
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temp_diff < 2
+        - 2 <= temp_diff < 4
+        - temp_diff >= 4
+        - temp_diff == 3
+        - battery_level < 10
+        - battery_level < 30
+        - battery_level >= 50
+        - maintenance_hours < 9000
+        - maintenance_hours > 10000
+        thresholds_from_decomp:
+        - temp_diff < 2
+        - temp_diff == 3
+        - temp_diff >= 4
+        - battery_level < 10
+        - battery_level < 30
+        - battery_level >= 50
+        - power_consumption > 5000
+        - maintenance_hours < 9000
+        - maintenance_hours > 10000
+        reasoning: The LLM identified several thresholds correctly, but missed the
+          relation between the occupancy state and how it affects the control decision
+          processes. Thus, while some thresholds match those found by ImandraX, others
+          were identified in a less precise manner.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provided thresholds and distributions but some values were
+          approximate rather than exact matches to the thresholds defined by ImandraX,
+          leading to a half mark on this metric.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM's conclusion about the number of scenarios is incorrect
+          as it fails to demonstrate the correct reasoning behind the state transitions
+          leading to the 612 scenarios. It did acknowledge various scenarios but concluded
+          incorrectly.
+      coverage_completeness:
+        score: 0.2
+        reasoning: While the LLM attempted to outline decision scenarios, it only
+          captured a fraction of the coverage compared to ImandraX's complete breakdown,
+          thus leading to a low score.
+      overall_summary: The LLM demonstrated a partial understanding of HVAC decision-making
+        but significantly underestimated the number of distinct scenarios (17 vs 612).
+        It correctly identified some control logic and thresholds but missed deeper
+        interactions and edge cases. Overall, the LLM provides high-level insights
+        but lacks the depth and accuracy necessary to match against a well-decomposed
+        answer.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 180
+        reasoning: The LLM estimated that Emergency mode is selected under one set
+          of conditions, while the ImandraX found 180 distinct scenarios. This significant
+          difference indicates a major underestimation by the LLM.
+        score: -6.483815777264256
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the control structures and precedence
+          of conditions involved in selecting Emergency mode. The reasoning about
+          override logic and conditions was clear, but it successfully captured all
+          aspects of control flow in the HVAC system.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Battery critical and overdue maintenance override Emergency mode
+        - Fire alarm without manual override case
+        total_edge_cases: 2
+        reasoning: 'The LLM identified two edge cases: (1) The critical battery and
+          overdue maintenance situation that overrides standard Emergency mode. (2)
+          Another case where the system must determine between Emergency mode and
+          Off which may need manual intervention.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        thresholds_from_decomp:
+        - battery_level < 10
+        - battery_level ≥ 10
+        - maintenance_hours > 10000
+        - maintenance_hours ≤ 10000
+        reasoning: The LLM identified 2 critical thresholds that affect the decision
+          to switch to Emergency mode. However, there are additional thresholds that
+          were not explicitly mentioned in the LLM answer.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM precisely specified the conditions for selecting Emergency
+          mode with correct logical operators without any inaccuracies.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion reached by the LLM about the conditions for selecting
+          Emergency mode aligns accurately with the safety protocols indicated in
+          the ImandraX breakdown.
+      coverage_completeness:
+        score: 0.005555555555555556
+        reasoning: The LLM identified only 1 scenario explicitly, while the decomposition
+          listed 180 scenarios, indicating that the LLM covered an extremely small
+          fraction of the necessary conditions.
+      overall_summary: The LLM showed strong correctness in defining the conditions
+        for Emergency mode but significantly underestimated the number of decision
+        scenarios. It demonstrated solid understanding of control flow and edge cases,
+        while also presenting clear reasoning. However, it failed to account for the
+        comprehensive scenario space captured by ImandraX.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM explicitly analyzed two branches for the FireAlarm scenario:
+          one leading to Emergency mode and another to Off with an override.'
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly establishes the order of conditions (AND before
+          OR when evaluating critical battery and maintenance hours), accurately reflects
+          the branching structure with two distinct cases, recognizes the short-circuit
+          nature of emergency overrides, and properly acknowledges that override logic
+          is consistently applied.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - battery level exactly 10
+        - maintenance hours exactly 10000
+        - battery level < 10 with maintenance hours > 10000
+        total_edge_cases: 3
+        reasoning: The LLM identifies specific edge cases which fall under strict
+          boundary conditions for battery level and maintenance, accurately capturing
+          the scenarios where violations might occur.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        thresholds_from_decomp:
+        - battery < 10
+        - maintenance_hours > 10000
+        reasoning: The LLM identifies relevant thresholds that dictate the system's
+          behavior in emergency situations.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides precise numeric distributions regarding boundaries
+          such as battery and maintenance thresholds, validating its meticulous poise
+          in understanding the conditions.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that the property cannot be violated is supported
+          by a thorough analysis of conditions and control mechanisms, indicating
+          the LLM's accurate understanding.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM correctly covered all scenarios pertaining to the FireAlarm
+          condition, acknowledging both emergency and special cases that return to
+          Off mode; it lists necessary conditions which assures comprehensive coverage.
+      overall_summary: The LLM's answer accurately reflects the operational logic
+        of the system during fire alarm scenarios. Its comprehensive analysis captures
+        critical edge cases, decision boundaries, and systematically demonstrates
+        that the safety property is upheld, matching ImandraX's declared assertions.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:14'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 17
+        n_decomposition_exact_scenarios: 612
+        reasoning: The LLM explicitly states '17 distinct reachable decision scenarios'
+          at the end of its answer, after initially mentioning 12 and then expanding
+          to 17 including emergencies. The decomposition provides exactly 612 scenarios.
+        score: -8.216745858195306
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly describes the precedence with emergency overrides
+          applied before energy constraints, and the quorum for energy being a combination
+          check. Branching is accurately captured as sequential stages: temp classification,
+          base mode, emergency, energy downgrade. Short-circuit via dead zone downgrade
+          within mild temp range. Override logic well-understood with sub-exceptions
+          for FireAlarm and MaintenanceMode trumping standard Emergency/Ventilation.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - temp_diff == 3 (dead zone equality constraint downgrading Mild to Ventilation)
+        - FireAlarm with battery_level < 10 AND maintenance_hours > 10000 (conjunctive
+          safety override to Off, counterintuitive negation of Emergency)
+        - MaintenanceMode with battery_level < 50 OR maintenance_hours >= 9000 (complex
+          override to Off)
+        - maintenance_hours > 10000 triggering override flag (safety-critical with
+          non-emergency)
+        total_edge_cases: 8
+        reasoning: The LLM identifies key edge cases involving equality, conjunctive
+          constraints, negations of expected outcomes (e.g., Off during FireAlarm),
+          and safety overrides. Based on decomposition thresholds creating boundary
+          regions, estimated total edge cases around 8 (one per major threshold combination
+          like exact equalities or rare conjunctions); LLM found 4, missing some finer
+          interactions like exact boundary behaviors in power_consumption or external_power
+          with numerics.
+        edge_case_count: 4
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temp_diff < 2
+        - temp_diff >= 2 and temp_diff < 4
+        - temp_diff >= 4
+        - temp_diff == 3
+        - battery_level < 10
+        - battery_level >= 50
+        - battery_level < 30
+        - power_consumption > 5000
+        - maintenance_hours > 10000
+        - maintenance_hours < 9000
+        - external_power == False
+        thresholds_from_decomp:
+        - temp_diff < 2
+        - temp_diff == 2
+        - temp_diff == 3
+        - temp_diff > 3 and temp_diff < 4
+        - temp_diff >= 4
+        - battery_level < 10
+        - battery_level >= 10 and battery_level < 30
+        - battery_level >= 30 and battery_level < 50
+        - battery_level >= 50
+        - power_consumption <= 5000
+        - power_consumption > 5000
+        - maintenance_hours < 9000
+        - maintenance_hours >= 9000 and maintenance_hours <= 10000
+        - maintenance_hours > 10000
+        reasoning: The LLM identifies all major decision thresholds including the
+          critical temp_diff == 3 equality and sub-ranges, battery levels at 10/30/50,
+          power >5000, maintenance at 9000/10000. However, it doesn't explicitly split
+          ranges like battery [10,30) or finer temp_diff sub-intervals if treated
+          discretely; decomp likely has more granular regions from thresholds, totaling
+          more items. LLM covers the key 8 unique points but misses explicit intermediate
+          ranges.
+        score: 0.7857142857142857
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM provides precise thresholds matching decomp (e.g., temp_diff
+          >=4 exact, battery <10), but outcomes are categorical modes with fixed fan
+          speeds rather than distributions. Numeric elements like fan_speed (40,70,80,100,0)
+          are exact, but no probabilistic or approximate distributions; score slightly
+          reduced for not addressing potential range approximations in dead zone or
+          quorum counts.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes 17 scenarios, but decomposition verifies 612,
+          a massive underestimation missing the combinatorial explosion from numeric
+          regions (e.g., temp_diff divided into 4+ regions, battery into 3, etc.,
+          multiplying with categoricals). Reasoning identifies key branches but fails
+          to quantify full state space, leading to completely wrong scale.
+      coverage_completeness:
+        score: 0.028
+        reasoning: 'Using (b) SCENARIO ENUMERATION: the LLM explicitly describes and
+          lists 17 distinct scenarios (unique mode + fan + override tuples). Against
+          612 total from decomposition, coverage is 17/612 ≈ 0.028. No higher rubric
+          applies as no full categories or explicit count matching decomp.'
+      overall_summary: The LLM demonstrates strong qualitative understanding of the
+        control flow, overrides, and key thresholds, correctly identifying all major
+        numeric boundaries and edge cases like the dead zone and emergency sub-exceptions.
+        However, it severely underestimates the state space by focusing on high-level
+        branches (17 vs 612), missing the full combinatorial product of numeric regions
+        (e.g., multiple intervals for battery_level, temp_diff sub-ranges) and categorical
+        factors, leading to incomplete coverage and incorrect quantitative conclusions.
+        ImandraX excels in exhaustive decomposition, revealing the true complexity
+        of 24 categorical × regions from 4 numerics.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 180
+        reasoning: The LLM answer does not provide any explicit or implicit numerical
+          estimate of the number of scenarios leading to Emergency mode. It describes
+          'exactly one set of conditions' but does not quantify the state space considering
+          all variables (e.g., temperature, occupancy, season). Thus, marked as 'unknown'.
+          The decomposition reports exactly 180 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - LLM accurately describes the
+          AND condition in the sub-exception (battery < 10 AND maintenance > 10000)
+          before setting Emergency. Branching structure: correct - Clearly outlines
+          the if-else structure in apply_emergency_mode, distinguishing FireAlarm
+          from other states like MaintenanceMode and NoEmergency. Short-circuit behavior:
+          correct - Identifies the early return to Off in the sub-exception case for
+          FireAlarm. Override logic: correct - Explains how Emergency overrides other
+          modes but is itself overridden to Off under critical battery and overdue
+          maintenance, and notes protection from energy downgrading.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - FireAlarm with battery < 10 AND maintenance_hours > 10000 forces Off instead
+          of Emergency (safety-critical override exception)
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies the key edge case: the sub-exception where
+          FireAlarm would normally trigger Emergency but is overridden to Off due
+          to critical battery and overdue maintenance, which is safety-critical and
+          contradicts the naive expectation of always Emergency on FireAlarm. The
+          decomposition highlights this as the primary exception, suggesting 1 total
+          edge case relevant to Emergency mode selection.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        thresholds_from_decomp:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        reasoning: 'The LLM correctly identifies the exact numeric thresholds for
+          the sub-exception: battery_level < 10 and maintenance_hours > 10000. No
+          other thresholds are relevant to Emergency mode selection (e.g., temperature
+          dead zones or energy quorums do not apply here). All thresholds from decomposition
+          are captured.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact matches for the numeric conditions leading
+          to Emergency mode outcomes: battery_level < 10 (critical) vs. >= 10, and
+          maintenance_hours > 10000 (overdue) vs. <= 10000. These precisely align
+          with the decomposition''s thresholds, with no approximations or qualitative
+          descriptions used.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches completely correct conclusions: Emergency mode
+          is selected precisely when emergency_state = FireAlarm and not (battery
+          < 10 AND maintenance > 10000), with the sub-exception correctly leading
+          to Off. Reasoning is detailed and accurate, matching the decomposition''s
+          primary trigger and exception, including override flag behavior.'
+      coverage_completeness:
+        score: 0.25
+        reasoning: The LLM provides a qualitative description acknowledging the core
+          conditions and one sub-exception but does not enumerate or estimate the
+          full set of 180 scenarios (e.g., does not consider combinations with temperature
+          differential, occupancy, season, etc., that may not affect the emergency
+          branch but contribute to total state space). This fits (d) QUALITATIVE ONLY,
+          as it acknowledges the multiplicity via the sub-exception without explicit
+          counting or categorization.
+      overall_summary: The LLM answer demonstrates strong understanding of the core
+        control flow and exact conditions for Emergency mode, accurately capturing
+        the primary trigger, sub-exception, and protections, with precise thresholds
+        and correct directionality. However, it underperforms in state space estimation
+        and coverage completeness by not quantifying or enumerating the full 180 scenarios,
+        treating the logic in isolation from broader inputs. Compared to ImandraX,
+        the LLM is concise and correct on key aspects but lacks the decomposed verification's
+        exhaustive scenario coverage and edge case breadth, making it suitable for
+        high-level explanation but less for comprehensive verification.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM performs an exhaustive case analysis identifying exactly
+          two scenarios for FireAlarm: (1) battery < 10 AND maintenance > 10000 leading
+          to Off, and (2) the else case leading to Emergency. This matches the decomposition''s
+          two regions (default Emergency and exception Off).'
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: LLM correctly identifies the AND condition (battery
+          < 10 AND maintenance > 10000) as the primary check before defaulting to
+          Emergency, with no misinterpretation of OR/AND order. Branching: Accurately
+          describes the two-branch structure in apply_emergency_mode (if critical
+          conditions then Off else Emergency), followed by override in energy constraints
+          that preserves these modes. Short-circuit: Correctly notes that emergency
+          override in Step 3 replaces base_mode entirely, acting as an early decision
+          point ignoring prior calculations like temp_diff or occupancy. Override
+          logic: Precisely captures that FireAlarm forces Emergency or Off, with energy
+          downgrades explicitly not applying to Emergency and Off remaining unchanged,
+          ensuring safety trumps normal operation.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Battery boundary (battery_level == 10, goes to Emergency)
+        - Maintenance boundary (maintenance_hours == 10000, goes to Emergency)
+        - Interaction of both critical conditions (battery < 10 and maintenance >
+          10000, forces Off with override)
+        - Energy constraints with all 3 active during FireAlarm (cannot downgrade
+          Emergency or Off)
+        - Empty building + FireAlarm (override still applies)
+        total_edge_cases: 3
+        reasoning: 'The decomposition highlights 3 key edge cases: battery boundary
+          (==10), maintenance boundary (==10000), and their interaction (both true).
+          The LLM identifies all three explicitly in its boundary and interaction
+          checks, plus additional relevant ones like max energy constraints and empty
+          building, which qualify as edge cases due to boundary thresholds, conjunctive
+          constraints (>=2/3 but irrelevant here), and override interactions contradicting
+          naive expectations (e.g., Off during FireAlarm is counterintuitive but safe).
+          No misses.'
+        edge_case_count: 5
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'battery_level < 10 (threshold: 10)'
+        - 'maintenance_hours > 10000 (threshold: 10000)'
+        thresholds_from_decomp:
+        - 'battery_level < 10 (threshold: 10)'
+        - 'maintenance_hours > 10000 (threshold: 10000)'
+        reasoning: 'The LLM explicitly identifies and tests the exact thresholds:
+          battery_level < 10 vs >=10, and maintenance_hours > 10000 vs <=10000, including
+          boundary values like ==10 and ==10000. These match the decomposition''s
+          thresholds precisely; no others exist in this FireAlarm logic (temp_diff
+          dead zone is irrelevant due to override). All thresholds identified and
+          none missed.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric conditions for outcomes: battery
+          < 10 AND maintenance > 10000 → Off with requires_override=true; else → Emergency
+          (immune to downgrades). This is an exact match to the decomposition''s conditions
+          and outcomes (Emergency or Off with override), including precise operators
+          (<10, >10000). No approximations; fully precise.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM concludes the property is never violated, with correct
+          reasoning mirroring the decomposition: exhaustive coverage of FireAlarm
+          paths leading only to Emergency or Off with override. No counterexamples
+          exist, and the analysis confirms the property holds unconditionally, aligning
+          perfectly with ImandraX''s proven status.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using (a) EXPLICIT COUNT: LLM states ''exactly two branches''
+          for FireAlarm, matching the decomposition''s 2 scenarios. Additionally,
+          it enumerates all sub-conditions and edge cases, covering 100% of decision
+          paths (override logic, energy interactions, base_mode irrelevance). Full
+          coverage achieved.'
+      overall_summary: The LLM answer is exceptionally strong, providing a thorough,
+        exhaustive proof that matches the ImandraX decomposition in conclusion, reasoning,
+        and detail. It correctly identifies the invariant safety property, covers
+        all control flows and overrides, and examines relevant edges/boundaries without
+        omission. No weaknesses; equivalent to verified analysis.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:31'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 17
+        n_decomposition_exact_scenarios: 612
+        reasoning: 'The LLM explicitly states ''17 distinct reachable decision scenarios''
+          as the final answer. ImandraX decomposition yields 612 scenarios through
+          systematic state-space enumeration. The LLM''s count appears to enumerate
+          only qualitatively distinct output combinations (final_mode, fan_speed,
+          override flag), treating all inputs producing the same triple as equivalent.
+          In contrast, ImandraX decomposes across the full Cartesian product of: 2
+          occupancy states × 2 seasons × 3 emergency states × 2 external_power states
+          = 24 categorical combinations, plus 4 numeric boundary conditions for continuous
+          parameters. The LLM fundamentally misunderstands what ''distinct scenarios''
+          means—it conflates output equivalence classes with decision scenarios (input
+          states). ImandraX correctly counts unique regions in the input parameter
+          space where behavior is distinct.'
+        score: -8.216745858195306
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'PRECEDENCE_OF_CONDITIONS (correct): The LLM correctly understands
+          that emergency overrides take precedence over temperature-based modes, which
+          then interact with energy constraints. The dead zone check (temp_diff ==
+          3) is correctly understood as having priority over Mild_Heating/Mild_Cooling
+          classification. The battery_level < 10 AND maintenance_hours > 10000 conjunction
+          is correctly stated with AND precedence over subsequent OR logic. BRANCHING_STRUCTURE
+          (correct): The LLM correctly identifies the multi-stage branching: (1) classify_temp_need,
+          (2) base_mode determination, (3) emergency override, (4) energy constraint
+          downgrade. This mirrors the actual if-else-if structure. Empty occupancy
+          is correctly identified as a short-circuit to NoHeating/Off regardless of
+          temperature. SHORT_CIRCUIT_BEHAVIOR (partial): The LLM mentions that emergency
+          modes ''are NOT downgraded by energy constraints'' and Off ''is already
+          the lowest'', showing understanding of guard clauses. However, it doesn''t
+          fully articulate that occupancy=Empty is a short-circuit that bypasses temperature
+          classification entirely, or that the sub-exception (battery<10 AND maintenance>10000)
+          short-circuits the normal FireAlarm→Emergency path. The logic is mostly
+          correct but the articulation of short-circuiting is incomplete. OVERRIDE_LOGIC
+          (correct): The LLM correctly identifies that FireAlarm has a sub-exception
+          (when battery<10 AND maintenance>10000, it becomes Off instead of Emergency),
+          that maintenance_hours > 10000 sets the override flag, and that MaintenanceMode
+          can downgrade FireAlarm effects. This is sophisticated override understanding.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - temp_diff == 3 exactly (dead zone)
+        - FireAlarm + battery < 10 AND maintenance > 10000 sub-exception
+        - Occupancy = Empty regardless of temperature
+        total_edge_cases: 7
+        reasoning: 'The LLM identifies 3 significant edge cases out of 7 total. IDENTIFIED:
+          (1) temp_diff == 3 dead zone is correctly identified as an equality constraint
+          causing downgrade from Mild→Ventilation; (2) FireAlarm sub-exception (battery<10
+          AND maintenance>10000→Off) is the most complex edge case involving contradictory
+          constraints; (3) Empty occupancy short-circuit is identified. MISSED: (4)
+          boundary behaviors at exactly temp_diff = 2 and temp_diff = 4 (transitions
+          between Comfortable/Mild and Mild/Need); (5) energy quorum boundary (exactly
+          2 conditions active vs 3); (6) maintenance_hours = 10000 exactly (threshold
+          boundary); (7) battery_level thresholds at exact boundaries (10, 30, 50).
+          The LLM identifies the most safety-critical edge case (FireAlarm sub-exception)
+          and the most counterintuitive one (dead zone), but misses numeric boundary
+          behaviors and the quorum edge conditions. Score = 3/7 = 0.43.'
+        edge_case_count: 3
+        score: 0.42857142857142855
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - temp_diff < 2
+        - 2 <= temp_diff < 4
+        - temp_diff >= 4
+        - temp_diff == 3
+        - battery_level < 10
+        - battery_level >= 50
+        - battery_level < 30
+        - maintenance_hours > 10000
+        - maintenance_hours < 9000
+        - maintenance_hours >= 9000
+        - power_consumption > 5000
+        - external_power == False
+        thresholds_from_decomp:
+        - temp_diff < 2
+        - temp_diff == 2
+        - temp_diff == 3
+        - temp_diff == 4
+        - temp_diff > 4
+        - battery_level < 10
+        - battery_level == 10
+        - battery_level < 30
+        - battery_level == 30
+        - battery_level >= 50
+        - battery_level < 50
+        - maintenance_hours < 9000
+        - maintenance_hours == 9000
+        - maintenance_hours == 10000
+        - maintenance_hours > 10000
+        - power_consumption <= 5000
+        - power_consumption == 5000
+        - power_consumption > 5000
+        - external_power == True
+        - external_power == False
+        - occupancy == Occupied
+        - occupancy == Empty
+        - season == Summer
+        - season == Winter
+        - emergency == FireAlarm
+        - emergency == MaintenanceMode
+        - emergency == NoEmergency
+        reasoning: 'The LLM identifies 12 distinct numeric thresholds, while ImandraX
+          decomposition includes 27 total decision boundaries (including exact boundary
+          points). The LLM captures the essential magnitude thresholds but misses
+          the exact boundary points that ImandraX must distinguish for complete symbolic
+          decomposition. Specifically: (1) LLM captures temp_diff intervals [<2, 2-4,
+          >4] and dead zone ==3, but ImandraX additionally distinguishes ==2 and ==4
+          as separate regions; (2) LLM captures battery thresholds {<10, <30, >=50}
+          but ImandraX distinguishes ==10, ==30, ==50 as separate regions; (3) LLM
+          captures maintenance thresholds {<9000, <10000, >10000} but ImandraX distinguishes
+          ==9000 and ==10000; (4) LLM captures power threshold >5000 but ImandraX
+          distinguishes ==5000 and <=5000; (5) LLM captures categorical states (occupancy,
+          season, emergency, external_power) but doesn''t list them as thresholds.
+          The LLM''s approach of identifying decision-relevant thresholds is correct,
+          but it misses the boundary points that ImandraX must include for exhaustive
+          decomposition. Score = 12 / 27 = 0.44.'
+        score: 0.4444444444444444
+      outcome_precision:
+        score: 0.85
+        reasoning: 'The LLM identifies most numeric thresholds with high precision:
+          temp_diff boundaries (2, 4) are exact matches; temp_diff == 3 (dead zone)
+          is correctly identified as an equality constraint; battery_level thresholds
+          (10, 30, 50) are all exact; maintenance_hours thresholds (9000, 10000) are
+          exact; power_consumption > 5000 is exact. One minor issue: the LLM states
+          ''temp_diff < 2'' for Comfortable, but more precisely should include empty
+          building case which is threshold-independent. The energy quorum ''IF 2+
+          active'' is correctly stated. ImandraX confirms all these thresholds. The
+          LLM''s precision on conditional logic (e.g., ''battery_level < 10 AND maintenance_hours
+          > 10000'') is exact. No qualitative-only descriptions are present—all thresholds
+          are numeric. The only minor imprecision is treating ''Comfortable'' as uniform
+          across all temp_diff < 2 without distinguishing edge cases at boundaries
+          like temp_diff = 1.999..., but for practical purposes this is 0.85/1.0 because
+          the thresholds themselves are stated correctly.'
+      direction_accuracy:
+        score: 0.75
+        reasoning: 'The LLM correctly identifies the direction of most logic: (1)
+          higher temp_diff → stronger heating/cooling needs; (2) low battery/high
+          power → energy downgrade; (3) FireAlarm usually forces Emergency, with rare
+          sub-exception (battery<10 AND maintenance>10000→Off); (4) MaintenanceMode
+          can be conditional Ventilation or Off. The conclusions about which parameters
+          override others are directionally correct. However, the fundamental error
+          in the final answer (claiming 17 scenarios instead of 612) significantly
+          undermines the overall direction. The LLM correctly identifies that emergency
+          modes are protected from energy downgrades, which is correct logic. The
+          reasoning about thresholds and precedence is sound. But by providing 17
+          as the definitive answer, the LLM reaches an incorrect quantitative conclusion
+          about the scale/scope of the decision space, even though the qualitative
+          understanding of control flow is mostly correct. The 0.75 reflects: correct
+          logic pathways (+0.25), correct threshold identification (+0.25), correct
+          override precedence (+0.25), but incorrect final count reduces by 0.25.'
+      coverage_completeness:
+        score: 0.05
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: The LLM explicitly states ''17
+          distinct reachable decision scenarios'' vs. ImandraX decomposition count
+          of 612. This is a catastrophic undercount. The LLM''s 17 scenarios represent
+          output equivalence classes (unique combinations of final_mode, fan_speed,
+          override), not input-space decision scenarios. ImandraX correctly enumerates
+          all reachable regions in the input parameter space. The LLM covers: (1)
+          Empty occupancy (1 scenario), (2) Occupied + 4 temperature-based modes ×
+          3 emergency conditions = 12 scenarios (approximately), (3) plus 4-5 emergency-specific
+          scenarios. But this misses: (1) the cross-product structure of occupancy
+          × season × emergency × external_power that ImandraX correctly identifies
+          as 24 base categorical combinations; (2) the numeric parameter ranges within
+          each categorical combination (battery_level has 3 critical regions, maintenance_hours
+          has 3, power_consumption has 2, temp_diff has 3); (3) the fact that even
+          when two scenarios produce the same output (e.g., both Ventilation fan=40),
+          they represent different decision regions in the input space and must be
+          counted separately in a decomposition. The LLM''s 17 represents roughly
+          17/612 = 2.8% of actual scenarios. Score = 0.05 (only awarded because the
+          LLM at least attempts a count, even though it''s fundamentally wrong).'
+      overall_summary: 'The LLM demonstrates strong qualitative understanding of the
+        HVAC control logic but makes a critical categorical error in quantifying the
+        decision scenarios. Strengths: (1) Correctly identifies all major numeric
+        thresholds (temp_diff: 2,3,4; battery_level: 10,30,50; maintenance_hours:
+        9000,10000; power_consumption: 5000); (2) Accurately describes control flow
+        precedence and branching structure; (3) Identifies key edge cases like the
+        FireAlarm sub-exception and dead zone behavior; (4) Correctly understands
+        override logic and emergency mode protection from energy downgrades. Weaknesses:
+        (1) **Fundamental misunderstanding of ''distinct scenarios''**: The LLM conflates
+        output equivalence classes (17 unique combinations of mode+fan+override) with
+        decision scenarios (612 distinct input-space regions). This is a critical
+        conceptual error; (2) Misses boundary point thresholds (e.g., distinguishing
+        temp_diff==2, temp_diff==4, battery==10, etc.); (3) Undercounts by 35x (17
+        vs 612), suggesting the LLM is not considering the full Cartesian product
+        of categorical dimensions (occupancy × season × emergency × external_power
+        = 24 combinations) and their interaction with continuous parameter boundaries;
+        (4) Does not recognize that ImandraX''s decomposition requires enumerating
+        all reachable regions where behavior differs, not just output patterns. ImandraX
+        provides the correct systematic approach: 24 categorical combinations × 4
+        symbolic integer boundary regions within the continuous parameter space =
+        612 total scenarios. The LLM''s answer would be appropriate for a different
+        question (''How many distinct output modes exist?''), but misses the specification
+        entirely for the actual question (''How many distinct HVAC control decision
+        scenarios exist?'').'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 180
+        reasoning: The LLM answer provides a logical derivation of when Emergency
+          mode is selected but does not provide an explicit count of scenarios. The
+          answer focuses on conditional logic ('either battery_level >= 10 OR maintenance_hours
+          <= 10000') rather than enumerating or estimating a specific number of decision
+          scenarios. The ImandraX decomposition identifies exactly 180 scenarios where
+          Emergency mode is selected. Since the LLM provides no numeric estimate of
+          scenario count (neither explicit count, range, approximation, nor implicit
+          calculation), I must mark n_llm_estimated_scenarios as 'unknown'. The scoring
+          formula requires two concrete numbers to calculate a meaningful ratio, but
+          without the LLM's estimate, we cannot compute the accuracy score.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          1. **Precedence of conditions**: The LLM correctly identifies that the logical
+          structure is: FireAlarm AND (battery >= 10 OR maintenance <= 10000) = Emergency.
+          The negation logic is properly analyzed: NOT(battery < 10 AND maintenance
+          > 10000) correctly simplifies to (battery >= 10 OR maintenance <= 10000).
+          This demonstrates correct understanding of Boolean algebra and operator
+          precedence (AND before OR).
+
+
+          2. **Branching structure**: The LLM correctly maps the if-else structure
+          of apply_emergency_mode: FireAlarm has a primary path (Emergency) and a
+          guarded sub-exception (Off when battery < 10 AND maintenance > 10000). The
+          distinction between independent branches (FireAlarm, MaintenanceMode, NoEmergency)
+          is properly understood. The code structure is accurately represented as
+          nested conditionals with sub-exceptions.
+
+
+          3. **Short-circuit behavior**: The LLM correctly identifies that the FireAlarm
+          exception check (battery < 10 AND maintenance > 10000) causes an early return
+          of Off, preventing the normal Emergency mode return. The guard clause protecting
+          Emergency mode from energy constraint downgrading in Step 4 is explicitly
+          recognized ('explicitly protected' / 'explicitly checks').
+
+
+          4. **Override logic**: The LLM correctly explains that the critical battery
+          + overdue maintenance condition overrides the normal FireAlarm→Emergency
+          behavior, forcing Off instead. This is properly characterized as a sub-exception
+          that trumps normal operation. The explanation of the requires_override flag
+          (true when both emergency_state != NoEmergency AND either final_mode==Off
+          with FireAlarm OR maintenance > 10000) is accurate.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - FireAlarm + battery < 10 + maintenance_hours > 10000 → Off (safety-critical
+          override preventing Emergency mode)
+        - Emergency mode protected from energy constraint downgrading despite other
+          modes being vulnerable (contradicts naive expectation that all modes can
+          be downgraded)
+        - Battery level exactly at boundary conditions (battery >= 10 vs battery <
+          10) determining Emergency vs Off selection
+        total_edge_cases: 8
+        reasoning: 'The LLM identifies 3 meaningful edge cases out of an estimated
+          8 total: (1) The critical battery + overdue maintenance exception is correctly
+          identified as a safety-critical case that violates the naive expectation
+          that FireAlarm always produces Emergency. This satisfies both criteria 4
+          (contradicts intuition) and 5 (safety-critical). (2) The immunity of Emergency
+          mode from energy downgrading is recognized as counterintuitive (criterion
+          4)—the LLM explicitly notes ''never downgraded'' with emphasis on this unusual
+          property. (3) The boundary condition at battery_level < 10 is mentioned,
+          suggesting awareness of equality/boundary constraints. However, the decomposition
+          likely identifies additional edge cases the LLM misses: (a) the interaction
+          between all three variables (emergency_state, battery_level, maintenance_hours)
+          creating complex conjunctive constraints (criterion 1); (b) other boundary
+          conditions in maintenance_hours (>= 10000 vs > 10000, >= 9000 etc.); (c)
+          edge cases in the energy constraint quorum logic (2 out of 3 conditions
+          for downgrading) that the LLM does not discuss; (d) potential boundary conditions
+          in other mode selections. The LLM''s 3/8 coverage = 0.375 score reflects
+          good identification of the most critical edge case but missing other subtle
+          boundary and conjunctive conditions.'
+        edge_case_count: 3
+        score: 0.375
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        - battery_level >= 10
+        - maintenance_hours <= 10000
+        thresholds_from_decomp:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        - battery_level >= 10
+        - maintenance_hours <= 10000
+        - battery_level >= 50
+        - maintenance_hours < 9000
+        - temp_diff = 3
+        - 'energy_conservation_triggers: 2 out of 3 conditions'
+        reasoning: 'The LLM explicitly identifies all four thresholds directly related
+          to the Emergency mode selection decision: battery_level < 10, maintenance_hours
+          > 10000, battery_level >= 10, and maintenance_hours <= 10000. These are
+          precisely stated with numeric values and correct comparison operators. However,
+          the LLM misses four other important thresholds from the decomposition: (1)
+          battery_level >= 50 (used in MaintenanceMode for Ventilation vs Off selection);
+          (2) maintenance_hours < 9000 (also in MaintenanceMode); (3) temp_diff =
+          3 (the dead zone for temperature-based mode selection); (4) the quorum-based
+          energy constraint triggers (2 out of 3 conditions for mode downgrading).
+          While these latter thresholds don''t directly determine Emergency selection,
+          they represent decision boundaries in the overall control logic. The LLM''s
+          focus is appropriately narrow (only thresholds relevant to Emergency), so
+          identifying 4/8 = 0.5 is reasonable. If the evaluation expects comprehensive
+          threshold identification across all modes, the score would reflect missing
+          context. Given the question specifically asks ''Under what exact conditions
+          does the system select Emergency mode?'', the LLM''s threshold identification
+          is complete for that specific query (4/4 direct thresholds identified).'
+        score: 0.5
+      outcome_precision:
+        score: 0.85
+        reasoning: 'The LLM provides highly precise numeric distributions for the
+          exact conditions of Emergency mode selection: (1) Correctly states ''battery_level
+          < 10 AND maintenance_hours > 10000'' with exact numeric thresholds and correct
+          logical operators (AND vs OR). The negation ''either battery_level >= 10
+          OR maintenance_hours <= 10000'' is mathematically precise and correctly
+          inverts the constraint. (2) Explicitly identifies the Off mode outcome when
+          the exception conditions are met, with exact thresholds (battery < 10, maintenance
+          > 10000). (3) The fan_speed = 100 for Emergency mode is mentioned with exact
+          value. However, minor precision issues exist: (1) The LLM could have been
+          more explicit about whether the boundaries are strict (battery < 10) vs
+          inclusive (battery <= 10), though the notation is correct. (2) The maintenance_hours
+          thresholds (>10000 vs <=10000) are used consistently but the LLM doesn''t
+          discuss whether these should be ''> 10000'' (exclusive) vs ''>= 10000''
+          (inclusive) based on code inspection. (3) No mention of the exact energy
+          constraint thresholds (2 out of 3) that might affect other scenarios, though
+          this is outside Emergency-specific logic. Overall, the precision for Emergency
+          mode conditions is excellent (0.85 score): exact numeric values with correct
+          operators, minor ambiguity on boundary inclusivity/exclusivity.'
+      direction_accuracy:
+        score: 0.9
+        reasoning: 'The LLM reaches the correct overall conclusion: Emergency mode
+          is selected when emergency_state == FireAlarm AND NOT (battery < 10 AND
+          maintenance > 10000). This conclusion is correct and well-reasoned. Strengths:
+          (1) The logical structure is completely accurate—the identification of the
+          exception case (critical battery + overdue maintenance forces Off) correctly
+          characterizes when Emergency is NOT selected despite FireAlarm being active.
+          (2) The explicit statement ''never downgraded by energy constraints'' is
+          a correct and important directional finding about Emergency mode''s immunity.
+          (3) The reasoning correctly identifies that MaintenanceMode and NoEmergency
+          never produce Emergency, narrowing the scope appropriately. (4) The requires_override
+          flag logic is correctly traced through both the normal and exception cases.
+          Minor weaknesses: (1) The answer doesn''t quantify the scale of scenarios
+          (180 from ImandraX)—it provides logical conditions but no sense of proportion
+          or frequency. (2) The answer could have been more explicit about all possible
+          combinations of temperature_diff, occupancy, and season that can lead to
+          Emergency (as long as FireAlarm is active with the right battery/maintenance
+          conditions). (3) No discussion of how the energy_conservation_triggers (2
+          out of 3 conditions) interact with Emergency mode protection. These are
+          very minor—the core directional logic (when Emergency is/isn''t selected)
+          is comprehensively and correctly explained. Score 0.9: essentially correct
+          conclusion with minor omissions in scope/scale.'
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Applying the most generous applicable rubric: The LLM provides
+          explicit scenario enumeration (Rubric b). The answer explicitly describes
+          2 distinct decision scenarios: (1) ''FireAlarm + (battery >= 10 OR maintenance
+          <= 10000) → Emergency'' and (2) ''FireAlarm + battery < 10 + maintenance
+          > 10000 → Off''. The ImandraX decomposition identifies 180 total scenarios
+          where Emergency mode is selected. The LLM''s enumeration covers the 2 primary
+          logical branches (Emergency case and its exception case), which represent
+          the key decision points. Interpreting coverage by outcome categories (Rubric
+          c): If we consider outcome categories as (1) Emergency mode selected, (2)
+          Emergency override prevented (Off), the LLM identifies 2/2 outcome categories
+          = 100%. However, a more granular interpretation of the decomposition''s
+          180 scenarios suggests many sub-cases across different combinations of temperature_diff,
+          occupancy, season, and other variables that still fall within the ''Emergency
+          selected'' category. The LLM captures the logical conditions but not the
+          full combinatorial expansion. The answer effectively covers the control
+          flow decision points (100% of branches: FireAlarm→Emergency vs FireAlarm+exception→Off,
+          MaintenanceMode→no Emergency, NoEmergency→no Emergency). Using the most
+          relevant rubric for a logical/conditional question: outcome category coverage
+          = 2 categories identified / estimated 3-4 total = 0.5-0.67. However, the
+          explicit scenario enumeration of the 2 primary paths suggests 2 scenarios
+          / 180 total ≈ 0.011. The most generous and reasonable interpretation: The
+          LLM identifies all the decision boundaries (branches) that determine Emergency
+          vs non-Emergency outcomes, covering 100% of the branch structure. But in
+          terms of full scenario enumeration across the state space, it captures approximately
+          2 representative scenarios out of 180, giving 2/180 ≈ 0.011. Using a middle
+          interpretation (outcome category + branch coverage), I assign 0.75: the
+          LLM captures the essential logical structure and outcome categories but
+          not the full combinatorial expansion of scenarios.'
+      overall_summary: >2
+
+        The LLM and ImandraX answers are largely aligned on the core logic of Emergency
+        mode selection, but differ significantly in scope and presentation. **Strengths
+        of LLM answer**: (1) Excellent control flow understanding—correctly maps the
+        FireAlarm→Emergency with battery/maintenance exception logic. (2) Precise
+        identification of exact numeric thresholds for the critical decision boundaries
+        (battery < 10, maintenance > 10000). (3) Clear explanation of the Emergency
+        mode immunity from energy constraint downgrading. (4) Correct logical reasoning
+        with proper Boolean simplification. (5) Addresses the requires_override flag
+        behavior in both cases. **Weaknesses of LLM answer**: (1) No quantification
+        of the state space—fails to estimate the 180 scenarios identified by ImandraX.
+        This is the most significant gap, as it doesn't convey the magnitude of the
+        decision space. (2) Limited edge case detection—identifies the critical battery+maintenance
+        exception but misses other boundary conditions and conjunctive constraints
+        (e.g., temperature dead zone at temp_diff=3, quorum-based energy triggers,
+        maintenance_hours boundary at 9000). (3) No discussion of how other variables
+        (temp_diff, occupancy, season, energy constraints) combine with the FireAlarm
+        logic to create the 180 scenarios. (4) Scope is narrower—focuses solely on
+        Emergency mode selection rather than exploring how it interacts with other
+        decision logic. **Alignment with ImandraX**: Both correctly identify the primary
+        trigger (emergency_state = FireAlarm) and the critical exception (battery
+        < 10 AND maintenance > 10000 → Off). Both recognize that this exception is
+        a safety-critical override. ImandraX provides the quantified view (180 scenarios)
+        while LLM provides the logical view (conditions). **Overall Assessment**:
+        The LLM answer is logically sound and precise for what it covers, but incomplete
+        in scope. It excels at explaining the immediate control flow for Emergency
+        selection but lacks the comprehensive state space understanding and edge case
+        detection that ImandraX provides. For a question asking "under what exact
+        conditions" the answer is quite good; for a question asking "in how many ways/scenarios"
+        it falls short.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM explicitly identifies exactly 2 cases: Case 1 (battery
+          < 10 AND maintenance_hours > 10000 → Off), and Case 2 (battery >= 10 OR
+          maintenance_hours <= 10000 → Emergency). The decomposition also identifies
+          exactly 2 primary paths: the default FireAlarm → Emergency, and the exception
+          for the battery/maintenance condition → Off. Both agree on n=2 scenarios
+          within the FireAlarm context. Score: 1 - abs(log2(|2-2|)) = 1 - abs(log2(0))
+          = 1.0 (perfect alignment).'
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly interprets ''battery_level < 10
+          AND maintenance_hours > 10000'' as a single conjunctive gate—both must be
+          true. The OR in Case 2 is correctly the negation. Branching: The LLM correctly
+          identifies the if-else-if structure: Case 1 checks the AND condition, Case
+          2 is the else (negation). No independent parallel checks. Short-circuit:
+          The LLM correctly notes emergency override occurs in Step 3, completely
+          replacing base_mode. The override is a complete guard that precedes energy
+          downgrading (Step 4). Override logic: The LLM correctly explains that (a)
+          Emergency is explicitly protected from downgrading, (b) Off remains Off
+          (not a downgrade target), (c) Off + FireAlarm → override=true. The safety
+          check trumps normal operation. All 4 aspects demonstrate correct understanding.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone (temp_diff = 3) during FireAlarm: irrelevant but checked'
+        - 'Boundary: battery_level = 10 (false for <10) → Case 2 → Emergency'
+        - 'Boundary: maintenance_hours = 10000 (false for >10000) → Case 2 → Emergency'
+        - 'Boundary: battery_level = 9.999, maintenance_hours = 10001 (both true)
+          → Case 1 → Off with override'
+        - All 3 energy constraints active with Emergency mode (must not downgrade)
+        - Empty building + FireAlarm (base_mode = Off, overridden → Emergency or Off
+          with override)
+        - Any occupancy/season/temp_diff combination under FireAlarm (all overridden)
+        total_edge_cases: 7
+        reasoning: 'The LLM identifies 7 distinct edge cases. Mapping to edge case
+          criteria: (1) Dead zone = equality constraint (temp_diff = 3). (2-3) Boundary
+          at battery=10 and maintenance=10000 are equality/boundary cases with negation
+          logic. (4) 9.999/10001 is a boundary crossing showing both conjuncts true
+          simultaneously. (5) All energy constraints with Emergency is a 3-conjunct
+          complex condition (Emergency + all constraints active + no downgrade). (6)
+          Empty building + FireAlarm contradicts naive expectation that Off remains
+          Off, but shows override intervention. (7) Any occupancy/season/temp_diff
+          is a negation of the emergency mode override''s dependence on base inputs
+          (safety-critical override). All 7 are substantive edge cases covering equality
+          constraints, boundary conditions, complex conjunctions, counterintuitive
+          outcomes, and safety-critical overrides. This represents high-quality edge
+          case analysis.'
+        edge_case_count: 7
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        - battery_level >= 10
+        - maintenance_hours <= 10000
+        - temp_diff = 3
+        - 2 energy constraints active
+        thresholds_from_decomp:
+        - battery_level < 10
+        - maintenance_hours > 10000
+        - temp_diff = 3
+        - 2 out of 3 energy constraints active
+        reasoning: 'The LLM identifies all critical thresholds from the decomposition.
+          The LLM explicitly mentions battery_level < 10 and maintenance_hours > 10000
+          as decision boundaries. The LLM correctly identifies the dead zone at temp_diff
+          = 3 and notes it''s irrelevant in this context (but still identifies it).
+          The LLM mentions energy constraints (3 active maximum). The LLM also implicitly
+          covers the complementary thresholds (>=10, <=10000) to explain the else
+          branch. The LLM identifies 6 threshold-related expressions, all of which
+          map to the 4 core thresholds in the decomposition. Score: 6/4 = 1.0 (all
+          main thresholds identified; some presented as complementary pairs).'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric precision for all conditions: ''battery_level
+          < 10'', ''maintenance_hours > 10000'', ''battery_level >= 10 OR maintenance_hours
+          <= 10000''. Every threshold is stated with exact operators. The boundary
+          cases are also precisely articulated: ''battery_level == 10'', ''maintenance_hours
+          == 10000'', ''battery_level == 9.999'', ''maintenance_hours == 10001''.
+          No qualitative approximations used; all distributions are exact numeric
+          statements. This matches the decomposition''s precision perfectly.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is completely correct and well-reasoned.
+          The property cannot be violated—this is the proven answer. The LLM''s reasoning
+          is rigorous: (1) identifies the two exhaustive branches correctly, (2) proves
+          Emergency is immune to energy downgrading with code citation, (3) proves
+          Off is not downgraded, (4) proves Off with FireAlarm triggers override=true,
+          (5) eliminates all other possible modes (Ventilation, Heating, Cooling),
+          (6) verifies boundary conditions with strict inequalities. The conclusion
+          is bulletproof and the logic chain is flawless.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using rubric (b) SCENARIO ENUMERATION: The LLM explicitly describes
+          2 main scenarios (Case 1, Case 2) plus 6 edge cases examined. All decomposition
+          scenarios are covered: default Emergency path, exception Off path, boundary
+          cases at battery=10, maintenance=10000, and their negations. The LLM also
+          covers indirect scenarios like ''empty building + FireAlarm'' and ''all
+          3 energy constraints active''. Coverage is exhaustive relative to the decomposition.'
+      overall_summary: 'The LLM answer demonstrates exceptional quality across all
+        metrics. Both the LLM and ImandraX reach the identical correct conclusion:
+        the safety property **cannot be violated**. The LLM''s reasoning is comprehensive,
+        rigorous, and well-structured, going significantly beyond ImandraX in depth.
+        Strengths: (1) Exhaustive case-by-case analysis with explicit proof of each
+        branch, (2) Precise numeric thresholds throughout with strict inequality handling,
+        (3) Code-level reasoning (citing explicit if-statements about Emergency immunity),
+        (4) Systematic edge case examination (dead zones, boundaries, energy constraints,
+        occupancy patterns), (5) Elimination of impossible outcomes (proving no path
+        leads to Ventilation/Heating/Cooling during FireAlarm), (6) Clear control
+        flow understanding (override hierarchy, guard logic, short-circuit behavior).
+        The LLM''s analysis is actually more thorough than ImandraX, which provides
+        only a high-level summary. No weaknesses detected. The LLM successfully proves
+        the safety property through formal reasoning combined with practical edge
+        case analysis. Perfect correctness with superior pedagogical clarity.'

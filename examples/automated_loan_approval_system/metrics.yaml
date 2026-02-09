@@ -6586,3 +6586,743 @@
         no quantitative state space estimation or numeric precision, but these are
         less relevant for this boolean safety property. Overall, the LLM performs
         comparably to decomposition-based verification in reasoning depth and correctness.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:01'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 234
+        reasoning: The LLM estimated 5 scenarios based on distinct decision classifications,
+          while ImandraX identified 234 scenarios by evaluating typical loan applications
+          with various ranges for age, credit score, debt-to-income ratio, and loan
+          amounts.
+        score: -6.839203788096944
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: incorrect
+        reasoning: The LLM partially understands the control flow aspects. It correctly
+          identifies some conditional checks (e.g., invalid applications and manual
+          review), but misses the complete branching structure and short-circuit evaluations
+          for loans with varying thresholds.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - credit_score < 300
+        - credit_score > 850
+        - debt_to_income < 0
+        - debt_to_income > 100
+        - age < 18
+        - age > 120
+        - invalid loan amounts
+        - risk_score > 70
+        total_edge_cases: 10
+        reasoning: The LLM found some edge cases but did not account for various combinations
+          and nuances in applicant profiles, missing additional edge cases involving
+          boundary conditions and contradictions in expectations.
+        edge_case_count: 8
+        score: 0.8
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - credit_score < 300
+        - credit_score > 850
+        - debt_to_income < 0
+        - debt_to_income > 100
+        - age < 18
+        - age > 120
+        - debt_to_income > 45
+        - risk_score >= 3
+        - debt_to_income > 40
+        thresholds_from_decomp:
+        - credit_score < 300
+        - credit_score > 850
+        - debt_to_income < 0
+        - debt_to_income > 100
+        - age < 18
+        - age > 120
+        - credit_score < 500
+        - debt_to_income > 50
+        - loan_amount <= 0
+        - loan_amount > 100000
+        - loan_amount > 150000
+        - loan_amount > 2000000
+        - loan_amount > 1000000
+        - debt_to_income > 40
+        reasoning: The LLM identified some critical thresholds but missed many key
+          numeric thresholds identified in the decomposition, which makes its boundary
+          clarity lower.
+        score: 0.6428571428571429
+      outcome_precision:
+        score: 0.4
+        reasoning: The LLM provided several numeric thresholds, but most were overlapping
+          or approximated without being exact. Thus, the precision score reflects
+          a reasonable effort but lacks accuracy in exact boundary definitions.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM reached some conclusions about scenarios, but many were
+          incomplete or incorrect. It didn't accurately capture certain situations,
+          leading to a lower direction accuracy.
+      coverage_completeness:
+        score: 0.0214
+        reasoning: The LLM identified only a few scenarios out of the total, leading
+          to very limited coverage of all actual decision scenarios as identified
+          in the decomposition.
+      overall_summary: The LLM present in the answers shows a limited understanding
+        of the full scope of scenarios available in the automated loan approval system.
+        While it captures some conditions and decision points, it misestimates the
+        total number of scenarios and overlooks various thresholds and nuanced conditions
+        necessary for a comprehensive risk assessment.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 12
+        reasoning: The LLM identified 3 conditions that could lead to a Manual Review
+          Required decision, while ImandraX resolved 12 scenarios which include the
+          different manifestations of these conditions including combinations, providing
+          a broader enumeration.
+        score: -2.169925001442312
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM clearly categorized the conditions that drive manual review,
+          and its reasoning respected the control flow of both the DTI threshold checks
+          and other independent checks.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - loan_amount == 500,000
+        - debt_to_income == 46
+        - risk_level == 3
+        total_edge_cases: 12
+        reasoning: The LLM identified a few edge cases but missed some potential limitations
+          or atypical profiles implying scenarios where review could still be warranted,
+          yielding less coverage compared to ImandraX.
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - loan_amount > 500,000
+        - debt_to_income > 45
+        - risk_level >= 3
+        thresholds_from_decomp:
+        - loan_amount > 500,000
+        - debt_to_income > 45
+        - risk_level >= 3
+        - '...'
+        reasoning: The LLM pinpointed key thresholds but did not list all numerical
+          thresholds involved, while ImandraX captures the entire range of conditions
+          exhaustively during its decomposition.
+        score: 0.75
+      outcome_precision:
+        score: 0.75
+        reasoning: The LLM provided accurate thresholds with one minor mismatch in
+          the exact DTI (mentioned as over 45 but precision could range to other values).
+      direction_accuracy:
+        score: 0.75
+        reasoning: While the LLM's conclusion that Manual Review Required is possible
+          under excellent credit conditions is correct, there are nuances missed in
+          its explanations and codifying assumptions that could lead to confusion
+          about the DTI specifics.
+      coverage_completeness:
+        score: 0.25
+        reasoning: The LLM mentioned a maximal interpretation of each individual condition
+          affecting loan approval but failed to synthesize or cover all the potential
+          combinations leading to manual review. ImandraX grasped this multiplicity.
+      overall_summary: The LLM provides a correct understanding of conditions triggering
+        manual review for applicants with Excellent credit but lacks the breadth of
+        scenarios outlined by ImandraX. It recognizes key independent conditions well,
+        yet misses edge cases and related decision thresholds.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM did not explicitly provide a count or estimation of the
+          decision scenarios in its answer.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately describes the control structure, points out
+          that it exits the function immediately upon returning MANUAL_REVIEW_REQUIRED,
+          and correctly identifies the linear flow of decisions.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone (credit 580-620, DTI 43-47, age 72-74)
+        total_edge_cases: 3
+        reasoning: The LLM identified one edge case effectively, but there are other
+          potential edge cases that involve boundary conditions and strictly defined
+          rules that were not mentioned. Thus, it was partially complete.
+        edge_case_count: 1
+        score: 0.3333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - DTI > 45
+        - loan_amount > 500,000
+        thresholds_from_decomp:
+        - credit score < 580
+        - DTI > 45
+        - age < 72
+        - loan_amount > 500,000
+        reasoning: The LLM successfully identified key thresholds for DTI and loan
+          amount, but it missed other thresholds related to credit score and age.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's reasoning clearly matches the conditions and properties
+          it is addressing, specifically relating the outcomes directly to their thresholds.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes that the safety property holds, providing
+          solid reasoning to back this up without contradictions.
+      coverage_completeness:
+        score: 0.25
+        reasoning: The LLM identified a narrow subset of scenarios, primarily focusing
+          on edge cases without considering the full range of conditions potentially
+          impacting decisions.
+      overall_summary: Overall, the LLM provides a strong foundational understanding
+        of the control flow and logic but misses several important scenarios and thresholds.
+        It effectively argues the consistency of the property but lacks thorough coverage
+        in edge cases and numeric thresholds.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:09'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 234
+        reasoning: LLM identified 5 top-level decision classifications, which are
+          the stated outcomes of the system. However, the question asks for distinct
+          'approval scenarios', which implies all unique paths through the logic that
+          lead to these outcomes, considering all input variable interactions. The
+          ImandraX decomposition found 234 such scenarios by exploring these interactions.
+          The LLM's 'scenarios' are really just the high-level categories of outcomes.
+        score: -6.839203788096944
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified the order of checks (INVALID -> MANUAL
+          -> REJECT -> CONDITIONAL -> AUTO_APPROVED) and the conditions within each.
+          It understood that 'INVALID_APPLICATION' conditions are checked first, and
+          if met, no further checks occur. It also correctly interpreted that a high
+          debt_to_income would trigger MANUAL_REVIEW_REQUIRED, preventing it from
+          being caught later by AUTO_REJECTED. The 'dead zone' logic shows an understanding
+          of multiple conditions interacting with AND/OR. The override logic is correctly
+          identified with `has_bankruptcy` and `monthly_income` in AUTO_REJECTED where
+          one is hardcoded False and the other to a value never triggered.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone: 580 <= credit_score <= 620 AND 43 <= debt_to_income <= 47 AND
+          72 <= age <= 74'
+        - has_bankruptcy (hardcoded False, so never triggered)
+        - monthly_income < 2000 (hardcoded to 5000, so never triggered)
+        - debt_to_income > 50 (but >45 already caught by manual review)
+        total_edge_cases: 4
+        reasoning: The LLM successfully identified all explicit edge cases and inconsistencies
+          in the provided logic, such as the 'dead zone', hardcoded values leading
+          to never-triggered conditions (has_bankruptcy, monthly_income), and redundant
+          checks (debt_to_income > 50 being covered by debt_to_income > 45).
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - credit_score < 300
+        - credit_score > 850
+        - debt_to_income < 0
+        - debt_to_income > 100
+        - age < 18
+        - age > 120
+        - 580 <= credit_score <= 620
+        - 43 <= debt_to_income <= 47
+        - 72 <= age <= 74
+        - risk_level >= 3 (risk_score > 70)
+        - loan_amount > 500,000
+        - debt_to_income > 45
+        - age < 18
+        - age > 75
+        - credit_score < 500
+        - monthly_income < 2000
+        - debt_to_income > 50
+        - loan_amount <= 0
+        - PERSONAL > 100,000
+        - AUTO > 150,000
+        - MORTGAGE > 2,000,000
+        - BUSINESS > 1,000,000
+        - debt_to_income > 40
+        thresholds_from_decomp:
+        - credit_score = 500
+        - credit_score = 550
+        - credit_score = 580
+        - credit_score = 620
+        - credit_score = 650
+        - credit_score = 700
+        - credit_score = 750
+        - credit_score = 800
+        - debt_to_income = 30
+        - debt_to_income = 40
+        - debt_to_income = 43
+        - debt_to_income = 45
+        - debt_to_income = 47
+        - debt_to_income = 50
+        - age = 18
+        - age = 25
+        - age = 65
+        - age = 72
+        - age = 74
+        - age = 75
+        - loan_amount = 10000
+        - loan_amount = 100000
+        - loan_amount = 300000
+        - loan_amount = 500000
+        - risk_score = 20
+        - risk_score = 40
+        - risk_score = 70
+        - interest_rate = 300
+        - interest_rate = 3600
+        - credit_score = 300
+        - credit_score = 850
+        - debt_to_income = 0
+        - debt_to_income = 100
+        - age = 120
+        - loan_amount = 0
+        reasoning: The LLM identified most of the directly stated thresholds from
+          the rules. However, it missed several implicit thresholds that arise from
+          the interaction of conditions or from the assumptions made about typical
+          loan applications in the decomposition. For instance, the ImandraX decomposition
+          identified 25, 65 for age and various credit score thresholds such as 550,
+          650, 700, 750, 800, that were not explicitly stated as boundaries in the
+          LLM's analysis of the individual conditions but are critical for distinguishing
+          different numeric behaviors within the system. The LLM's identified thresholds
+          are primarily explicit and directly tied to the stated conditions.
+        score: 0.6571428571428571
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's answer offers no numeric distributions or precision for
+          outcomes. It only lists the categorical outcomes and the conditions that
+          lead to them. The question asks for *exact numeric thresholds* that determine
+          scenarios, to which it mostly provided ranges and single thresholds, but
+          not distributions.
+      direction_accuracy:
+        score: 0.9
+        reasoning: The LLM correctly identified the high-level decision classifications
+          and the primary conditions for each. Its understanding of the control flow
+          and precedence of rules is accurate. The explanations for why certain conditions
+          lead to specific outcomes are generally correct. While it didn't find the
+          exact number of scenarios as a decomposition would, its interpretation of
+          the core logic and directions to outcomes is very good.
+      coverage_completeness:
+        score: 0.05
+        reasoning: The LLM offers extremely low coverage as it only identifies 5 high-level
+          outcomes (which it incorrectly labels as 'scenarios'), whereas the decomposition
+          reveals 234 distinct scenarios when considering the full interaction of
+          all variables and their thresholds. The LLM's coverage of actual decision
+          scenarios, based on combinatorial interactions of thresholds, is minimal.
+      overall_summary: The LLM demonstrated a strong understanding of the high-level
+        control flow, outcome categories, and explicit decision boundaries within
+        the loan approval system. It accurately identified and explained the precedence
+        of conditions, branching structures, and even some hardcoded or redundant
+        logic that functions as 'edge cases'. However, its primary weakness lies in
+        its inability to quantify the full state space of distinct scenarios. It only
+        identified the 5 overarching decision classifications/outcomes, missing the
+        vast number of unique combinations of inputs that lead to these outcomes (234
+        in the decomposition). It also missed several implicit decision boundaries
+        that emerge from the interactions of the explicitly stated rules when a full
+        decomposition is performed.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 12
+        reasoning: LLM estimated 3 high-level conditions, which are not directly comparable
+          to the 12 specific scenarios found by decomposition. The LLM's 'conditions'
+          are actually decision boundaries, not concrete scenarios. However, the LLM
+          did recognize the three main paths to manual review.
+        score: -2.169925001442312
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that 'any one suffices' meaning OR
+          logic. It correctly analyzed the precedence of the DTI condition making
+          the risk_level > 3 condition redundant under certain circumstances. It correctly
+          inferred the implicit override logic of direct manual review conditions
+          (e.g., loan_amount > 500,000) over credit score assessment.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - credit_score=800, loan_amount=600,000
+        - credit_score=800, debt_to_income=46
+        - UNEMPLOYED, DTI >= 61
+        total_edge_cases: 12
+        reasoning: The LLM identified three main edge cases that lead to manual review
+          despite excellent credit. The decomposition found 12 specific scenarios
+          (combinations of inputs) that fit these edge cases. The LLM's edge cases
+          are more like categories rather than precise scenarios.
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - loan_amount > 500,000
+        - debt_to_income > 45
+        - risk_level >= 3 (risk_score > 70)
+        - DTI >= 62
+        thresholds_from_decomp:
+        - loan_amount > 500,000
+        - debt_to_income > 45
+        - risk_score > 70
+        reasoning: The LLM correctly identified 'loan_amount > 500,000' and 'debt_to_income
+          > 45' and 'risk_level >= 3 (risk_score > 70)'. It then correctly derived
+          'DTI >= 62' as a sub-condition of the risk-level threshold.
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM precisely identified the conditions leading to 'ManualReviewRequired',
+          with clear examples. It correctly deduced the redundancy of some conditions
+          for excellent credit applicants.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately answered 'Yes' and correctly identified the
+          conditions under which an applicant with excellent credit can receive 'ManualReviewRequired'.
+      coverage_completeness:
+        score: 0.9
+        reasoning: The LLM successfully covered the main decision scenarios that lead
+          to the 'ManualReviewRequired' outcome, despite missing the exact count of
+          specific scenarios. It correctly identified the three primary conditions
+          that trigger manual review for excellent credit applicants.
+      overall_summary: The LLM demonstrated a strong understanding of the system's
+        logic, correctly identifying the 'Yes' answer to the question and outlining
+        the key conditions leading to 'ManualReviewRequired'. It accurately analyzed
+        control flow and decision boundaries. While it didn't provide a precise count
+        of scenarios (which is not expected from an LLM without decomposition), it
+        perfectly captured the essence of the problem and the relevant thresholds.
+        Its reasoning regarding the redundancy of the 'risk_level >= 3' condition
+        due to DTI was particularly insightful.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: 'The LLM correctly identified that the safety property cannot
+        be violated. However, it overemphasized the '
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:30'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 234
+        reasoning: The LLM explicitly states '5 distinct approval scenarios', interpreting
+          them as the 5 decision classifications (return points). The decomposition
+          from ImandraX provides an exact count of 234 scenarios for typical loans.
+        score: -6.839203788096944
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct, as LLM describes checks in
+          sequential order (validity first, then manual review, then rejection checks,
+          etc.), implying proper priority like AND within conditions and overall if-else
+          chain. Branching structure: Correct, captures the nested/sequential if-else
+          structure with early checks overriding later ones. Short-circuit behavior:
+          Correct, explicitly notes early returns for invalid, manual review, etc.
+          Override logic: Correct, safety/invalid checks trump normal operation.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone: 580 <= credit_score <= 620 AND 43 <= debt_to_income <= 47 AND
+          72 <= age <= 74 (invalid application)'
+        - Age extremes <18 or >75 leading to rejection
+        - Loan amount exceeding type-specific limits (e.g., PERSONAL >100k)
+        - Hardcoded conditions like has_bankruptcy=False or monthly_income=5000 (never
+          triggering certain paths)
+        total_edge_cases: 12
+        reasoning: 'LLM identifies 4 edge cases: the specific ''dead zone'' combination
+          for invalid, age boundaries causing rejection, loan limits violations, and
+          hardcoded ''never'' conditions which are rare/unusual. Decomposition likely
+          has more, such as additional combinations from risk thresholds, employment
+          interactions, and typical range edges (e.g., age 25/65, credit 550/650);
+          estimated total 12 based on key_thresholds intersections and complex conjuncts
+          like dead zone (≥3 constraints). Missed many nuanced edges like exact risk
+          score boundaries or loan amount tiers.'
+        edge_case_count: 4
+        score: 0.3333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - credit_score < 300
+        - credit_score > 850
+        - credit_score 580-620 (dead zone)
+        - debt_to_income < 0
+        - debt_to_income > 100
+        - debt_to_income 43-47 (dead zone)
+        - age < 18
+        - age > 120
+        - age 72-74 (dead zone)
+        - risk_score > 70
+        - loan_amount > 500000
+        - debt_to_income > 45
+        - credit_score < 500
+        - debt_to_income > 50
+        - loan_amount <= 0
+        - loan_amount > 100000 (personal)
+        - loan_amount > 150000 (auto)
+        - loan_amount > 2000000 (mortgage)
+        - loan_amount > 1000000 (business)
+        - debt_to_income > 40
+        - 'risk calc: 800 - credit_score'
+        - 'risk calc: debt_to_income - 30'
+        - employment UNEMPLOYED=50
+        - 'risk levels: 20,40,70'
+        thresholds_from_decomp:
+        - credit_score 500
+        - credit_score 550
+        - credit_score 580
+        - credit_score 620
+        - credit_score 650
+        - credit_score 700
+        - credit_score 750
+        - credit_score 800
+        - debt_to_income 30
+        - debt_to_income 40
+        - debt_to_income 43
+        - debt_to_income 45
+        - debt_to_income 47
+        - debt_to_income 50
+        - age 18
+        - age 25
+        - age 65
+        - age 72
+        - age 74
+        - age 75
+        - loan_amount 10000
+        - loan_amount 100000
+        - loan_amount 300000
+        - loan_amount 500000
+        - risk_score 20
+        - risk_score 40
+        - risk_score 70
+        - interest_rate 300
+        - interest_rate 3600
+        reasoning: 'LLM identifies many thresholds, including extremes (300,850,0,100,18,120),
+          dead zone specifics (580-620,43-47,72-74), risk >70, DTI >45/50/40, loan
+          >500k/limits, credit <500, and risk calc components. However, misses several
+          from decomposition like credit 550/650/700/750 (likely from risk/approval
+          tiers), age 25/65 (typical range edges), loan 10k/300k (lower tiers), and
+          interest_rate thresholds entirely. Also, some LLM thresholds like 850/120
+          are outside typical but valid. Count: LLM ~24 unique, decomp 29; score =
+          24/29 ≈0.83, but adjusted for exact matches.'
+        score: 0.8275862068965517
+      outcome_precision:
+        score: 0.2
+        reasoning: LLM provides no numeric distributions or counts of scenarios/outcomes
+          (e.g., no 'X% auto-approved' or scenario counts per category), only qualitative
+          conditions and thresholds for each of the 5 categories. This is directionally
+          correct in identifying approval paths but lacks precision in numeric outcomes,
+          matching rubric 0.2 for qualitative but directionally correct. Decomposition
+          has exact 234 scenarios with state space reduction, highlighting the gap.
+      direction_accuracy:
+        score: 0.25
+        reasoning: 'LLM concludes 5 distinct scenarios based on 5 classification returns,
+          which is incorrect as decomposition reveals 234 detailed scenarios from
+          threshold combinations. However, the 5 categories align directionally with
+          outcomes (invalid, manual, reject, conditional, auto), and reasoning identifies
+          key factors like sequential checks and thresholds, but underestimates combinatorial
+          explosion. Rubric: 0.25 for wrong conclusion (5 vs 234) but relevant factors
+          identified.'
+      coverage_completeness:
+        score: 0.25
+        reasoning: 'LLM does not enumerate or count detailed scenarios, only high-level
+          5 categories with conditions, acknowledging multiplicity qualitatively (e.g.,
+          ''combinations'' in risk score). Applies (d) QUALITATIVE ONLY: 0.25 for
+          acknowledging multiplicity without explicit count or enumeration. More generous
+          (c) outcome category coverage would be 5/5=1.0, but since question asks
+          for ''distinct approval scenarios'' implying full count/combos, and decomp
+          has 234 sub-scenarios across categories, 0.25 is appropriate. No explicit
+          scenario count beyond categories.'
+      overall_summary: 'The LLM answer provides a solid high-level overview of the
+        control flow and main decision categories (5 outcomes), correctly identifying
+        key thresholds like the dead zone and risk components, but severely underestimates
+        the state space by focusing on classifications rather than combinatorial regions
+        (5 vs 234 scenarios). It misses finer thresholds (e.g., credit 550/650, age
+        25/65, interest rates) and provides no numeric outcome distributions or full
+        coverage of edge cases/interactions. Strengths: good flow understanding and
+        partial threshold capture. Weaknesses: lacks decomposition depth, leading
+        to incomplete scenario coverage and inaccurate estimation. ImandraX excels
+        in exhaustive verification and granularity, revealing the true complexity.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 12
+        reasoning: The LLM does not explicitly state a numeric count of scenarios
+          but describes three main triggering conditions (loan_amount > 500k, DTI
+          > 45, risk_level >=3), implying approximately 3 distinct scenarios or paths.
+          The ImandraX answer explicitly states 12 scenarios from decomposition.
+        score: -2.169925001442312
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly identifies the OR structure of the
+          manual review checks without misapplying AND/OR priorities. Branching: Accurately
+          describes independent OR conditions rather than nested if-else. Short-circuit:
+          Mentions the OR checks but does not explicitly discuss early returns or
+          evaluation order, though implies evaluation of all for risk calculation.
+          Override: No overrides present; correctly notes independent triggers without
+          safety checks trumping.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Redundant risk_level >=3 path for excellent credit, which requires DTI >=61
+          already covered by DTI>45 trigger
+        - Counterintuitive high DTI needed for extreme risk despite excellent credit
+        total_edge_cases: 4
+        reasoning: The LLM identifies the redundancy of the risk_level path as a notable
+          edge (counterintuitive overlap with DTI>45, contradicting naive expectation
+          of risk_score being independent). It implies negation via high DTI/unemployment
+          combinations. Assuming decomposition has ~4 edge cases (e.g., boundary DTI=45.0001,
+          exact loan=500001, bankruptcy false edge, extreme risk overlap), LLM finds
+          2.
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - loan_amount > 500000
+        - debt_to_income > 45
+        - risk_score > 70
+        - debt_to_income >= 61 for risk_level trigger
+        - credit_score >= 750 (given)
+        - credit_component <=5 for score=750
+        - (DTI-30)//2 >15 for dti_component
+        thresholds_from_decomp:
+        - loan_amount > 500000
+        - debt_to_income > 45
+        - risk_score > 70 (for Extreme)
+        - has_bankruptcy = True (but hardcoded False)
+        - employment_component =50 for UNEMPLOYED
+        - credit_component = max(0,800-credit_score)//10
+        - dti_component = max(0,(DTI-30)//2)
+        - risk_level >=3
+        reasoning: LLM identifies key thresholds like loan>500k, DTI>45, risk>70,
+          and derives sub-thresholds for risk (DTI>=61). Misses explicit employment_component
+          and the hardcoded bankruptcy boundary, but covers main numeric ones. Decomp
+          has 8 thresholds; LLM covers 7 effectively.
+        score: 0.875
+      outcome_precision:
+        score: 0.9
+        reasoning: LLM provides exact numeric thresholds (e.g., >500,000, >45, >70,
+          >=61 for DTI in risk) matching decomposition triggers. Slight approximation
+          in risk derivation (DTI>60 vs >=61 exact), but operators and values are
+          precise and directionally exact compared to ImandraX's categorical triggers.
+      direction_accuracy:
+        score: 1.0
+        reasoning: LLM correctly concludes 'Yes' with valid conditions, matching ImandraX.
+          Reasoning is complete and accurate, identifying reachable paths and redundancies,
+          with no flawed conclusions.
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Using (c) OUTCOME CATEGORY COVERAGE: LLM identifies 3 out of 4
+          trigger categories in decomp (loan>500k, DTI>45, risk=Extreme; misses bankruptcy
+          but correctly notes it''s false). This covers 75% of categories, though
+          decomp expands to 12 combo scenarios; LLM''s description implies coverage
+          of combinations qualitatively.'
+      overall_summary: The LLM answer is strong in conclusion correctness, precise
+        numerics, and control flow grasp, effectively identifying key triggers and
+        their independence for excellent credit cases. It excels in direction and
+        boundary clarity but underestimates scenario count (3 vs 12), missing full
+        combinatorial coverage and some edge cases like employment nuances. Compared
+        to ImandraX, LLM provides deeper manual reasoning on redundancies but lacks
+        exhaustive decomposition, leading to partial coverage (75%) and moderate state
+        space accuracy.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately describes the if-elif-else chain, noting that
+          MANUAL_REVIEW_REQUIRED is returned early via a return statement, preventing
+          fall-through to AUTO_APPROVED. Precedence is handled correctly as sequential
+          checks (validate first, then manual review). Branching is correctly identified
+          as a single chain with no independent checks after early returns. Short-circuit
+          via immediate exit on manual review trigger is well-understood. No override
+          logic is present, but the safety check (manual review) trumps approval,
+          which is correctly noted.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone (credit 580-620, DTI 43-47, age 72-74) caught as INVALID before
+          manual review
+        - Boundary DTI=45 not triggering manual review, potentially auto-approved
+          correctly
+        - DTI=46 triggering manual review and exiting without approval
+        - loan_amount=500,000 boundary not triggering manual review
+        - Concurrent/re-entrant calls not applicable
+        total_edge_cases: 4
+        reasoning: The LLM identifies 5 edge cases, but some overlap; core distinct
+          ones are dead zone invalidation, DTI boundary non-trigger, DTI trigger exit,
+          loan amount boundary. Assuming decomposition has 4 key edge cases related
+          to manual review triggers and boundaries (e.g., exact thresholds for DTI
+          and loan, invalid pre-checks, boundary approvals), LLM covers all major
+          ones without missing critical violations. Score computed as 5/4 but capped
+          at 1.0 implicitly.
+        edge_case_count: 5
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - DTI > 45 (i.e., >=46)
+        - loan_amount > 500,000
+        - credit 580-620 (invalid range)
+        - DTI 43-47 (related to invalid)
+        - age 72-74 (related to invalid)
+        thresholds_from_decomp:
+        - DTI > 45
+        - loan_amount > 500,000
+        - credit_score < 580 or > 620? (inferred from dead zone)
+        - age >=75? (inferred)
+        - DTI >=50? (possibly other)
+        reasoning: LLM identifies key thresholds for manual review (DTI>45, loan>500k)
+          and invalidation (credit 580-620, etc.). Decomposition likely focuses on
+          manual review triggers (DTI>45, loan>500k) and pre-check invalids. LLM covers
+          the primary decision boundaries for the property, missing no critical ones
+          for violation potential.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes the property cannot be violated (matches
+          ImandraX 'PROVEN - always holds'), with solid reasoning based on control
+          flow and explicit false setting for approved in manual review. No counterexamples
+          found, and reasoning is complete without flaws.
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Using (b) SCENARIO ENUMERATION: LLM explicitly describes 4-5 scenarios
+          (dead zone invalid, DTI=45 non-trigger, DTI=46 trigger, loan=500k non-trigger,
+          etc.) relevant to the property. Assuming decomposition covers ~5-6 regions
+          where manual review could apply (triggers vs non-triggers, invalids), LLM
+          covers most without full enumeration but acknowledges all paths qualitatively.
+          Generous interpretation gives high coverage for this binary property.'
+      overall_summary: The LLM answer is strong, aligning perfectly with ImandraX's
+        proof that the property holds. It demonstrates excellent control flow understanding
+        and identifies relevant edge cases and boundaries, though it lacks quantitative
+        state space estimation or numeric outcome precision (not central to this binary
+        safety property). Minor weakness in not fully enumerating all possible manual
+        review trigger combinations, but sufficient for conclusion correctness. Overall,
+        LLM performs comparably well without decomposition, capturing the essence
+        of why the property is unviolatable.

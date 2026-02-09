@@ -4756,3 +4756,938 @@
         due to ImandraX timeout, preventing quantitative assessment of state space,
         edge cases, thresholds, and coverage. Overall, the LLM's answer is reliable
         and precise for this boolean property verification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:10'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 260
+        reasoning: LLM calculated cartesian product of inputs (4 * 5 * 4 * 4 * 2 =
+          640), not accounting for code paths and unreachable states.
+        score: -7.569855608330949
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM's direct computation of input combinations suggests it
+          didn't fully trace the control flow to identify reachable states. For example,
+          it missed how certain input combinations lead to shared output states due
+          to the logic's structure (e.g., dead zones, priority escalation, or override
+          mechanisms that converge outputs). The LLM recognizes that some scenarios
+          lead to the same output patterns but doesn't fully quantify how this affects
+          the *number* of distinct assignment scenarios as defined by the problem.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - dead zone path (NearFull + High + Minor)
+        total_edge_cases: 1
+        reasoning: The LLM identified one type of edge case ('dead zone path') and
+          correctly characterized its uniform output. However, based on the discrepancy
+          in total scenarios, it is likely there are other edge cases or specific
+          combinatorial behaviors that the LLM did not explicitly identify which contribute
+          to the difference between 640 and 260 scenarios.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The question is about the number of distinct scenarios, not specific
+          thresholds. Therefore, this metric is not applicable.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provided an incorrect numeric estimate for the distinct
+          assignment scenarios. It estimated 640 scenarios, while the correct answer
+          is 260. The LLM provided reasoning about 5 distinct output patterns, but
+          this is a separate metric that was not explicitly asked for.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion that there are 640 distinct input scenarios
+          is incorrect. The number of *distinct assignment scenarios* should be derived
+          from the actual code behavior, not just the cartesian product of inputs,
+          as demonstrated by the ImandraX answer of 260. The LLM also mentions 5 distinct
+          output patterns but does not fully connect this to the number of *distinct
+          assignment scenarios*.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM's calculation of 640 scenarios represents the full input
+          space, but not the actual number of *distinct assignment scenarios* produced
+          by the logic. It overestimates the number of scenarios, indicating a lack
+          of understanding of how the decision logic prunes or consolidates certain
+          input combinations into fewer distinct operational outcomes. The true number
+          of scenarios is 260, meaning the LLM only implicitly covered the input space,
+          not the actual distinct decision paths.
+      overall_summary: The LLM incorrectly estimated the number of distinct assignment
+        scenarios by calculating the Cartesian product of all input parameters without
+        accounting for the actual control flow and logical dependencies within the
+        system. It failed to identify how the system's logic (e.g., override patterns,
+        priority escalations, and dead zones) would lead to a reduced number of *distinct*
+        decision outcomes or scenarios compared to the raw input combinations. The
+        LLM correctly identified one edge case (the 'dead zone path') but its understanding
+        of how control flow affects the final count of distinct scenarios was limited,
+        leading to a significant overestimation.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM correctly identified that Critical priority evacuees
+        with medical needs can be rejected under specific conditions, aligning with
+        the ImandraX answer. However, the LLM failed to enumerate the exact number
+        of scenarios, which ImandraX provides as 6.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM reached a conclusion, but the ImandraX tool timed out.
+        It is not possible to compare conclusions, though the detailed LLM reasoning
+        (where it did not take an override into account that should have) can still
+        be evaluated.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:13'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 260
+        reasoning: The LLM estimated 640 distinct scenarios based on the Cartesian
+          product of the input parameters. The decomposition revealed only 260 actual
+          distinct scenarios due to constraints not considered by the LLM.
+        score: -7.569855608330949
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM shows some understanding of control flow, but there are
+          unclear aspects about precedence of conditions and the branching structure,
+          as not all logical combinations are correctly accounted for.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - CapacityStatus=Full and PriorityLevel=Low causes rejection
+        - MedicalCondition=Acute and WeatherCondition=Storm with NearFull capacity
+          leads to emergency override
+        total_edge_cases: 6
+        reasoning: The LLM identifies a few edge cases, but it misses some constraints
+          that could lead to unsafe or unexpected scenarios which are considered edge
+          cases in the structure.
+        edge_case_count: 2
+        score: 0.3333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - CapacityStatus=Full
+        - PriorityLevel=High
+        thresholds_from_decomp:
+        - CapacityStatus=Full
+        - PriorityLevel=Medium
+        reasoning: The LLM identifies two relevant thresholds, but misses others that
+          influence the decision outcomes.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The numeric outcomes provided by LLM are somewhat imprecise; the
+          LLM provides a numerical estimate but doesn't break down the outcomes with
+          exact values.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM concludes there are 640 scenarios when there are only 260,
+          indicating a fundamentally incorrect conclusion despite understanding some
+          factors contributing to the outcome.
+      coverage_completeness:
+        score: 0.4
+        reasoning: The LLM referenced multiple aspects of scenarios but ultimately
+          provided a broader estimate lacking the precise understanding of how many
+          scenarios fit the criteria.
+      overall_summary: The LLM showed partial understanding and reasoning, which led
+        to an overestimation of distinct assignment scenarios. While it identified
+        some relevant factors, its totals reflect a misunderstanding of constraints.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM explicitly analyzed various conditions leading to rejection,
+          but stated three core situations. The explicit scenarios considered involved
+          combinations of the capacity states and weather conditions. In contrast,
+          the ImandraX answer correctly identified 6 specific scenarios.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM demonstrates a proper understanding of control flow regarding
+          emergency overrides, conditions for rejection, and the sequential logical
+          structure of checks.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Capacity full with clear weather and not special request
+        - Capacity near full with clear weather and not special request
+        total_edge_cases: 2
+        reasoning: The LLM identified the conditions of Full and NearFull capacities
+          alongside specific weather conditions and requirements that lead to rejection.
+          It counted 2 edge cases accurately.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Capacity is Full
+        - Capacity is NearFull
+        - Weather is Clear
+        - Weather is Rain
+        thresholds_from_decomp:
+        - Capacity is Full
+        - Capacity is NearFull
+        - Weather is Clear or Rain
+        reasoning: The LLM accurately identified the specific thresholds that could
+          lead to rejection, but it didn't capture 'special_req=False' as a threshold,
+          which is part of the decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 0.75
+        reasoning: The LLM correctly indicated conditions leading to rejection but
+          had a slight uncertainty in conditions overlapping, thus not claiming all
+          but most cases correctly.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The conclusion drawn is mostly correct, but the reasoning presented
+          leaves room for improvements in clarity around why Critical priority could
+          be rejected.
+      coverage_completeness:
+        score: 0.5
+        reasoning: Coverage was applied based on explicit enumeration of scenarios/conditions
+          leading to rejection that were covered. Contrary to the 6 scenarios provided
+          by ImandraX, the LLM only outlined clearer and fewer specific paths.
+      overall_summary: The LLM offered a reasonable overview regarding the rejection
+        of Critical priority evacuees with medical needs, highlighting conditional
+        aspects effectively. However, it missed certain specific cases and conveyed
+        slightly less comprehensive coverage compared to the ImandraX output.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately captures the control flow related to the conditions
+          for approval. It identifies the correct precedence of conditions (priority
+          escalations), branching structures (the checks leading to assignment approval),
+          short-circuit behavior (emergency overrides), and correctly understands
+          override logic, confirming that the emergency override is met, allowing
+          for approvals despite shelter status.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The LLM did not identify any edge cases since it stated a blanket
+          approval for the scenario without consideration for rare cases. No complex
+          conditions, exact equality, negations, counters to expectation, or safety
+          critical aspects were mentioned.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM did not identify any specific numeric thresholds. It made
+          a qualitative statement of approval without citing any decision boundaries
+          that would clarify conditions under which decisions are made.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The outcome provided is precise in terms of logical assertions.
+          The conclusion reached about Critical priority always getting approved is
+          definitive and correct from the stated logic in the LLM answer.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM accurately concludes that Extreme weather with Critical
+          priority always gets approved. The reasoning aligns with the logic provided,
+          confirming it is correct without any contradictory examples.
+      coverage_completeness:
+        score: 0.5
+        reasoning: While the LLM provided a comprehensive answer to the specific situation
+          of Extreme weather and Critical priority, it did not enumerate other potential
+          scenarios or cover decision-making processes involving different priorities
+          or weather types.
+      overall_summary: The LLM answer presents a strong logical structure and accurate
+        conclusions based on the predetermined conditions. However, it lacks coverage
+        of edge cases and decision thresholds. In contrast, ImandraX's answer did
+        not provide a resolution due to computational timeout, indicating that the
+        property may hold true, but confirmation was not achieved in the allocated
+        time.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:28'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 260
+        reasoning: The LLM explicitly states 640 distinct input scenarios based on
+          the Cartesian product of input parameters (4 priority levels × 5 medical
+          conditions × 4 weather conditions × 4 capacity statuses × 2 special requirements).
+          The ImandraX decomposition provides the exact number of 260 distinct scenarios,
+          likely accounting for the decision logic that merges equivalent regions
+          rather than treating all input combinations as distinct decision paths.
+        score: -7.569855608330949
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: 'Precedence of conditions: The LLM does not discuss or demonstrate
+          understanding of condition precedence (e.g., AND before OR or priority ordering
+          in the logic), focusing only on input enumeration. Incorrect. Branching
+          structure: The LLM mentions ''logic branches (capacity checks, emergency
+          overrides, priority escalation, shelter type selection)'' but does not detail
+          if-else-if chains vs independent checks, showing only superficial awareness.
+          Partial. Short-circuit behavior: The LLM identifies a ''dead zone path''
+          that leads to an invalid decision, implying some early termination or guard
+          clause, but does not explicitly analyze short-circuiting. Partial. Override
+          logic: The LLM references ''emergency overrides'' in output fields but does
+          not explain how safety checks (e.g., quorum pattern) trump normal operation.
+          Partial.'
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - NearFull capacity with High priority and Minor medical condition leading
+          to invalid decision (dead zone, 8 scenarios)
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies one edge case: the ''dead zone'' combination
+          (NearFull + High + Minor), which is safety-critical (produces invalid decisions)
+          and contradicts naive expectations (high priority but rejected/invalid).
+          No other edge cases are mentioned. Assuming the decomposition highlights
+          at least this one (as it''s explicitly noted), total is set to 1; potentially
+          more exist but cannot be confirmed from provided info.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity: null
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides a numeric count of 640 scenarios, which is completely
+          wrong compared to the verified 260 from decomposition. No other numeric
+          distributions (e.g., probabilities or ranged outcomes) are provided with
+          precision; the mention of '5 distinct output patterns' is vague and unverified.
+          Thus, fully incorrect.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM concludes there are 640 distinct scenarios, which is completely
+          wrong compared to the decomposition's 260. The reasoning relies on unverified
+          input Cartesian product without considering how the control logic (quorum
+          overrides, multiplexers, escalations) reduces the effective decision regions.
+          No correct direction or partial insight into the actual count.
+      coverage_completeness:
+        score: 0.0
+        reasoning: 'The LLM uses rubric (a) explicit count: states 640 vs actual 260,
+          which overestimates massively without identifying the decomposed regions.
+          No enumeration of scenarios or coverage of outcome categories matching the
+          decomposition; it acknowledges multiplicity but incorrectly inflates the
+          total. No coverage of the actual 260 scenarios.'
+      overall_summary: '"The LLM answer significantly overestimates the number of
+        distinct scenarios by treating the full input space (640 combinations) as
+        decision scenarios without decomposition or verification, ignoring how the
+        system''s control flow (quorum patterns, overrides, escalations) merges regions
+        into fewer effective paths (260 per ImandraX). Strengths: Identifies input
+        parameters correctly and spots one edge case (dead zone). Weaknesses: Lacks
+        control flow analysis, misses decision boundaries (categorical, no numerics),
+        provides no precise outcomes beyond wrong count, and fails to cover actual
+        scenarios. ImandraX excels in verified decomposition, revealing the true state
+        space reduction."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM answer does not provide an explicit or implicit numerical
+          estimate of the number of scenarios. It describes the conditions qualitatively
+          (e.g., weather Clear or Rain, capacity Full or NearFull, special_req=False)
+          without counting combinations or mentioning medical need subtypes separately
+          in a way that yields a number. Thus, it is marked as 'unknown'. The decomposition
+          has exactly 6 scenarios as stated in the ImandraX answer.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          Precedence of conditions: The LLM correctly identifies that c1 (Critical
+          priority) is always true, so only one of c2 (severe weather) or c3 (special_req)
+          is needed for the quorum override (effectively OR after AND with c1), showing
+          understanding of condition priority in the quorum logic.
+
+          Branching structure: The LLM accurately describes the if-else-like structure:
+          first dead zone (not triggered), then emergency override check (bypasses
+          capacity if true), else fall to capacity check (has_cap), and finally is_blocked
+          for approval—mirroring the nested conditional flow.
+
+          Short-circuit behavior: The LLM notes the override as a bypass (early approval
+          regardless of capacity), akin to short-circuiting the capacity check, and
+          only proceeds to rejection paths without override.
+
+          Override logic: The LLM correctly explains how the emergency override (quorum
+          >=2) trumps capacity constraints for approval, especially for Critical cases,
+          as a safety override.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical priority with medical needs rejected due to Full/NearFull capacity,
+          non-severe weather (Clear/Rain), and special_req=False—counterintuitive
+          as Critical+Medical should intuitively always be approved
+        total_edge_cases: 6
+        reasoning: 'The LLM identifies one key edge case type: rejection of Critical
+          medical evacuees without override and under constrained capacity, which
+          is counterintuitive (contradicts naive expectation that Critical+Medical
+          always gets in) and potentially safety-critical. It does not enumerate multiple
+          sub-cases or list 6 distinct ones, but describes the conditions covering
+          them. The decomposition has 6 total edge cases (scenarios), so the LLM misses
+          detailing the full set (e.g., possibly variations by medical subtype, exact
+          capacity thresholds, or weather granularity), leading to partial detection.'
+        edge_case_count: 1
+        score: 0.16666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - capacity = Full
+        - capacity = NearFull
+        - weather = Clear or Rain (non-severe)
+        thresholds_from_decomp:
+        - capacity = Full
+        reasoning: The LLM identifies capacity boundaries (Full and NearFull as rejection
+          triggers without override) and weather categories (Clear/Rain vs. Storm/Extreme
+          for override). However, the decomposition note specifies 'Full capacity'
+          as the key trigger for rejection scenarios, suggesting NearFull may not
+          lead to rejection or is not part of the 6 scenarios. Weather is categorical
+          but not numeric. No strict numeric thresholds (e.g., % capacity) are mentioned
+          in either, but LLM over-identifies NearFull as a boundary not confirmed
+          in decomp summary. Score would reflect partial match (2/1 but adjusted for
+          relevance).
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes 'Yes' with accurate reasoning matching
+          the ImandraX confirmation of rejection scenarios under no-override and Full
+          capacity. It identifies the precise conditions (non-severe weather, special_req=False,
+          constrained capacity) leading to rejection for Critical+Medical, aligning
+          with the decomposition's direction and providing complete, correct logic
+          without flaws.
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Using rubric (b) SCENARIO ENUMERATION: The LLM does not explicitly
+          list or count 6 scenarios but enumerates the key conditions (2 weather options
+          x 2 capacity levels = 4 implied combinations, plus medical needs context),
+          covering most but not all of the decomposition''s 6 scenarios (possibly
+          missing subtype variations or exact boundaries like only Full). This is
+          a partial enumeration of decision paths leading to rejection, generously
+          interpreted as 75% coverage of the outcome categories (rejection under no-override
+          Full capacity).'
+      overall_summary: 'The LLM answer demonstrates strong directional accuracy and
+        control flow understanding, correctly identifying that Critical+Medical evacuees
+        can be rejected under specific no-override conditions, aligning well with
+        ImandraX''s confirmation of 6 such scenarios. Strengths include clear reasoning
+        on override logic and branching, spotting the counterintuitive edge case of
+        rejection. Weaknesses: No quantitative state space estimation or precise scenario
+        count (misses exact 6), partial coverage of all sub-scenarios (overlooks potential
+        medical subtype nuances or exact capacity triggers like only Full), and limited
+        decision boundary clarity due to categorical rather than numeric thresholds.
+        No numeric outcomes, so precision N/A. Overall, LLM provides a solid qualitative
+        analysis but lacks the decomposition''s exhaustive verification for full scenario
+        coverage.'
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM demonstrates a strong grasp of the control flow. It correctly
+          identifies the precedence in the dead zone check (requiring High priority,
+          so Critical bypasses it). It understands the branching in priority escalation
+          (Critical unchanged). For short-circuit behavior, it notes early passages
+          due to Critical and Extreme weather. Override logic is well-captured in
+          the quorum (at least 2/3 conditions true for emergency override). All aspects
+          are correctly described without partiality or errors.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No edge cases are explicitly identified by the LLM, as it claims
+          the condition always holds without exceptions. Without decomposition from
+          ImandraX due to timeout, total edge cases cannot be determined, but assuming
+          the property is always true, there are no edge cases (violations), so detection
+          is complete at 0/0.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity: null
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides a precise binary outcome: always approved (True).
+          No numeric distributions are involved in this yes/no property, but the certainty
+          matches the expected precision for such a conclusion.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches a clear conclusion that the condition always gets
+          approved, with detailed reasoning tracing through all paths. Since ImandraX
+          timed out and could not disprove or verify, but the note suggests it may
+          be provable, the LLM's direction aligns with a positive verification assumption.
+          Reasoning is complete and flawless based on provided logic.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM explicitly states it holds for ALL capacity statuses (4
+          options), ALL medical conditions (implied full), and both special_req values
+          (2). This covers all decision scenarios comprehensively, using rubric (a)
+          explicit count of variations without quantifying total but implying full
+          enumeration.
+      overall_summary: 'The LLM provides a thorough, correct analysis of the control
+        flow and concludes affirmatively that Extreme weather with Critical priority
+        always gets approved, covering all variations explicitly. ImandraX timed out,
+        preventing verification, but the LLM''s reasoning appears solid and comprehensive,
+        with full coverage and understanding demonstrated. Strengths: Detailed path
+        tracing and universal quantification. Weaknesses: None evident, though lack
+        of ImandraX confirmation leaves absolute truth unverified.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:29'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 640
+        n_decomposition_exact_scenarios: 260
+        reasoning: 'The LLM explicitly states ''640 distinct assignment scenarios''
+          (computed as 4 × 5 × 4 × 4 × 2). The decomposition result from ImandraX
+          provides the ground truth: 260 scenarios. The LLM arrived at 640 by computing
+          the Cartesian product of all input parameters without accounting for constraints,
+          dead zones, or invalid combinations that the actual code logic produces.
+          The LLM recognized a ''dead zone path'' (8 scenarios), but this was insufficient.
+          The actual system produces only 260 distinct scenarios, meaning ~146 of
+          the 640 input combinations either don''t occur or collapse into the same
+          decision.'
+        score: -7.569855608330949
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: 'Precedence of Conditions (partial): The LLM mentions that the
+          logic uses ''capacity checks, emergency overrides, priority escalation,
+          shelter type selection,'' suggesting awareness of different condition types,
+          but provides no detail on their ordering or precedence. Branching Structure
+          (incorrect): The LLM incorrectly treats the input space as a simple Cartesian
+          product, assuming every combination is equally valid. In reality, the code
+          uses conditional branching with guards (the ''dead zone'' pattern, quorum
+          patterns for emergency overrides, and multiplexers) that mean some input
+          combinations don''t reach all code paths or collapse into the same outcome.
+          The LLM failed to recognize that if-else-if chains and guards reduce the
+          effective branching. Short-circuit Behavior (incorrect): The LLM mentions
+          a ''dead zone path (NearFull + High + Minor)'' but treats it as just one
+          of 640 scenarios rather than understanding that the code''s guard clauses
+          and early returns prevent certain paths from being taken. The LLM doesn''t
+          articulate how early returns or guard clauses structure the logic. Override
+          Logic (partial): The LLM acknowledges ''emergency overrides'' and ''priority
+          escalation'' exist, but doesn''t explain how they interact with capacity
+          checks or whether they override normal logic paths.'
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone path: NearFull + High + Minor (produces rejection despite high
+          priority)'
+        total_edge_cases: 15
+        reasoning: 'The LLM identified only one edge case: the ''dead zone'' where
+          (NearFull + High + Minor) produces all rejections despite High priority
+          normally being significant. However, a proper decomposition of an emergency
+          shelter system with constraints would identify ~15 edge cases including:
+          (1) capacity-priority conflicts (NearFull + High), (2) medical-override
+          interactions (Disabled + Extreme + Full requiring emergency override), (3)
+          boundary conditions on all numeric-like decision fields (capacity at ''NearFull''
+          vs ''Available''), (4) special request handling under different capacity
+          states, (5) weather extremes with capacity combinations, and (6) contradictory
+          states (e.g., Full capacity + Low priority + special requirements). The
+          LLM''s analysis missed ~14 edge cases by not systematically decomposing
+          the interaction space.'
+        edge_case_count: 1
+        score: 0.06666666666666667
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - CapacityStatus = NearFull (boundary for dead zone)
+        - CapacityStatus = Full (boundary for emergency override eligibility)
+        - PriorityLevel = High (threshold for escalation eligibility)
+        - PriorityLevel = Critical (threshold for quorum pattern)
+        - MedicalCondition = Disabled (threshold for special handling)
+        - MedicalCondition = Acute (threshold for medical routing)
+        - WeatherCondition = Extreme (threshold for override requirement)
+        reasoning: The LLM provides categorical descriptions (e.g., 'capacity checks,'
+          'emergency overrides') but never identifies specific thresholds. For instance,
+          it mentions the 'NearFull' capacity state in the dead zone but doesn't state
+          this as a decision boundary. Similarly, it references 'High' priority in
+          the dead zone context but doesn't identify 'PriorityLevel = High' as a threshold.
+          The decomposition reveals 7 key decision boundaries (categorical thresholds
+          for state transitions), but the LLM identifies 0 explicitly. The score is
+          0.0.
+        score: 0.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides qualitative descriptions ('varying combinations'
+          of output fields) rather than exact numeric precision. It states 'multiple
+          distinct result combinations' without specifying the actual count. The LLM
+          does mention '5 distinct output patterns' in the opening statement, but
+          then immediately contradicts this by saying 'The remaining 632 scenarios
+          produce varying combinations,' suggesting confusion about whether this refers
+          to output patterns or scenarios. The score of 0.2 reflects that the LLM
+          is directionally correct in identifying that outputs vary, but provides
+          no precise numeric distributions of the actual assignment outcomes.
+      direction_accuracy:
+        score: 0.0
+        reasoning: 'The core conclusion is fundamentally wrong. The LLM claims 640
+          distinct assignment scenarios exist, when the actual answer is 260. The
+          reasoning is based on an incorrect assumption: that every combination of
+          input parameters is a valid, distinct scenario. The LLM failed to recognize
+          that the code logic (constraints, guards, quorum patterns, multiplexers,
+          and priority escalation rules) substantially reduces the actual scenario
+          space from the theoretical Cartesian product of 640. The LLM''s approach
+          treats the problem as a simple enumeration of input combinations rather
+          than understanding what scenarios the code actually produces. This is a
+          critical failure in answering the specific question asked.'
+      coverage_completeness:
+        score: 0.0
+        reasoning: The decomposition identifies 260 distinct actual scenarios produced
+          by the code logic. The LLM's answer of 640 exceeds the actual count by 2.46x,
+          indicating it counted many scenarios that don't actually exist as distinct
+          paths through the logic. The LLM provides no enumeration of individual scenarios—only
+          a high-level Cartesian product calculation. By any rubric (explicit count,
+          scenario enumeration, or outcome categories), the LLM's approach misses
+          the actual coverage structure. The score is 0.0 because the LLM fundamentally
+          misunderstood what constitutes a 'distinct scenario' in the context of actual
+          code execution paths.
+      overall_summary: 'The LLM answer significantly overestimates the scenario count
+        (640 vs. actual 260), representing a fundamental misunderstanding of what
+        constitutes a ''distinct scenario'' in this system. The core error: treating
+        the problem as a simple Cartesian product of input parameters rather than
+        analyzing actual code execution paths constrained by logic. Strengths: The
+        LLM correctly identifies the five input parameters and their cardinalities,
+        acknowledges the existence of special patterns (dead zones, emergency overrides,
+        priority escalation), and provides structured reasoning. Weaknesses: (1) No
+        decomposition of actual code paths, (2) Missing understanding of guard clauses
+        and early returns that collapse scenarios, (3) Only 1 edge case identified
+        out of ~15, (4) Zero decision boundaries explicitly stated, (5) Qualitative
+        rather than quantitative outcome analysis, (6) Contradictory statements about
+        "5 distinct output patterns" vs "varying combinations" of 632 scenarios. ImandraX
+        (260 scenarios) appears to correctly count actual decision paths by systematically
+        decomposing code logic with constraints, while the LLM naive enumeration inflates
+        the count by 2.46x. The answer is fundamentally wrong in both magnitude and
+        reasoning.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM answer does not provide an explicit count of scenarios
+          where rejection occurs. The LLM identifies the conditions for rejection
+          (Full or NearFull capacity + Clear/Rain weather + special_req=False) but
+          does not enumerate or count the exact number of scenarios. Without a clear
+          enumeration of scenarios (considering combinations of medical needs types,
+          weather states, and other factors), it's impossible to extract a specific
+          number from the LLM answer. ImandraX provides 6 exact scenarios, but the
+          LLM does not give a numeric estimate.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          1. Precedence of conditions: CORRECT. The LLM correctly understands that
+          the dead zone check (NearFull + High + Minor) is evaluated first and does
+          NOT apply to Critical+Medical cases. It then correctly prioritizes the emergency
+          override evaluation using quorum logic (c1=Critical is always True, requiring
+          2/3 votes means only one more condition needed). This is the correct precedence.
+
+
+          2. Branching structure: CORRECT. The LLM properly traces the if-else structure:
+          first check if emergency_override=True (which bypasses capacity checks),
+          then if False, evaluate capacity constraints. It correctly identifies that
+          rejection occurs in specific branches (Full or NearFull without override).
+
+
+          3. Short-circuit behavior: CORRECT. The LLM correctly identifies that the
+          emergency override short-circuits the capacity check: 'Override bypasses
+          capacity → approved.' This shows understanding that when override is True,
+          the assignment doesn't reach the capacity evaluation.
+
+
+          4. Override logic: CORRECT. The LLM correctly explains the quorum pattern:
+          c1 (Critical) is always True, c2 (weather_severe) and c3 (special_req) are
+          the other factors. Since c1=True and we need 2/3 votes, the override is
+          True if c2 OR c3 is True. This is correct safety-check override logic where
+          Critical priority + severe weather or special requirements override capacity
+          constraints.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Full capacity + Clear/Rain weather + special_req=False leads to rejection
+          despite Critical priority
+        - NearFull capacity + Clear/Rain weather + special_req=False leads to rejection
+          despite Critical priority
+        - Dead zone condition (NearFull + High + Minor) does not apply to Critical
+          medical cases
+        total_edge_cases: 6
+        reasoning: 'The LLM identifies 3 edge cases/scenario clusters: (1) Full capacity
+          rejection scenarios, (2) NearFull capacity rejection scenarios, and (3)
+          the dead zone non-applicability. However, these are broad categories rather
+          than enumerated edge cases. The ImandraX decomposition reports 6 specific
+          scenarios, suggesting more granular edge cases. Looking at the criteria
+          for edge cases: (1) The rejection without override despite Critical priority
+          satisfies criteria #4 (contradicts naive expectation - one might expect
+          Critical to always be approved) and #5 (safety-critical as it violates the
+          priority hierarchy). (2) The deadzone non-applicability to Critical cases
+          is a negation of common case (#3). The LLM identifies the conceptual edge
+          cases but doesn''t enumerate all 6 specific scenarios. The LLM finds the
+          categories of edge cases but not the full count. Score = 3/6 = 0.5.'
+        edge_case_count: 3
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Capacity = Full
+        - Capacity = NearFull
+        - Weather = Clear or Rain
+        - Weather = Storm or Extreme
+        - special_req = True
+        - special_req = False
+        thresholds_from_decomp:
+        - Capacity = Full
+        - Capacity = NearFull
+        - Capacity = Available
+        - Capacity = Ample
+        - Weather = Clear
+        - Weather = Rain
+        - Weather = Storm
+        - Weather = Extreme
+        - special_req = True
+        - special_req = False
+        - Priority = Critical
+        - Medical needs present (Chronic/Acute/Disabled)
+        reasoning: 'The LLM identifies several key thresholds/boundaries but not all.
+          Identified: (1) Capacity states that trigger rejection (Full, NearFull),
+          (2) Weather thresholds that prevent override (Clear, Rain), (3) Special
+          requirements flag (True/False). The LLM does NOT explicitly identify individual
+          weather states (Storm, Extreme) or capacity states that allow approval (Available,
+          Ample), though the LLM implies these by contrast when discussing override
+          conditions. The LLM also doesn''t explicitly list medical need types (Chronic,
+          Acute, Disabled) as separate decision boundaries, though it mentions them.
+          From the decomposition, all individual states/values should be considered
+          distinct thresholds. The LLM identifies 6 thresholds explicitly; the decomposition
+          has 12. This is a partial identification of decision boundaries. Score =
+          6/12 = 0.5.'
+        score: 0.5
+      outcome_precision:
+        score: 0.8
+        reasoning: 'The LLM provides reasonably precise outcome conditions, though
+          with some approximation. Specifically: (1) The LLM correctly identifies
+          the rejection condition as requiring ''Full or NearFull'' capacity, which
+          is precise. (2) The LLM correctly identifies weather conditions as ''Clear
+          or Rain'' (as opposed to Storm/Extreme), which is directionally correct
+          and nearly exact. (3) The LLM correctly identifies special_req=False as
+          a requirement, which is exact. (4) The LLM''s logic flow and conditions
+          align well with the system design. However, the answer lacks explicit numeric
+          quantification of the 6 exact scenarios (considering the 3 medical types:
+          Chronic, Acute, Disabled), which ImandraX provides. The LLM gives one example
+          but doesn''t enumerate all combinations. The answer is 0.8 because the conditions
+          and reasoning are nearly exact, but the enumeration of all 6 scenarios is
+          missing.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the correct conclusion: YES, Critical priority
+          evacuees with medical needs CAN be rejected. This directly matches the ImandraX
+          answer. The reasoning is also sound: the LLM correctly traces through the
+          logic (dead zone check, emergency override quorum pattern, capacity constraints)
+          and identifies the exact conditions under which rejection occurs (Full/NearFull
+          capacity + Clear/Rain weather + special_req=False). The LLM also correctly
+          explains that in most cases (with Storm/Extreme weather or special_req=True),
+          the emergency override would prevent rejection. The answer demonstrates
+          correct understanding of the quorum pattern (c1 always True requires only
+          one of c2 or c3 to be True) and the capacity-blocking logic. The reasoning
+          is complete and leads to the correct direction.'
+      coverage_completeness:
+        score: 0.67
+        reasoning: 'The LLM identifies the rejection scenarios qualitatively and conditionally
+          but does not explicitly enumerate all 6 scenarios. Using rubric (b) - SCENARIO
+          ENUMERATION: the LLM describes the decision scenario space but only provides
+          one concrete example (Critical + Acute + Clear + Full + special_req=False),
+          though it does identify that rejection requires one of multiple capacity
+          states (Full or NearFull) and weather states (Clear or Rain). The LLM implicitly
+          covers the decision space by identifying all constraints that lead to rejection
+          but doesn''t explicitly count or list all combinations. ImandraX reports
+          6 scenarios; the LLM''s implicit coverage includes: 2 capacity states (Full,
+          NearFull) × 2 weather states (Clear, Rain) × some number of scenarios (at
+          minimum 1 explicit example given, but implicitly should be 3 medical types).
+          The LLM identifies the outcome categories/decision paths (rejection under
+          specific conditions) rather than full enumeration. Score: 4/6 = 0.67, accounting
+          for partial enumeration of the state space.'
+      overall_summary: >-
+        STRENGTHS OF LLM ANSWER:
+
+        1. Correct Conclusion: The LLM correctly answers YES, matching ImandraX.
+
+        2. Sound Logical Reasoning: The LLM properly traces through the dead zone
+        check, emergency override quorum pattern, and capacity constraints.
+
+        3. Correct Control Flow: Understanding of precedence, branching, short-circuit
+        behavior, and override logic is accurate.
+
+        4. Clear Explanation: The reasoning is well-structured and explains WHY rejection
+        occurs (e.g., override failures due to non-severe weather and no special requirements).
+
+        5. Concrete Example: Provides a specific example of rejection (Critical +
+        Acute + Clear + Full + special_req=False).
+
+
+        WEAKNESSES OF LLM ANSWER (compared to ImandraX):
+
+        1. Missing Scenario Count: The LLM does not identify or enumerate the 6 specific
+        scenarios. ImandraX is explicit about this count.
+
+        2. Incomplete Enumeration: The LLM identifies rejection conditions but doesn't
+        systematically enumerate all combinations (2 capacity states × 2 weather states
+        × 3 medical types = ? combinations based on conditions).
+
+        3. Partial Threshold Identification: While key boundaries are identified,
+        individual state values (e.g., Available vs Ample, specific weather types)
+        are not all explicitly stated.
+
+        4. Limited Edge Case Coverage: The LLM identifies edge case categories but
+        doesn't enumerate or count all 6 specific scenarios as distinct cases.
+
+
+        OVERALL ASSESSMENT:
+
+        The LLM provides a fundamentally correct and well-reasoned answer that demonstrates
+        solid understanding of the system logic and control flow. However, ImandraX's
+        decomposition-based approach provides more systematic coverage and explicit
+        scenario enumeration (6 scenarios), whereas the LLM's answer is more conceptual
+        and less quantitatively precise. The LLM excels in directional accuracy and
+        reasoning quality (direction_accuracy: 1.0) but falls short in state space
+        estimation and coverage completeness due to lack of explicit enumeration.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: ImandraX returned a TIMEOUT without completing the verification.
+          Since no decomposition regions were produced, we cannot establish a baseline
+          for state space scenarios. The LLM did not provide an explicit scenario
+          count, making state_space_estimation_accuracy not applicable. Marking as
+          unknown since we lack complete decomposition data.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates strong understanding of the control flow:
+          (1) Precedence: correctly identifies that critical priority in the dead
+          zone check requires High priority, which Critical doesn''t match, so the
+          dead zone never triggers. (2) Branching: correctly traces the if-else-if
+          branching structure through dead zone check → priority escalation → emergency
+          override quorum → can_assign → is_blocked → final_approval. (3) Short-circuit
+          behavior: correctly identifies that emergency_override=True short-circuits
+          the is_blocked logic (since is_blocked=False when emergency_override=True).
+          (4) Override logic: correctly identifies the quorum pattern where 2+ conditions
+          trigger emergency_override, and that this override logic takes precedence
+          in can_assign (or operation) and is_blocked (negation of override in the
+          conjunction).'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical priority with Extreme weather across all capacity levels (Full,
+          NearFull, Available, Ample)
+        - Critical priority with Extreme weather regardless of medical conditions
+        - Critical priority with Extreme weather for both True and False special_req
+          values
+        total_edge_cases: 12
+        reasoning: 'The LLM identifies the key edge case: that the universality claim
+          holds across all parameter combinations (4 capacity levels × 3 medical conditions
+          × 2 special_req values = 24 parameter combinations). However, ImandraX timeout
+          prevents verification of how many distinct edge cases actually exist in
+          the formal decomposition. The LLM found 3 high-level edge case categories
+          (all capacities, all medical conditions, all special_req). Assuming ImandraX''s
+          full decomposition would identify ~12 distinct parameter-driven edge cases
+          (representing the Cartesian product of constraints), the LLM''s coverage
+          of edge case exploration is partial—it identified the generality but didn''t
+          enumerate all specific combinations. Score: 3/12 ≈ 0.25'
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'Dead zone condition: capacity == NearFull AND priority == High AND medical
+          == Minor'
+        - 'Priority escalation triggers: capacity == NearFull AND (priority == Medium
+          OR priority == Low)'
+        - 'Emergency override quorum: requires 2+ conditions from {Critical priority,
+          Extreme/Storm weather, special_req}'
+        thresholds_from_decomp: []
+        reasoning: 'Since ImandraX timed out, we cannot extract thresholds from the
+          decomposition. However, the LLM identifies several decision boundaries as
+          logical conditions rather than numeric thresholds. The system appears to
+          use categorical thresholds (priority levels, capacity states, weather categories)
+          rather than numeric ones. The LLM correctly identifies key decision boundaries:
+          the NearFull capacity gate, the priority escalation conditions, and the
+          quorum rule (2+ of 3 conditions). Without ImandraX decomposition, this comparison
+          is incomplete, but the LLM''s threshold identification appears reasonable
+          for a categorical system.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides a precise, binary outcome: ''Yes, always approved''
+          for the specific condition of Extreme weather with Critical priority. The
+          reasoning traces through exact categorical values (Critical priority, Extreme
+          weather, emergency_override=True, is_blocked=False, final_approval=True).
+          The LLM explicitly accounts for variability across all other parameters
+          (capacity, medical conditions, special_req) and confirms the outcome is
+          invariant. This is maximally precise within a categorical system where outcomes
+          are deterministic given the inputs.'
+      direction_accuracy:
+        score: 0.5
+        reasoning: 'The LLM provides a definitive answer (''Yes, always approved'')
+          with detailed reasoning that appears logically sound given the code structure
+          described. However, this answer cannot be verified because ImandraX timed
+          out. The reasoning chain is well-articulated and follows a logical progression
+          through each decision point. The LLM correctly identifies that: (1) the
+          dead zone doesn''t trigger with Critical priority, (2) emergency override
+          reaches 2+ conditions, and (3) is_blocked=False when emergency_override=True.
+          However, without formal verification, we cannot confirm if this reasoning
+          is truly correct or if there are subtle interactions or edge cases that
+          invalidate the conclusion. The answer earns 0.5 because the reasoning is
+          solid and self-consistent, but unverified correctness cannot be fully credited.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM explicitly addresses all parameter combinations: ''This
+          holds for ALL capacity statuses (Full, NearFull, Available, Ample), ALL
+          medical conditions, and both special_req values.'' Using rubric (a) EXPLICIT
+          COUNT: the LLM doesn''t state a scenario count but uses explicit quantifiers
+          (''all'') to claim complete coverage of the decision space. Using rubric
+          (c) OUTCOME CATEGORY COVERAGE: the LLM identifies the universal outcome
+          category (always approved) and verifies it across all sub-categories. The
+          answer demonstrates 100% coverage of the input space relevant to the question.'
+      overall_summary: >-
+        The LLM provides a clear, logically structured answer with excellent control
+        flow understanding and comprehensive coverage of the parameter space. The
+        reasoning correctly traces through the emergency shelter system's logic: dead
+        zone check, priority escalation, emergency override quorum, capacity check,
+        and blocking conditions. All decision boundaries and control structures are
+        properly understood. The precision of the outcome is maximum for a categorical
+        system. However, the critical limitation is that ImandraX timed out, preventing
+        formal verification of the claim. While the LLM's reasoning appears sound
+        and self-consistent, we cannot definitively confirm correctness without the
+        decomposition-based verification. The answer scores well on all dimensions
+        of reasoning quality but faces the inherent weakness of being unverified against
+        the ground truth."
+
+        }

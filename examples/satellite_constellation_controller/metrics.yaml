@@ -4580,3 +4580,872 @@
         as it fully addresses the query with accurate, complete coverage. Overall,
         the LLM performs equivalently to the verified decomposition for this targeted
         question.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:53'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 9
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM initially provides multiple scenario counts (10, 16, 7,
+          9) and states its final count to be 9 distinct decision paths. The decomposition
+          provides the exact number of scenarios as 13.
+        score: -1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM correctly identifies that emergency conditions take precedence
+          and short-circuit other checks (‘Emergency branch always approved’). However,
+          it struggles with the branching structure, particularly how 'Normal' and
+          'PowerSave' modes, while generating identical outputs for a given battery
+          level, still constitute distinct decision paths given that the overall input
+          space considers system mode. This leads to an underestimation of the total
+          scenarios. The override logic is partially understood, as the LLM recognizes
+          debris avoidance as an override but doesn't fully account for its distinct
+          scenarios when combined with ground approval.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Critical battery level (maneuver rejected)
+        - Emergency DebrisAvoidance (always approved with RCS)
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies two edge cases: critical battery resulting
+          in rejection, and emergency debris avoidance always resulting in approval.
+          These align with the decomposition''s understanding of edge cases for this
+          problem.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 25
+        - battery >= 75
+        - 50 <= battery < 75
+        - 25 <= battery < 50
+        - fuel < 20%
+        thresholds_from_decomp:
+        - 'battery_levels: [25, 50, 75]'
+        - 'fuel_threshold: 20'
+        reasoning: The LLM identifies all the battery level thresholds and the fuel
+          threshold correctly. It expresses them as ranges, which is a correct interpretation
+          of the underlying thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The question asks for the number of distinct scenarios, not for
+          numeric distributions of any outcomes. Therefore, this metric is not applicable
+          and a score of 0.0 is assigned.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The question is quantitative and asks for a specific count rather
+          than a directional conclusion. Hence, this metric is not applicable and
+          a score of 0.0 is assigned.
+      coverage_completeness:
+        score: 0.0
+        reasoning: This metric is not applicable as the question is about counting
+          distinct scenarios, not about identifying decision scenarios. Therefore,
+          a score of 0.0 is assigned.
+      overall_summary: The LLM struggles significantly with accurately counting the
+        total distinct scenarios, providing several different numbers before settling
+        on 9, which is still incorrect compared to the ImandraX answer of 13. While
+        it correctly identifies key thresholds and edge cases, its understanding of
+        how different system modes and control flow paths combine to create unique
+        scenarios is flawed, leading to an underestimation of the total state space.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: Both LLM and ImandraX correctly identified that there are 0 scenarios
+          where the Electric thruster can be selected when battery_pct < 75. The LLM
+          implicitly estimated zero scenarios by answering 'No' and explaining why
+          the condition cannot be met.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that the Electric thruster is selected
+          based on a condition of `battery_level >= 3` and that this condition is
+          derived from `battery_pct >= 75`. It also correctly understood the branching
+          logic of the `_categorize_battery` function and how it maps `battery_pct`
+          to `battery_level`. The LLM also correctly identified that in the 'DebrisAvoidance'
+          emergency branch, only RCS is used, overriding other considerations for
+          thruster selection.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - DebrisAvoidance emergency branch
+        total_edge_cases: 1
+        reasoning: The LLM successfully identified the 'DebrisAvoidance emergency
+          branch' as an edge case where thruster selection logic changes. ImandraX
+          implicitly handles this by providing 0 scenarios.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct >= 75
+        - battery_pct < 75
+        thresholds_from_decomp:
+        - battery_pct >= 75
+        - 50 <= battery_pct < 75
+        - 25 <= battery_pct < 50
+        reasoning: The LLM explicitly identified 'battery_pct >= 75' as the critical
+          threshold for Electric thruster selection and 'battery_pct < 75' as the
+          condition under which it cannot be selected. ImandraX confirms 'battery_pct
+          >= 75' for Electric thruster and further highlights '50-74%' and '25-49%'
+          for other thrusters, which are implicit in the LLM's understanding of the
+          `_categorize_battery` function.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's conclusion is a binary 'No', which is precisely correct
+          given the question. There are no numeric distributions to assess for precision.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion that the Electric thruster can never be selected
+          when battery_pct < 75 is correct and aligns perfectly with the ImandraX
+          answer.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM's reasoning thoroughly covers all relevant conditions and
+          code paths, including the `_categorize_battery` function and the emergency
+          override. It correctly identifies the single scenario (battery_pct >= 75)
+          where an electric Thruster is selected and correctly explains why battery_pct
+          < 75 is not part of this scenario. This demonstrates complete coverage of
+          the decision scenarios pertinent to the question.
+      overall_summary: The LLM provided a correct and well-reasoned answer, accurately
+        identifying that the Electric thruster cannot be selected when battery_pct
+        < 75. Its explanation demonstrated strong control flow understanding, correctly
+        interpreting battery categorization logic and emergency overrides. It matched
+        ImandraX's conclusion precisely. The LLM successfully identified relevant
+        thresholds and acknowledged an important edge case, showcasing a comprehensive
+        grasp of the problem's logic.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM correctly identifies that debris avoidance maneuvers
+        are always approved, regardless of battery or communication status. Its reasoning
+        aligns perfectly with the proven outcome from ImandraX, highlighting the emergency
+        override that bypasses other checks. The LLM demonstrates a strong understanding
+        of control flow and condition precedence in this specific scenario.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:49:05'
+  metrics:
+    q1:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM generally captures the control flow structures correctly.
+          The precedence of conditions is well understood, particularly in differentiating
+          emergency and non-emergency scenarios. However, while the LLM correctly
+          identifies some branch structures, it misinterprets how the Normal and PowerSave
+          modes interplay, treating them as separate branches rather than acknowledging
+          their identical outcomes fully.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 2
+        reasoning: The LLM did not identify any edge cases. The only critical edge
+          cases seem to be related to the battery levels being exactly at the critical
+          values (25%, 50%, 75%), which were not identified as edge cases by the LLM.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 25
+        - battery >= 75
+        - battery < 50
+        thresholds_from_decomp:
+        - battery < 25
+        - battery >= 75
+        - battery < 50
+        - fuel < 20
+        reasoning: The LLM identified the three battery thresholds but missed the
+          fuel threshold of 20, resulting in a lack of completeness in recognizing
+          all relevant decision boundaries.
+        score: 0.75
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's outcomes are generally on point but were imprecise in
+          the exact distribution of results, particularly regarding the counted scenarios.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM's ability to derive conclusions was partially accurate.
+          It reached the conclusion of 10 scenarios but left room for clarification
+          on the counting method, stating 9 distinct paths.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM recognized some of the decision scenarios but did not fully
+          cover all aspects of the decision-making process, missing nuances that the
+          decomposed ImandraX answer captured.
+      overall_summary: The LLM’s answer, while exploring complex decision boundaries
+        in depth, ultimately displayed a misunderstanding of the operational overlap
+        between different modes. It missed some key aspects and edge cases, leading
+        to an inaccurate count of maneuver scenarios.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM correctly identifies how the battery level affects the selection
+          of thrusters. It understands that the electric thruster depends on the full
+          battery condition (battery_pct >= 75) and that in the emergency state, only
+          RCS is used.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: There are no edge cases relevant in identifying the selection of
+          the electric thruster based on battery_pct.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct < 75
+        thresholds_from_decomp:
+        - battery_pct >= 75
+        reasoning: The LLM identified a relevant threshold (< 75) but did not capture
+          the full threshold range; the exact decision boundary is `battery_pct >=
+          75`.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provided a direct statement aligning with the threshold
+          conditions known from decomposition.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that the electric thruster cannot be selected below
+          75% is entirely correct based on the model requirements.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM's answer covers the decision scenario of selecting the
+          Electric thruster, which is consistent with the known outcomes from the
+          decomposition.
+      overall_summary: The LLM correctly identifies the relationship between battery
+        percentage and thruster selection with precise reasoning. However, it falls
+        short in precisely outlining the complete set of thresholds.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly understands that the emergency override logic
+          allows maneuver approval regardless of battery or communication status,
+          capturing the necessary control flow aspects.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The LLM didn't identify any edge cases because the assertion was
+          straightforward without complex conditions or counterintuitive outcomes.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM did not identify any numeric thresholds related to the
+          approval conditions. However, this is expected as the conditions do not
+          rely on numeric thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's answer precisely matches the correct conclusion with
+          clear reasoning, confirming that approval is always granted.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion reached by the LLM is completely correct, and the
+          reasoning is clear and complete.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM captures the single scenario where maneuver approval occurs
+          under all conditions, thus fully covering the decision scenario.
+      overall_summary: The LLM answer is accurate and well-reasoned, successfully
+        articulating how the DebrisAvoidance mode leads to guaranteed approval without
+        regard to battery and communication status. However, it did not identify any
+        edge cases or numeric thresholds, which can be seen as limitations in addressing
+        more complex scenarios.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:11'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 13
+        reasoning: 'The LLM explicitly states ''10 distinct scenarios'' as their primary
+          answer (though they waffle between 9, 10, and 16 throughout their reasoning).
+          The ImandraX decomposition identifies 13 distinct scenarios. The LLM''s
+          estimate of 10 is significantly lower than the actual decomposition count
+          of 13, missing 3 scenarios. The log-based penalty formula: 1 - abs(log2(|10
+          - 13|)) = 1 - abs(log2(3)) ≈ 1 - 1.585 = -0.585, clamped to a meaningful
+          range, indicates substantial underestimation. The LLM failed to exhaustively
+          enumerate all combinations of conditions.'
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identifies that mode
+          (emergency vs non-emergency) takes precedence, followed by battery level,
+          then link status/fuel for ground approval. AND/OR logic is properly understood
+          (link LOST/DEGRADED AND fuel < 20 for ground approval). Branching structure:
+          The LLM partially grasps the structure. They correctly identify the emergency
+          vs non-emergency split and battery-level branches within non-emergency.
+          However, they fail to enumerate all distinct leaf nodes. They note that
+          ''Normal and PowerSave behave identically'' and decide not to multiply scenarios,
+          but this reasoning misses that the 13 scenarios in the decomposition likely
+          arise from a more complete enumeration of condition combinations. They count
+          4 battery levels correctly but don''t fully explore all sub-branches within
+          each. Short-circuit behavior: Correct. The LLM recognizes that DebrisAvoidance
+          mode ''skips battery categorization entirely'' and provides an early approval,
+          understanding the override mechanism. Override logic: Correct. The emergency
+          DebrisAvoidance override that always approves with RCS is properly understood
+          as safety-critical behavior trumping normal battery-constrained logic. The
+          LLM correctly identifies this as an exception to normal battery-based decision-making.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency DebrisAvoidance mode always approves with RCS, bypassing all battery
+          checks
+        - Critical battery (< 25%) always rejects regardless of other conditions
+        - Fuel < 20% AND (link LOST or DEGRADED) triggers mandatory ground approval
+        - RCS thruster used in both emergency mode and low battery condition (field
+          overlap)
+        total_edge_cases: 13
+        reasoning: 'The LLM identifies several safety-critical and counterintuitive
+          cases: (1) emergency override bypassing normal logic is recognized as a
+          special case, (2) critical battery immediate rejection is identified, (3)
+          the fuel+link combination for ground approval is found. However, the LLM
+          misses the complete enumeration of edge cases. The decomposition likely
+          contains 13 edge cases reflecting: all distinct combinations of (mode state,
+          battery state, link status, fuel level) that produce unique decision outcomes.
+          The LLM finds approximately 4 distinct edge case classes but not all 13
+          specific scenario instances. With total_edge_cases=13 and edge_cases_found=4,
+          the score is 4/13 ≈ 0.31. This is notably low because the LLM''s approach
+          focuses on qualitative branching rather than exhaustive scenario enumeration.
+          Many edge cases likely involve boundary crossings (exactly at battery thresholds)
+          or specific combinations of normally independent conditions that the LLM
+          doesn''t explicitly enumerate.'
+        edge_case_count: 4
+        score: 0.3076923076923077
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 25 (critical)
+        - 25 <= battery < 50 (low)
+        - 50 <= battery < 75 (good)
+        - battery >= 75 (full)
+        - fuel < 20
+        - 'link status: LOST or DEGRADED'
+        thresholds_from_decomp:
+        - battery < 25
+        - 25 <= battery < 50
+        - 50 <= battery < 75
+        - battery >= 75
+        - fuel < 20
+        - link_status IN {LOST, DEGRADED}
+        - link_status = NOMINAL
+        - mode = DebrisAvoidance
+        - mode IN {Normal, PowerSave}
+        - delta_v constraints (implicit in thruster selection)
+        reasoning: 'The LLM identifies the 6 most obvious numeric thresholds (battery
+          boundaries and fuel threshold, link status categories). However, the decomposition
+          includes additional thresholds: explicit handling of NOMINAL link status
+          (not just its absence), explicit mode values (DebrisAvoidance vs Normal
+          vs PowerSave as distinct thresholds), and potentially delta-v based constraints
+          within thruster selection logic. The LLM identifies 6 out of ~10 thresholds,
+          giving a score of 6/10 = 0.6. The LLM correctly characterizes the direction
+          of each threshold but doesn''t fully capture all decision boundaries, particularly
+          the mode-based split which is a critical structural threshold, and any implicit
+          numeric constraints on delta-v.'
+        score: 0.6
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM identifies some numeric thresholds correctly (battery <
+          25, 25-50, 50-75, >= 75 ranges; fuel < 20%) and correctly describes their
+          role in decisions. However, the precision is approximate rather than exact.
+          The LLM's reasoning about thresholds is qualitatively directionally correct
+          (higher battery enables better thrusters) but doesn't enumerate all distinct
+          outcome combinations arising from the threshold interaction. The LLM correctly
+          identifies that ground_approval varies based on link status (LOST, DEGRADED)
+          and fuel, but doesn't fully specify how many distinct numeric outcomes result
+          from all conditions. The score of 0.5 reflects that values are approximate
+          and the full combinatorial precision of how all thresholds interact to create
+          distinct outcomes is not precisely articulated.
+      direction_accuracy:
+        score: 0.75
+        reasoning: 'The LLM''s overall direction is correct: emergency mode (DebrisAvoidance)
+          always approves with RCS, low battery restricts options, critical battery
+          rejects, and full/good battery allow better thrusters. The reasoning traces
+          the correct logical flow: emergency → approved+RCS; critical → rejected;
+          battery-dependent thruster selection for non-emergency modes. However, the
+          final conclusion of ''10 distinct scenarios'' is incorrect—the correct answer
+          is 13. The LLM''s reasoning is mostly sound but incomplete: they correctly
+          identify the branching structure and most of the decision logic, but fail
+          to exhaustively count all distinct scenario combinations. The LLM even acknowledges
+          uncertainty (''best stated as 9 distinct decision paths''), suggesting incomplete
+          confidence. The core logic understanding is present, but the enumeration
+          is flawed, resulting in undercounting.'
+      coverage_completeness:
+        score: 0.77
+        reasoning: 'Using the EXPLICIT COUNT rubric: The LLM estimates 10 scenarios
+          vs the decomposition''s 13 actual scenarios. Coverage = 10/13 ≈ 0.77. The
+          LLM demonstrates partial enumeration of outcome categories (rejected, approved+RCS,
+          approved+Electric, approved+Chemical are all identified), so using the OUTCOME
+          CATEGORY COVERAGE rubric would score similarly. The LLM successfully identifies
+          the major decision branches (emergency, critical, full, good, low) but misses
+          some of the distinct combinations. Notably, they identify 7 distinct ManeuverDecision
+          output tuples but claim 10 scenarios in their final answer, showing internal
+          inconsistency. The value of 0.77 reflects that roughly 77% of the scenario
+          space was covered, with 3 distinct scenarios missing from the enumeration.'
+      overall_summary: >
+        {
+          "summary": "The LLM demonstrates solid understanding of the control flow
+        logic but significantly undercounts the distinct scenarios. Key strengths:
+        (1) Correctly identifies the hierarchical branching (mode → battery → ground_approval),
+        (2) Recognizes emergency override behavior, (3) Understands ground approval
+        conditions, (4) Correctly identifies major threshold boundaries (25, 50, 75
+        for battery; 20 for fuel). Key weaknesses: (1) Undercounts scenarios (10 vs
+        13 actual), (2) Shows uncertainty and wavering between 9, 10, and 16 scenarios—suggesting
+        incomplete reasoning, (3) Fails to exhaustively enumerate all distinct combinations,
+        (4) Misses some decision boundary thresholds, (5) Incomplete edge case detection
+        (4/13 found). The root issue appears to be a qualitative branching analysis
+        rather than exhaustive combinatorial enumeration. The LLM recognizes that
+        Normal and PowerSave produce 'identical' outputs and therefore doesn't multiply
+        scenarios, but may have missed that distinct input combinations still produce
+        distinct state-space regions even if output values overlap. ImandraX's decomposition
+        approach systematically enumerates all 13 unique regions, while the LLM's
+        manual analysis leaves 3 scenarios unaccounted for." }
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM does not provide an explicit scenario count or range. The
+          question is a yes/no query about whether a specific condition can occur,
+          not a request to enumerate scenarios. The LLM provides logical reasoning
+          showing that the condition cannot occur (0 scenarios). The decomposition
+          confirms 0 scenarios where battery < 75 and Electric is selected. Since
+          no scenario count is explicitly stated by the LLM, n_llm_estimated_scenarios
+          cannot be reliably extracted.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates excellent understanding of control flow:
+          (1) Correctly identifies the precedence that Electric thruster selection
+          depends on battery_level >= 3. (2) Correctly maps the branching structure:
+          battery_level categorization determines which thrusters can be selected
+          in normal operation vs. emergency mode. (3) Correctly recognizes short-circuit
+          behavior: the emergency (DebrisAvoidance) override bypasses normal logic
+          and always uses RCS. (4) Correctly identifies override logic: the emergency
+          branch represents a safety override that supersedes normal battery-dependent
+          selection. The LLM explicitly acknowledges both the normal path (battery_level
+          >= 3 required) and the emergency path (no Electric, only RCS).'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency/DebrisAvoidance mode overrides normal battery-dependent logic
+          and forces RCS use regardless of battery level
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies the key edge case: the emergency override that
+          forces RCS selection in DebrisAvoidance mode, bypassing normal battery-based
+          selection logic. This is a safety-critical override that contradicts the
+          normal (naive) expectation of battery-dependent thruster selection. This
+          represents the main edge case relevant to the question. The decomposition
+          suggests 0 scenarios where Electric is selected with battery < 75, and the
+          LLM correctly identifies why: the only alternative path (emergency) uses
+          RCS, not Electric. The LLM found the 1 relevant edge case (emergency override).'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct >= 75 (Full category)
+        - battery_level >= 3 (required for Electric)
+        thresholds_from_decomp:
+        - battery_pct >= 75 (Full)
+        - battery_pct 50-74 (Chemical)
+        - battery_pct 25-49 (RCS)
+        - battery_level >= 3 (Electric selection)
+        reasoning: 'The LLM explicitly identifies the critical thresholds: battery_pct
+          >= 75 for Full category and battery_level >= 3 for Electric selection. The
+          LLM does not explicitly mention the intermediate thresholds (50-74% for
+          Chemical, 25-49% for RCS) in its answer, though these are implied by mentioning
+          ''2 (Good), 1 (Low), or 0 (Critical)''. The LLM identified 2 of the 4 key
+          thresholds explicitly. However, the core thresholds relevant to the question
+          (>= 75% and >= 3) are both clearly stated.'
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides a precise, quantified answer: battery_pct >=
+          75 is the exact threshold required for Full battery category (battery_level
+          = 3). The conclusion is stated definitively: ''No, the Electric thruster
+          can never be selected when battery_pct < 75.'' This matches the decomposition
+          exactly: Electric strictly requires battery >= 75, and below 75% only Chemical
+          or RCS are available. The numeric threshold (75) and the logical consequence
+          (Electric impossible below this) are both exact and correct.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the completely correct conclusion: Electric thruster
+          cannot be selected when battery_pct < 75. The reasoning is sound and comprehensive:
+          (1) Electric requires battery_level >= 3 (Full), (2) Full is defined as
+          battery_pct >= 75, (3) Below 75%, categorization returns values < 3, so
+          condition fails, (4) Emergency override uses RCS, not Electric. The logic
+          is airtight and the conclusion is definitively correct as confirmed by decomposition.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The question asks a binary question about whether a specific condition
+          can occur. The LLM addresses both relevant decision paths: (1) normal operation
+          path where Electric selection depends on battery_level >= 3, (2) emergency
+          path where Electric is never used. The LLM covers all relevant scenarios
+          by demonstrating that in all decision paths, the condition (Electric selected
+          with battery < 75) cannot occur. For a binary/qualitative question, complete
+          coverage means addressing all possible paths and outcomes, which the LLM
+          does explicitly.'
+      overall_summary: >-
+        The LLM answer is excellent and directly comparable in quality to the ImandraX
+        answer. Both reach the identical correct conclusion: Electric thruster cannot
+        be selected when battery_pct < 75. The LLM provides sound logical reasoning
+        that correctly traces through the battery categorization logic and emergency
+        override behavior. The LLM demonstrates strong control flow understanding,
+        correctly identifies the critical threshold (75%), and provides precise numeric
+        information. The main difference is that ImandraX explicitly states '0 scenarios'
+        and mentions alternative thruster selections (Chemical at 50-74%, RCS at 25-49%),
+        while the LLM focuses on explaining why the Electric path is impossible. Both
+        approaches are valid and arrive at the correct answer through rigorous logic."
+
+        }
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not provide an explicit count of scenarios or regions
+          for DebrisAvoidance mode. The answer focuses on reasoning about a single
+          property (whether approval is always granted regardless of battery/communication)
+          rather than enumerating distinct scenarios. The decomposition addresses
+          a single property proven for the DebrisAvoidance case. Without an explicit
+          scenario count from the LLM, the metric cannot be meaningfully scored.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: '(1) PRECEDENCE: The LLM correctly identifies that the check `mode
+          == SystemMode.DEBRIS_AVOIDANCE` takes precedence and enters the `if emergency:`
+          branch immediately, bypassing normal conditional logic. (2) BRANCHING: The
+          LLM correctly understands the branching structure—DebrisAvoidance enters
+          a dedicated emergency branch separate from normal mode handling. (3) SHORT-CIRCUIT:
+          The LLM correctly identifies short-circuit behavior: once the emergency
+          branch is entered, subsequent battery/communication checks are never evaluated,
+          exemplifying guard clause behavior. (4) OVERRIDE: The LLM correctly identifies
+          that the emergency override (DebrisAvoidance mode) trumps all other considerations
+          (battery, communication status, fuel constraints), setting `approved=True`
+          unconditionally.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical battery level (0%) does not prevent approval in DebrisAvoidance
+          mode
+        - Broken communication link (worst case for link_status) does not prevent
+          approval in DebrisAvoidance mode
+        - Low fuel level does not prevent approval in DebrisAvoidance mode
+        total_edge_cases: 3
+        reasoning: 'The LLM explicitly identifies three edge cases that contradict
+          naive expectations: (1) battery at critical level (0%) would normally be
+          restrictive but is bypassed in DebrisAvoidance, (2) broken communication
+          link would normally require ground approval but doesn''t prevent the approval
+          flag in DebrisAvoidance, (3) fuel constraints are similarly overridden.
+          These represent safety-critical edge cases where normal constraints are
+          violated by the emergency override policy. The answer demonstrates awareness
+          that DebrisAvoidance represents a policy-violating edge case where invariants
+          that normally hold (battery/communication/fuel checks matter) are violated.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - mode == SystemMode.DEBRIS_AVOIDANCE (mode boundary)
+        - battery level check bypassed (no specific threshold evaluated)
+        - communication link status check bypassed (link_status affects requires_ground_approval,
+          not approved)
+        thresholds_from_decomp:
+        - mode == SystemMode.DEBRIS_AVOIDANCE
+        reasoning: 'The LLM correctly identifies the primary decision boundary: `mode
+          == SystemMode.DEBRIS_AVOIDANCE` determines entry into the emergency override
+          branch. The LLM also correctly notes that battery thresholds (which would
+          normally exist) are bypassed, and communication link thresholds are bypassed
+          for the `approved` flag (though they affect `requires_ground_approval`).
+          The decomposition confirms a single key threshold: the DebrisAvoidance mode
+          check. The LLM identifies the most critical threshold with full clarity.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides precise numeric/categorical precision. It correctly
+          identifies that `approved=True` is set unconditionally in the emergency
+          branch, and correctly specifies that battery level (even 0%, critical level)
+          does not prevent approval. The statement 'maneuver approval is always granted
+          (approved=True)' is an exact characterization with correct boolean outcome.
+          The answer also correctly identifies that communication status affects `requires_ground_approval`
+          flag, not the `approved` flag—this is precise and accurate distinction.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is completely correct: in DebrisAvoidance
+          mode, maneuver approval IS always granted regardless of battery or communication
+          status. The reasoning supporting this conclusion is sound: (1) DebrisAvoidance
+          enters the emergency branch, (2) approved is unconditionally set to True,
+          (3) battery categorization is skipped, (4) communication affects requires_ground_approval
+          not approved, (5) fuel affects requires_ground_approval not approved. The
+          ImandraX answer confirms this with ''PROVEN'' status. No counterexamples
+          exist, and the logic chain is valid.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM correctly covers the relevant decision scenario for DebrisAvoidance
+          mode: maneuver approval is always granted. The question asks specifically
+          about one conditional property (''is approval always granted regardless
+          of battery/communication status''), and the LLM addresses exactly this scenario.
+          There are no multiple sub-scenarios to enumerate here—the DebrisAvoidance
+          mode has a uniform behavior with respect to the approval decision. The answer
+          achieves complete coverage of the relevant decision space by confirming
+          the invariant applies unconditionally.'
+      overall_summary: 'The LLM answer demonstrates excellent alignment with the ImandraX
+        verified answer. The conclusion is correct and well-reasoned: DebrisAvoidance
+        mode unconditionally approves maneuvers by entering an emergency branch that
+        bypasses normal checks. The LLM shows strong understanding of control flow
+        (branching structure, short-circuit behavior, override logic), correctly identifies
+        multiple edge cases (critical battery, broken link, fuel constraints all being
+        overridden), provides precise outcome characterization (approved=True unconditionally),
+        and clearly identifies the relevant decision boundary (mode == DEBRIS_AVOIDANCE).
+        The reasoning explicitly traces the control flow, correctly noting which variables
+        are evaluated vs bypassed. The answer achieves 100% directional accuracy and
+        complete coverage of the relevant scenario. The only limitation is the lack
+        of explicit scenario counting, which is not directly applicable to this narrowly-scoped
+        property question. Overall, this is a high-quality LLM analysis that matches
+        the formal verification result.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:16'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM explicitly states '10 distinct maneuver approval scenarios'
+          as the final answer, though the reasoning wavers between 7, 9, 10, and other
+          counts. Using the explicit final number of 10 per extraction rules (a).
+          The decomposition from ImandraX gives exactly 13 scenarios.
+        score: -0.5849625007211561
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the emergency (DebrisAvoidance) branch
+          as overriding other modes with short-circuit approval using RCS, independent
+          of battery levels. It accurately describes the non-emergency branching for
+          Normal and PowerSave modes (treated identically) into four battery level
+          categories with if-else-if structure. Ground approval is correctly placed
+          as a subsequent check based on link_status and fuel_remaining_pct conditions,
+          with AND logic for requiring approval (lost/degraded link AND low fuel).
+          Precedence is correct as mode check precedes battery checks, and ground
+          approval follows thruster selection.
+        score: 1.0
+      edge_case_detection: null
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery < 25
+        - battery >= 75
+        - 50 <= battery < 75
+        - 25 <= battery < 50
+        - fuel < 20
+        - link is LOST or DEGRADED
+        thresholds_from_decomp:
+        - 'battery_levels: 25, 50, 75'
+        - 'fuel_threshold: 20'
+        reasoning: 'The LLM identifies all key thresholds: battery thresholds at 25,
+          50, 75 (expressed as ranges), fuel at 20, and the link status conditions
+          (LOST/DEGRADED, which are categorical but tied to the fuel threshold for
+          ground approval). No misses; the link statuses are not numeric but are correctly
+          noted as part of the conjunctive condition. Score will be 1.0 as all decomposition
+          thresholds are covered.'
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provides a numeric count of 10 scenarios, while the true
+          decomposition has 13. This is an approximate value (off by 3), fitting the
+          'Value approximate' category in the rubric (e.g., similar to '> =18' vs
+          '> =20'). No exact match or operator approximation applies directly, but
+          the count is directionally correct and close, warranting 0.5 rather than
+          lower.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM's conclusion of 10 scenarios is partially correct, as it
+          is close to the true 13 and identifies most relevant factors (modes, battery
+          levels, ground approval variations). However, it undercounts by not fully
+          distinguishing paths, such as treating Normal and PowerSave identically
+          without considering if modes add unique scenarios, or missing subtle combinations
+          in ground approval across modes. This is partial correctness with incomplete
+          reasoning, scoring 0.5.
+      coverage_completeness:
+        score: 0.76923
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM states 10 vs decomposition
+          13, so proportion 10/13 ≈ 0.77. The LLM enumerates most scenarios (emergency
+          with/without ground approval, critical rejection, and the three approval
+          types each with/without ground approval), but likely misses 3 subtle paths,
+          such as mode-specific variations or additional link/fuel combinations not
+          fully expanded.'
+      overall_summary: '"The LLM demonstrates strong understanding of the control
+        flow, branches, and decision boundaries, correctly identifying all key thresholds
+        and the overriding emergency logic. It covers most scenarios and provides
+        detailed reasoning on outcomes, but underestimates the total count at 10 vs
+        the true 13, possibly due to not fully decomposing mode interactions or ground
+        approval nuances across all inputs (e.g., 3 link statuses × 2 fuel ranges
+        not fully multiplied). ImandraX''s decomposition reveals a more precise state
+        space of 13, highlighting the LLM''s partial but insightful analysis without
+        verification."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM implicitly estimates 0 scenarios where the Electric thruster
+          can be selected when battery_pct < 75, stating 'never' and explaining no
+          code path exists. The ImandraX decomposition confirms exactly 0 such scenarios.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          - Precedence of conditions: Correct, as LLM accurately describes the battery
+          categorization feeding into the battery_level >= 3 check, with no misordering
+          of conditions.
+
+          - Branching structure: Correct, LLM outlines the main branch for battery_level
+          >= 3 and contrasts it with lower levels leading to other thrusters, plus
+          the separate emergency branch.
+
+          - Short-circuit behavior: Correct, LLM notes the emergency (DebrisAvoidance)
+          branch as an override that always sets use_electric=False, preventing Electric
+          selection.
+
+          - Override logic: Correct, LLM explicitly states that emergency overrides
+          trump normal operation by forcing RCS regardless of battery.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No edge cases exist where Electric thruster is selected under battery_pct
+          < 75, as confirmed by decomposition. LLM correctly identifies no such cases
+          by stating there is no code path, thus finding all (zero) edge cases.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - battery_pct >= 75
+        thresholds_from_decomp:
+        - battery_pct >= 75
+        reasoning: LLM correctly identifies the key threshold 'battery_pct >= 75'
+          for the Full battery category enabling Electric thruster. Decomposition
+          matches this exactly, with no other thresholds missed for this decision.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: LLM provides exact numeric threshold 'battery_pct >= 75' matching
+          the decomposition's 'battery >= 75', with precise categorization (Full only
+          at >=75, others below). This is an exact match for the condition determining
+          Electric selection.
+      direction_accuracy:
+        score: 1.0
+        reasoning: LLM reaches the completely correct conclusion ('No, never') with
+          solid reasoning tracing the code paths, battery categorization, and emergency
+          override, aligning perfectly with ImandraX's 'NO' and explanation.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM implies 0 scenarios for the
+          queried condition (<75), matching decomposition''s 0 scenarios exactly,
+          fully covering the decision space for Electric selection under low battery.'
+      overall_summary: The LLM answer is highly accurate and comprehensive, matching
+        the ImandraX decomposition in conclusion, reasoning, and detail. It correctly
+        identifies the strict battery threshold, control flow, and lack of any exceptions,
+        demonstrating strong understanding without decomposition. No weaknesses observed;
+        LLM performs equivalently to verified analysis.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM answer implies a single scenario where approval is always
+          granted in DebrisAvoidance mode, regardless of other factors. The ImandraX
+          answer confirms this as a single proven property with one unconditional
+          outcome (always approves), so the decomposition has 1 exact scenario/region.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct, as the emergency mode check
+          precedes all other evaluations. Branching structure: Correct, LLM accurately
+          describes the if-emergency branch as an immediate path bypassing subsequent
+          checks like battery categorization. Short-circuit behavior: Correct, the
+          function short-circuits into the emergency approval without evaluating battery
+          or communication for approval decisions. Override logic: Correct, LLM notes
+          that emergency (DebrisAvoidance) overrides normal operation, trumping battery
+          and communication checks.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Critical battery level (0%) still approves
+        - No communication link still approves
+        total_edge_cases: 2
+        reasoning: The LLM identifies two key edge cases where typical blocking conditions
+          (critical battery and poor communication) do not prevent approval due to
+          the emergency override, which contradicts naive expectations of safety checks.
+          The decomposition, per ImandraX, implies these bypassed checks represent
+          the edge cases in this mode, totaling 2 as they are the 'other checks' bypassed.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: No numeric thresholds are relevant or mentioned in DebrisAvoidance
+          mode, as approval is unconditional and bypasses all checks including battery
+          categorization and communication status evaluations. Both answers confirm
+          no boundaries apply here.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion that approval
+          is always granted, matching the ImandraX proven property exactly. Reasoning
+          is sound, explicitly addressing battery and communication irrelevance, with
+          no flaws.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: The LLM effectively covers the
+          single decision scenario (always approve in DebrisAvoidance), matching the
+          decomposition''s one region/outcome as per ImandraX. Full coverage of the
+          unconditional path.'
+      overall_summary: The LLM answer demonstrates strong alignment with the ImandraX
+        decomposition, accurately capturing the emergency override logic and its bypassing
+        effect. Strengths include precise control flow understanding and identification
+        of key edge cases where normal constraints are ignored. No weaknesses noted;
+        the answer is comprehensive for this binary question without needing numeric
+        precision or boundaries. Overall, the LLM performs equivalently to the verified
+        decomposition in correctness and insight.

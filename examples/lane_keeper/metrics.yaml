@@ -7392,3 +7392,1229 @@
         - **Direction Accuracy: 0.2 (likely wrong conclusion if ImandraX is authoritative)**
 
         - Coverage: Moderate (identifies major violations but not systematic)
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:23'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 498
+        reasoning: The LLM estimated 4 distinct scenarios, which are high-level control
+          modes. However, the decomposition reveals 498 distinct scenarios, which
+          represent the precise combinations of input conditions that lead to each
+          control mode. The LLM's understanding is at a much higher abstraction level
+          and doesn't capture the granularity of the state space.
+        score: -7.948367231584678
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM correctly identified the precedence of conditions and the
+          general branching structure. For example, it correctly noted MANUAL_OVERRIDE
+          takes precedence over FULL_AUTONOMOUS and ASSISTED_DRIVING. However, its
+          understanding of short-circuit behavior and override logic is partial. It
+          correctly identified that an 'invalid state' leads to MANUAL_OVERRIDE immediately,
+          which is a form of short-circuiting. It also correctly identified that 'close
+          obstacle OR needs_manual OR NOT visibility_ok' leads to MANUAL_OVERRIDE.
+          However, it missed some nuances in how these conditions are evaluated and
+          combined within the actual code beyond a simple OR. For instance, the 'dead
+          zone' and 'out of bounds' conditions for 'invalid state' are distinct and
+          handled with specific logic rather than a single 'invalid state' concept.
+          The LLM also missed that EmergencyBraking was not implemented, suggesting
+          a lack of understanding of the *actual* override logic in the code versus
+          what its description might imply. Therefore, while it grasps the general
+          override concept and some short-circuiting, the detail is lacking.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - invalid state (dead zone)
+        - invalid state (out of bounds)
+        - visibility not acceptable (clear night degraded sensor)
+        - visibility not acceptable (rain degraded sensor)
+        - manual override needed (both sensors degraded)
+        - manual override needed (driver intervention time > 15)
+        total_edge_cases: 8
+        reasoning: The LLM identified some edge cases, such as specific 'invalid state'
+          conditions (dead zone, out of bounds) and particular 'visibility not acceptable'
+          scenarios. It also identified 'both sensors degraded' and 'driver intervention
+          time > 15' as conditions leading to manual override. However, the ImandraX
+          decomposition would likely expose more granular edge cases at the numeric
+          boundary level for each variable where the control mode might switch, which
+          the LLM did not explicitly mention. For example, specific thresholds for
+          sensor_conf in various weather conditions are identified but not explicitly
+          called 'edge cases'. The lack of 'EmergencyBraking' implementation was also
+          an edge case detected by the LLM (an unimplemented outcome from the problem
+          description).
+        edge_case_count: 6
+        score: 0.75
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance < 5
+        - obstacle_distance > 100
+        - speed < 10
+        - speed > 80
+        - lane_offset < 10
+        - lane_offset > 60
+        - 48 <= obstacle_distance <= 52
+        - 38 <= speed <= 42
+        - 28 <= lane_offset <= 32
+        - speed > 15
+        - speed < 40
+        - speed >= 40
+        - time_of_day < 6
+        - time_of_day >= 18
+        - sensor_conf < 70 (Clear night)
+        - sensor_conf < 75 (Rain)
+        - sensor_conf >= 90
+        - sensor_conf < 25
+        thresholds_from_decomp:
+        - time_of_day = 6
+        - time_of_day = 12
+        - time_of_day = 18
+        - time_of_day = 20
+        - sensor_confidence = 70
+        - sensor_confidence = 75
+        - sensor_confidence = 90
+        - sensor_confidence = 95
+        - speed = 40
+        - lane_offset = 25
+        - lane_offset = 28
+        - lane_offset = 32
+        - lane_offset = 35
+        - driver_intervention_time = 15
+        - obstacle_distance = 48
+        - obstacle_distance = 52
+        reasoning: 'The LLM identified many of the numeric thresholds but missed several.
+          It successfully extracted values like 5, 100, 10, 80, 60 for min/max for
+          the out-of-bounds invalid states, and ranges like 48-52, 38-42, 28-32 for
+          the dead zone. It also correctly identified thresholds for speed (>15, <40,
+          >=40), sensor confidence (<70, <75, >=90), and time of day (<6, >=18). However,
+          the LLM did not provide specific thresholds for ''sensor confidence: 95
+          (both Active), 75 (camera Active/lidar Degraded), 70 (camera Degraded/lidar
+          Active), 40 (both Degraded)'' as distinct boundaries, rather it saw these
+          as input values for sensor configuration states. The ImandraX answer gives
+          specific boundaries such as time_of_day = 12, time_of_day = 20, sensor_confidence
+          = 40, sensor_confidence = 95, lane_offset = 35, which were not explicitly
+          identified by the LLM as critical decision boundaries, but rather aspects
+          of parameters. The LLM provided redundant thresholds like ''sensor_conf
+          < 25'' which is likely a typo for ''lane_offset < 25''.'
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The question asked for 'exact numeric thresholds' and the LLM's
+          answer provides a mix of ranges ('48-52') and inequality comparisons ('<',
+          '>', '>='). While these are technically numeric, the ImandraX output provides
+          precise points that define the boundaries between scenarios. The LLM's understanding
+          of 'exact numeric thresholds' is too broad. It does not provide any numeric
+          *distributions* so this metric is scored 0.
+      direction_accuracy:
+        score: 0.8
+        reasoning: The LLM correctly identified the high-level control modes and their
+          general triggers. It correctly understood the precedence of MANUAL_OVERRIDE
+          and the conditions for FULL_AUTONOMOUS and ASSISTED_DRIVING. It also correctly
+          identified that EmergencyBraking was not implemented, which is an important
+          correct conclusion. However, it significantly underestimated the number
+          of distinct scenarios, indicating a lack of precision in its understanding
+          of the state space. It correctly identifies the factors influencing decisions
+          but misses the granularity due to the combinatorial nature of these factors.
+          This leads to a high-level correctness but low-level inaccuracy.
+      coverage_completeness:
+        score: 0.01
+        reasoning: The LLM identified 4 high-level scenarios. The decomposition found
+          498 distinct scenarios. Therefore, the LLM only covered a tiny fraction
+          of the actual decision scenarios. While the high-level control modes were
+          correctly identified, the actual coverage of the granular, distinct pathways
+          is extremely low. The LLM's answer provides a very coarse-grained view of
+          the system's behavior, missing almost all the specific scenarios that result
+          from the interplay of various thresholds. 4/498 is approximately 0.008,
+          thus 0.01 is a fair score.
+      overall_summary: The LLM demonstrated a good high-level understanding of the
+        control flow logic and correctly identified the main control modes and many
+        key numeric thresholds. It also correctly noted that an expected feature (EmergencyBraking)
+        was not implemented. However, it significantly underestimated the total number
+        of distinct scenarios by several orders of magnitude, failing to grasp the
+        combinatorial complexity that the ImandraX decomposition reveals. Its definition
+        of 'exact numeric thresholds' was also less precise than the point values
+        provided by ImandraX, often providing ranges or inequalities where specific
+        boundary values were expected. The LLM's strength lies in abstracting the
+        core logic, while its weakness is in the detailed enumeration and precise
+        boundary identification of the entire state space.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM answer correctly identifies that Manual Override can
+        trigger when an obstacle is close and provides some conditions. It attempts
+        to detail the safe distance calculations but misses some of the nuances and
+        edge cases identified by the ImandraX answer. The ImandraX answer focuses
+        on the count of scenarios and provides a counter-intuitive example.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM incorrectly identified scenarios where the safety property
+        could be violated. The ImandraX answer proves that the safety property always
+        holds under the given conditions. The LLM misinterpreted the override logic
+        and condition precedence, leading it to believe that other factors could override
+        the "allow driving" state when clear weather and active sensors are present,
+        which is not the case according to the ImandraX verification. The ImandraX
+        verification provides a concrete proof that under the given conditions, the
+        output is always 'FullAutonomous' or 'AssistedDriving', directly contradicting
+        the LLM's scenarios for violation.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:27'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 498
+        reasoning: The LLM estimated 4 distinct control mode scenarios based on the
+          conditions described in the answer, which was confirmed by the detailed
+          reasoning for the branches in the logic. In contrast, the ImandraX decomposition
+          determined that there are a total of 498 scenarios, which indicates a substantial
+          discrepancy between the LLM's estimate and the actual scenarios derived
+          from the system's logic.
+        score: -7.948367231584678
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: The LLM did not accurately capture the control flow of the conditions.
+          For instance, it suggests a direct count of scenarios without considering
+          complex interdependencies and interactions in the control structure, thereby
+          failing to analyze aspects like AND/OR precedence and the effects of various
+          conditions properly.
+        score: 0.0
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid State Paths due to conditions
+        - Invalid Weather Visibility conditions
+        total_edge_cases: 2
+        reasoning: The LLM identified some edge cases that involve invalid configurations,
+          but it missed recognizing the full range of complex scenarios that could
+          arise from the interplay of multiple thresholds, especially involving night-time
+          and degraded sensor conditions.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance < 5
+        - sensor_confidence >= 90
+        - speed > 15
+        thresholds_from_decomp:
+        - time_of_day < 6
+        - time_of_day >= 18
+        - sensor_confidence >= 90
+        - lane_offset < 25
+        - driver_intervention_time > 15
+        - obstacle_distance < 48
+        - obstacle_distance > 52
+        reasoning: The LLM identified certain thresholds but did not capture the complete
+          set as laid out in the ImandraX answer. The identified thresholds were significant
+          but did not cover all necessary decision boundaries from the decomposition.
+        score: 0.42857142857142855
+      outcome_precision:
+        score: 0.6
+        reasoning: Some thresholds and distributions were identified, and their values
+          largely aligned with the qualitative conditions provided by the LLM, but
+          there was a lack of precision in exact numeric representation.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The conclusions reached by the LLM regarding the scenarios and
+          conditions were partially correct but lacked a complete understanding of
+          critical aspects of the control structure and misrepresented the scenarios.
+      coverage_completeness:
+        score: 0.008
+        reasoning: Out of 498 total scenarios, LLM only identified a simplistic view
+          of 4 scenarios which is a very small fraction of the total, showing a severe
+          deficiency in coverage.
+      overall_summary: The LLM's evaluation greatly underestimated the number of control
+        scenarios compared to the ImandraX answer. It struggled with understanding
+        the complex interactions between conditions and failed to accurately identify
+        detailed thresholds. While some aspects of the logic were recognized, the
+        LLM ultimately provided an overly simplified view and lacked in-depth understanding
+        of the underlying logic.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 9
+        n_decomposition_exact_scenarios: 36
+        reasoning: LLM estimated that up to 5 scenarios can be considered from the
+          valid conditions and implied other scenarios that can be included like degraded
+          sensors, speed, and so forth, leading to a total of approximately 9 scenarios.
+        score: -3.7548875021634682
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly captures the precedence of conditions and short-circuit
+          behavior in its detailed explanation of how `close_obstacle` interacts with
+          other conditions. The branching structure understanding is partial because
+          while it captures some interactions, it could miss out on others, especially
+          in combining conditions effectively. The override logic understanding is
+          correct, as it discusses how the system prioritizes manual override.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - obstacle_distance < 5
+        - sensor is degraded
+        total_edge_cases: 3
+        reasoning: LLM identified edge cases such as when the obstacle distance is
+          critically low (<5) and situations where sensors are degraded, which affect
+          normal operating conditions. Missed edge cases could include specific combinations
+          of perfect sensor conditions under various weather situations.
+        edge_case_count: 2
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance < safe_distance
+        - speed > 15
+        thresholds_from_decomp:
+        - obstacle_distance < 10
+        - obstacle_distance < 13
+        - obstacle_distance < 15
+        - obstacle_distance < 19
+        reasoning: The LLM correctly identified overall conditions for safe distances
+          but missed exact numerical thresholds for when each would apply as detailed
+          in the decomposition.
+        score: 0.5
+      outcome_precision:
+        score: 0.8
+        reasoning: LLM provided precise values for conditions surrounding the close
+          obstacle scenario, with correct values but slightly varied conditions resulting
+          in a precision score of 0.8.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reached the correct conclusion that ManualOverride can
+          trigger due to a close obstacle and provided properly founded reasoning
+          for this conclusion.
+      coverage_completeness:
+        score: 0.25
+        reasoning: LLM covered a couple of scenarios it identified, but overall only
+          a small fraction of the 36 detailed scenarios from ImandraX were noted.
+      overall_summary: The LLM provides a generally correct answer with detailed reasoning
+        but fails to capture the full complexity and range of scenarios surrounding
+        ManualOverride. There are both strengths and weaknesses in the metrics – it
+        accurately addresses the conditions under which ManualOverride is triggered
+        and its required outputs but lacks full coverage and precision in threshold
+        identification.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately understands the precedence of conditions, correctly
+          interprets the branching structure, and identifies short-circuit behaviors
+          that directly impact decision-making in the control logic. The override
+          logic is also understood as it factors in multiple scenarios that can result
+          in a need for manual override.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Driver intervention time exceeds 15 seconds
+        - Obstacles within close proximity that trigger manual override
+        - Invalid state situations leading to manual override
+        total_edge_cases: 3
+        reasoning: The LLM successfully identifies edge cases that include conditions
+          that may not be typical driving scenarios, such as a long driver intervention
+          time and invalid states.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - driver_intervention_time > 15
+        - obstacle_distance < 40
+        - speed > 15
+        thresholds_from_decomp:
+        - driver_intervention_time <= 15
+        - obstacle_distance > 40
+        - lane_offset < 25
+        reasoning: The LLM identifies multiple thresholds related to driver intervention
+          time, obstacle distance, and speed, but misses the threshold for lane offset.
+          The identified thresholds align closely to the defined thresholds, contributing
+          to a partial score.
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides qualitative descriptions of scenarios when it
+          should have provided exact numeric values, which impacts the precision score.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The LLM identifies circumstances that can lead to manual override
+          but does not conclusively link them to the scenarios described, resulting
+          in a partially correct conclusion.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM covers key scenarios but fails to categorize all potential
+          scenarios leading to the decision-making process of the system.
+      overall_summary: The LLM demonstrates a strong grasp of control flow and identifies
+        multiple scenarios where the safety property can be violated, but struggles
+        with providing precise numeric distributions and fully covering decision scenarios.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:32'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 498
+        reasoning: 'The LLM explicitly states ''There are 4 distinct control mode
+          scenarios'' referring to the 4 high-level control modes (MANUAL_OVERRIDE
+          invalid, MANUAL_OVERRIDE valid, FULL_AUTONOMOUS, ASSISTED_DRIVING). However,
+          the LLM is counting control modes, not distinct decision regions/scenarios.
+          The ImandraX decomposition identifies 498 actual decision regions that result
+          from the cartesian product of constraint combinations across all input variables:
+          time_of_day partitions [6, 12, 18, 20], sensor_confidence partitions [70,
+          75, 90, 95], speed threshold [40], lane_offset partitions [25, 28, 32, 35],
+          driver_intervention_time [15], obstacle_distance dead zone [48-52], etc.
+          These represent distinct regions with different outcome possibilities. The
+          LLM''s count of 4 reflects the decision tree structure (high-level branches)
+          rather than the actual state space decomposition.'
+        score: -7.948367231584678
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates strong understanding of all control flow
+          aspects: (1) PRECEDENCE OF CONDITIONS - Correctly identifies that invalid
+          state is checked first (guard clause), then within valid states, checks
+          for close_obstacle OR needs_manual OR NOT visibility_ok before FULL_AUTONOMOUS
+          conditions. The precedence is correct: invalid state check trumps everything,
+          then safety/override conditions, then full autonomy requirements. (2) BRANCHING
+          STRUCTURE - Correctly describes the four-branch structure: invalid state
+          → MANUAL_OVERRIDE, then valid state splits into three branches (override
+          conditions → MANUAL_OVERRIDE, full_autonomous_conditions → FULL_AUTONOMOUS,
+          else → ASSISTED_DRIVING). This is an if-else-if chain, correctly understood.
+          (3) SHORT-CIRCUIT BEHAVIOR - Correctly identifies guard clauses: invalid
+          state returns early with zeroed outputs, and within valid state, any override
+          condition triggers MANUAL_OVERRIDE immediately without further checks. (4)
+          OVERRIDE LOGIC - Correctly describes the override pattern: close_obstacle,
+          manual_override_needed, and visibility failures all trigger MANUAL_OVERRIDE,
+          representing safety overrides of normal operation. All four aspects are
+          comprehensively and accurately understood.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 'Dead zone boundaries: 48-52 (obstacle), 38-42 (speed), 28-32 (lane_offset)
+          where state is considered invalid'
+        - 'Out-of-bounds conditions: obstacle < 5 OR > 100, speed < 10 OR > 80, lane_offset
+          < 10 OR > 60 triggering invalid state'
+        - 'Night hours with degraded sensors: time_of_day < 6 OR ≥ 18 combined with
+          sensor degradation in Clear weather'
+        - 'Both sensors DEGRADED: triggers manual override regardless of other conditions'
+        - 'Speed-dependent safe distance multiplier: different behavior at speed ≥
+          40 (1.3x multiplier via integer division)'
+        - 'Integer division artifact: 15*13//10 = 19 instead of 19.5 for Rain at high
+          speed'
+        total_edge_cases: 15
+        reasoning: 'The LLM identifies 6 edge cases. From ImandraX decomposition,
+          there are approximately 15 distinct edge cases: (1-3) Dead zone and out-of-bounds
+          invalid state regions (3 edge cases), (4) Both sensors degraded forcing
+          manual override (1 edge case), (5-6) Night/degraded sensor combinations
+          in different weather (2 edge cases), (7) Speed-dependent safe distance transitions
+          (1 edge case), (8) Integer division rounding effects (1 edge case), plus
+          approximately 7 more complex conjunctive edge cases from the cartesian product
+          decomposition. The LLM finds the most obvious edge cases (dead zones, both
+          degraded, night+degraded, speed transitions) but misses several conjunctive
+          edge cases that arise from specific combinations of multiple thresholds
+          (e.g., time_of_day=[6,12,18,20] create multiple boundary conditions when
+          combined with sensor_confidence partitions). The LLM captures ~40% of edge
+          cases - good identification of the most critical safety-relevant cases but
+          incomplete coverage of subtle boundary combinations.'
+        edge_case_count: 6
+        score: 0.4
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'sensor_conf: 95, 75, 70, 40'
+        - 'safe_distance_base: 10 (Clear), 15 (Rain)'
+        - 'safe_distance_multiplier: 13//10 = 1.3x when speed ≥ 40'
+        - 'speed_for_close_obstacle: > 15'
+        - 'speed_for_safe_distance_increase: 40'
+        - 'night_hours: < 6 or ≥ 18'
+        - 'visibility_sensor_clear: < 70'
+        - 'visibility_sensor_rain: 75'
+        - 'full_autonomous_sensor_conf: ≥ 90'
+        - 'full_autonomous_lane_offset: < 25'
+        - 'driver_intervention_time: > 15'
+        - 'dead_zone_obstacle: 48-52'
+        - 'dead_zone_speed: 38-42'
+        - 'dead_zone_lane_offset: 28-32'
+        - 'out_of_bounds_obstacle: < 5 or > 100'
+        - 'out_of_bounds_speed: < 10 or > 80'
+        - 'out_of_bounds_lane_offset: < 10 or > 60'
+        thresholds_from_decomp:
+        - 'time_of_day: 6, 12, 18, 20'
+        - 'sensor_confidence: 70, 75, 90, 95'
+        - 'speed: 40'
+        - 'lane_offset: 25, 28, 32, 35'
+        - 'driver_intervention_time: 15'
+        - 'obstacle_distance: 48, 52'
+        - dead_zone combinations
+        reasoning: 'The LLM identifies 17 distinct thresholds, while ImandraX decomposition
+          identifies 7 key threshold partitions. Comparing: LLM correctly identifies
+          sensor_confidence [95, 75, 70, 40] matching decomp [70, 75, 90, 95] - match
+          on key values. LLM identifies speed threshold 40, matching decomp [40].
+          LLM identifies lane_offset < 25 and 28-32 dead zone, partially matching
+          decomp [25, 28, 32, 35] - LLM misses some lane_offset partitions. LLM identifies
+          driver_intervention_time > 15, matching decomp [15]. LLM identifies obstacle_distance
+          48-52, matching decomp [48, 52]. LLM identifies night_hours < 6 or ≥ 18,
+          while decomp lists time_of_day [6, 12, 18, 20] - LLM''s identification is
+          more specific about the night boundary transitions. The LLM''s advantage
+          is providing exact operator relationships (e.g., ''safe_distance < obstacle_distance'')
+          and functional relationships (multiplier logic), which decomp doesn''t capture
+          in threshold list. However, LLM misses some lane_offset partition points
+          and doesn''t explicitly partition time_of_day into all 4 critical values.
+          Rough match: 5-6 of 7 decomp threshold partitions identified. Score ~0.75.'
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: 'The LLM provides many exact numeric thresholds with correct operators,
+          achieving high precision on most key values. Exact matches include: sensor_conf
+          thresholds (95, 75, 70, 40), safe distance bases (10 for Clear, 15 for Rain),
+          speed threshold for close obstacle (>15), speed threshold for safe distance
+          increase (40), night hours (<6 or ≥18), full autonomous thresholds (sensor_conf
+          ≥90, lane_offset <25), driver intervention time (>15), dead zone bounds
+          (48-52, 38-42, 28-32), and out-of-bounds limits. However, there are minor
+          precision issues: (1) The safe distance multiplier is described as ''13//10
+          = 1.3x'' which is approximately correct (actual is 1.3x via integer division),
+          but the intermediate computation is slightly unclear. (2) The visibility
+          sensor thresholds description for Rain is somewhat confusing (''sensor_conf
+          ≥75 required'' vs the actual condition). The LLM provides excellent numeric
+          specificity but with minor approximations in explaining the integer division
+          logic. Score reflects mostly exact matches with one computational explanation
+          issue.'
+      direction_accuracy:
+        score: 0.75
+        reasoning: 'The LLM''s conclusions are directionally correct on several key
+          points: (1) Correctly identifies that there are branching paths leading
+          to different control modes, (2) Correctly identifies that MANUAL_OVERRIDE
+          is triggered by invalid state OR unsafe conditions, (3) Correctly identifies
+          FULL_AUTONOMOUS requires high sensor confidence and small lane offset, (4)
+          Correctly identifies ASSISTED_DRIVING as the fallback mode. However, the
+          reasoning has a significant flaw: the LLM concludes there are ''4 distinct
+          scenarios'' and counts these as decision paths/control modes, when the question
+          asks for ''distinct lane keeping control scenarios'' which decomposition
+          shows are actually 498 distinct regions. The LLM''s reasoning about the
+          decision tree structure is sound, but it fundamentally misinterprets what
+          constitutes a ''scenario'' - it counts outputs/branches rather than input
+          state space regions. The conclusion about which conditions lead to which
+          modes is accurate, but the quantitative conclusion (4 vs 498) is wrong due
+          to a categorical misunderstanding. Correct reasoning quality but incorrect
+          final count leads to 0.75 score.'
+      coverage_completeness:
+        score: 0.3
+        reasoning: 'Using rubric (c) - OUTCOME CATEGORY COVERAGE: The LLM explicitly
+          identifies 4 output categories/outcomes: MANUAL_OVERRIDE (invalid), MANUAL_OVERRIDE
+          (valid but unsafe), FULL_AUTONOMOUS, ASSISTED_DRIVING. However, ImandraX
+          decomposition finds 498 distinct decision scenarios, meaning the LLM''s
+          4 categories collapse 498 actual regions into just 4 equivalence classes.
+          This is a 4/498 ≈ 0.008 literal coverage. However, using a more generous
+          interpretation (rubric a) - the question asks ''how many distinct scenarios
+          exist'', and the LLM attempts to answer this by enumerating decision paths
+          rather than leaf regions. If we count the LLM''s enumerated decision branches:
+          invalid state path (1), three valid-state sub-branches (3), totaling 4.
+          But the decomposition shows there are 498 actual regions. The LLM demonstrates
+          understanding of the major outcome categories and the primary decision branches
+          (precedence correct, logic correct), but massively underestimates the actual
+          scenario count by ~125x. The coverage of ''what should be counted as distinct
+          scenarios'' is fundamentally misunderstood. Score reflects that the LLM
+          identifies correct logical categories but vastly undercounts the actual
+          decision space. Using intermediate interpretation: LLM identifies 4 scenarios
+          vs 498 actual → 4/498 ≈ 0.008 adjusted to 0.3 for demonstrating correct
+          understanding of branching structure even though count is wrong.'
+      overall_summary: >-
+        {
+          "summary": "The LLM demonstrates STRONG QUALITATIVE UNDERSTANDING of the
+        control flow logic but FUNDAMENTAL MISCOUNTING of decision scenarios. STRENGTHS:
+        (1) Correctly identifies all major numeric thresholds (sensor confidence levels,
+        safe distances, speed boundaries, night hours, etc.) with high precision;
+        (2) Excellent understanding of control flow structure, precedence, short-circuiting,
+        and override logic; (3) Correctly traces the four-branch decision tree; (4)
+        Identifies most critical edge cases (dead zones, both-sensors-degraded, night+degradation).
+        CRITICAL WEAKNESS: (1) Confuses 'distinct scenarios' (498 state space regions)
+        with 'distinct control modes' (4 outputs); (2) Severely underestimates scenario
+        count by 125x (4 vs 498), fundamentally misinterpreting what a 'scenario'
+        means in terms of decision region decomposition; (3) Does not recognize that
+        the cartesian product of thresholds creates far more distinct regions than
+        just output equivalence classes. IMANDRAХ ADVANTAGE: Performs actual state
+        space decomposition across all variables, identifying 498 distinct regions
+        where different constraint combinations produce different outcomes or have
+        different feasibility. This captures the true complexity missed by the LLM's
+        decision tree approach. IMPACT: For questions about system complexity, robustness
+        testing, coverage, or scenario-based analysis, the LLM's answer would dramatically
+        underestimate requirements. The LLM is excellent for explaining logic but
+        poor for quantifying decision space." }
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 36
+        reasoning: The LLM answer does not provide an explicit scenario count or enumeration.
+          It describes conditions qualitatively (e.g., 'Direct close obstacle trigger'
+          with various speed/weather combinations) but does not estimate a total number
+          of scenarios. The LLM covers the safe distance thresholds across 4 weather/speed
+          combinations, and mentions multiple paths (close_obstacle alone, invalid
+          state path, combined with other conditions), but does not quantify the total
+          state space. The ImandraX decomposition identifies exactly 36 concrete scenarios
+          where ManualOverride triggers with close obstacles. Without an explicit
+          number from the LLM, this cannot be scored as a ratio.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies the OR structure: ''if close_obstacle
+          or needs_manual or not visibility_ok → MANUAL_OVERRIDE''. It correctly explains
+          that close_obstacle is one of three conditions that independently trigger
+          the override (short-circuit behavior via OR). The LLM also correctly identifies
+          that ManualOverride can trigger via multiple independent paths: (1) the
+          close_obstacle condition directly, (2) the needs_manual condition, (3) the
+          visibility_ok condition, and (4) an invalid state path when obstacle_distance
+          < 5. The LLM correctly notes that close_obstacle alone is sufficient (override_logic:
+          safety-critical condition), and that even when close_obstacle is false,
+          other conditions can trigger ManualOverride. The precedence is correctly
+          understood: the function checks multiple independent conditions in OR order.
+          No control flow misunderstanding is apparent.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - obstacle_distance < 5 (out of bounds / invalid state) with close obstacle
+        - 'Speed boundary: speed > 15 vs speed ≤ 15 affects close_obstacle detection'
+        - 'Speed boundary: speed < 40 vs speed ≥ 40 affects safe_distance calculation'
+        total_edge_cases: 36
+        reasoning: 'The LLM identifies some edge cases: (1) the out-of-bounds case
+          where obstacle_distance < 5 leading to invalid state, (2) the speed threshold
+          of 15 that determines whether close_obstacle can trigger, and (3) the speed
+          threshold of 40 that changes safe distance multiplier. However, these are
+          relatively few compared to the 36 actual scenarios. The ImandraX answer
+          reveals that with 36 concrete scenarios involving sensor degradation, obstacle
+          distance ranges, speed ranges, and weather conditions, there are likely
+          many more edge cases involving boundary interactions (e.g., exactly at speed=40,
+          exactly at distance thresholds, sensor status transitions, degraded vs failed).
+          The LLM focuses on the qualitative structure (speed 15 and 40 boundaries,
+          obstacle < 5) but does not enumerate the combinatorial boundary cases that
+          form the bulk of the state space.'
+        edge_case_count: 3
+        score: 0.08333333333333333
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance < safe_distance
+        - speed > 15
+        - obstacle_distance < 10 (clear weather, speed < 40)
+        - obstacle_distance < 13 (clear weather, speed ≥ 40)
+        - obstacle_distance < 15 (rain, speed < 40)
+        - obstacle_distance < 19 (rain, speed ≥ 40)
+        - obstacle_distance < 5 (invalid state)
+        thresholds_from_decomp:
+        - obstacle_distance < 30
+        - speed >= 20
+        - camera_status = Degraded
+        - speed > 15 (for close_obstacle detection)
+        - speed < 40 vs >= 40 (safe_distance multiplier)
+        - obstacle_distance < 10 (clear, speed < 40)
+        - obstacle_distance < 13 (clear, speed >= 40)
+        - obstacle_distance < 15 (rain, speed < 40)
+        - obstacle_distance < 19 (rain, speed >= 40)
+        - obstacle_distance < 5 (invalid state)
+        - lidar_status = Degraded
+        - time_of_day = Night
+        - visibility < 50
+        - driver_alert_time > 10 (implied from needs_manual condition)
+        reasoning: 'The LLM identifies 7 thresholds, all related to obstacle distance
+          and speed boundaries. These are accurate and correct. However, the ImandraX
+          decomposition reveals many additional thresholds that the LLM missed: sensor
+          status boundaries (camera_status, lidar_status, their Degraded state), visibility
+          thresholds (< 50), time of day (Night), and driver intervention time (>
+          10). The LLM''s answer is limited to the direct close_obstacle path but
+          does not explore the broader conditions under which ManualOverride triggers
+          with close obstacles, such as sensor degradation (which the ImandraX example
+          explicitly mentions). The LLM captures the safe_distance thresholds correctly
+          (10, 13, 15, 19) and the speed boundary (15, 40), but misses sensor status
+          and visibility as decision boundaries.'
+        score: 0.5
+      outcome_precision:
+        score: 0.75
+        reasoning: 'The LLM provides precise numeric thresholds for the safe_distance
+          values (10, 13, 15, 19) with exact weather/speed conditions. This is correct
+          and matches expected behavior (exact match on values and operators). However,
+          the LLM describes the outcome imprecisely in some respects: (1) it states
+          ''allow_steering = False, require_driver_alert = True, max_steering_angle
+          is calculated normally'' for ManualOverride cases, but does not specify
+          exact values or ranges for these outputs; (2) it mentions ''confidence_level
+          reflects sensor state'' without giving numeric precision; (3) the invalid
+          state path is described as ''all zeroed outputs'' which is qualitative rather
+          than numeric. The core obstacle distance thresholds are precise (1.0 score
+          worthy), but the secondary output variables are described qualitatively
+          (would be 0.5 score). Weighted: strong precision on primary thresholds (safe_distance),
+          weak precision on outputs. The ImandraX example shows obstacle_distance
+          < 30, which is a broader categorization than the specific thresholds (10,
+          13, 15, 19), suggesting the LLM''s precision on exact values may not capture
+          all scenarios.'
+      direction_accuracy:
+        score: 0.9
+        reasoning: 'The LLM correctly concludes that YES, ManualOverride CAN trigger
+          when an obstacle is close, and identifies the primary mechanism: the close_obstacle
+          condition in the OR expression directly triggers it. The reasoning is sound:
+          close_obstacle is checked via obstacle_distance < safe_distance AND speed
+          > 15, and when true, mode = MANUAL_OVERRIDE. The LLM also correctly identifies
+          alternative paths (needs_manual, visibility_ok, invalid state). The minor
+          weaknesses: (1) the LLM does not explore the full breadth of scenarios where
+          close obstacles trigger ManualOverride, specifically missing sensor degradation
+          as an additional trigger context (as shown in the ImandraX example where
+          degraded camera + close obstacle = ManualOverride); (2) it focuses heavily
+          on the speed-based safe_distance thresholds but does not discuss how sensor
+          degradation changes the dynamics. However, the core directional answer is
+          completely correct: yes, close obstacles DO trigger ManualOverride, and
+          the mechanism is correctly identified. The reasoning is mostly complete,
+          just not exhaustive.'
+      coverage_completeness:
+        score: 0.5
+        reasoning: 'Using rubric (c) OUTCOME CATEGORY COVERAGE: The LLM identifies
+          at least 2-3 outcome categories or paths: (1) Direct close obstacle trigger
+          with specific safe_distance thresholds, (2) Invalid state path with obstacle_distance
+          < 5, (3) Combined conditions with other triggers (needs_manual, visibility).
+          This represents partial enumeration of distinct decision branches. However,
+          the ImandraX decomposition reveals 36 concrete scenarios, implying many
+          more category combinations: sensor status combinations (camera/lidar degraded/normal),
+          visibility ranges, time-of-day (day vs night), speed ranges, and obstacle
+          distance ranges. The LLM''s coverage identifies the structural paths but
+          not the combinatorial expansion of those paths across sensor states, visibility
+          conditions, and time-of-day factors. Estimated coverage: LLM identifies
+          ~3-4 outcome categories / ~15-20+ actual categories across 36 scenarios
+          ≈ 0.25-0.33, but using a charitable interpretation of the LLM''s ''combined
+          conditions'' statement (which acknowledges interaction with sensor and visibility),
+          could be 0.5. Score: 0.5 reflects partial but incomplete scenario coverage.'
+      overall_summary: >2
+
+        The LLM provides a correct directional answer with sound core reasoning but
+        lacks comprehensive coverage. Strengths: (1) Correctly identifies that ManualOverride
+        triggers with close obstacles; (2) Provides exact numeric thresholds for safe_distance
+        (10, 13, 15, 19) across weather/speed combinations; (3) Correctly explains
+        the OR branching logic and multiple trigger paths; (4) Identifies control
+        flow structure accurately. Weaknesses: (1) No explicit scenario count vs ImandraX's
+        36 concrete scenarios; (2) Missing sensor degradation as a key contextual
+        factor (ImandraX example highlights degraded camera); (3) Limited exploration
+        of boundary conditions across sensor states, visibility, and time-of-day;
+        (4) Qualitative descriptions of outputs rather than numeric precision; (5)
+        Does not enumerate the full combinatorial state space. ImandraX demonstrates
+        that the complete picture involves not just speed/weather-based safe distances,
+        but also sensor quality, visibility constraints, and time-of-day interactions.
+        The LLM's answer would satisfy a basic question but misses significant edge
+        cases and the broader system constraints.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not estimate a total scenario count explicitly. Instead,
+          it describes 3 specific violation scenarios (long driver intervention, close
+          obstacle, invalid state). The ImandraX decomposition appears to identify
+          a single core region where the property holds, implying the negation space
+          is the complement. Without an explicit scenario count from the LLM, the
+          score cannot be reliably computed.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          Precedence: The LLM correctly identifies the OR logic in _requires_manual_override
+          (both_degraded OR long_intervention), showing correct precedence understanding.
+          However, it does not fully articulate the priority of obstacle and intervention
+          checks relative to each other. Partial.
+
+
+          Branching: The LLM describes multiple independent checks (close_obstacle,
+          needs_manual, invalid_state) as separate conditions, suggesting understanding
+          of branching. However, it conflates these with the 'all-OR' structure of
+          override conditions, showing partial understanding of the true branching
+          logic. Partial.
+
+
+          Short-circuit: The LLM correctly notes that any of the three override conditions
+          (close_obstacle, long_intervention, invalid_state) can trigger MANUAL_OVERRIDE
+          immediately, demonstrating understanding of short-circuit/guard clause behavior.
+          Correct.
+
+
+          Override logic: The LLM correctly identifies that _requires_manual_override
+          uses quorum-based override logic where driver_intervention_time > 15 is
+          checked independently of sensor health, prioritizing safety. Correct.
+
+
+          Overall score = (1 + 0.5 + 1 + 1) / 4 = 0.875
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Long driver intervention time (> 15s) with perfect sensors forcing manual
+          override
+        - Close obstacle triggering manual override despite clear weather and active
+          sensors
+        - Dead zone states (obstacle_distance 48-52, speed 38-42, lane_offset 28-32)
+          forcing manual override
+        - Night-time with degraded sensors despite clear weather
+        - Invalid state (out-of-bounds) conditions
+        total_edge_cases: 5
+        reasoning: The LLM explicitly identifies 5 distinct edge cases or violation
+          scenarios. Edge case 1 (long intervention override) demonstrates the safety-critical
+          quorum override pattern violating naive expectations. Edge case 2 (close
+          obstacle) combines multiple constraints (obstacle proximity + speed > 15).
+          Edge case 3 (dead zones) represents equality/boundary constraints. Edge
+          case 4 (night with degraded sensors) contradicts the naive expectation of
+          clear weather always allowing driving. Edge case 5 (invalid state) is a
+          safety-critical invariant violation. All 5 are valid edge cases meeting
+          the criteria (conjunctive constraints, boundary conditions, safety-critical
+          behavior). The LLM identifies all edge cases present in its analysis. Score
+          = 5/5 = 1.0.
+        edge_case_count: 5
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - driver_intervention_time > 15
+        - 'obstacle_distance < safe_dist (speed-dependent: < 10 at speed < 40, < 13
+          at speed >= 40)'
+        - lane_offset < 25
+        - sensor_conf >= 70
+        - obstacle_distance 48-52 (dead zone)
+        - speed 38-42 (dead zone)
+        - lane_offset 28-32 (dead zone)
+        thresholds_from_decomp:
+        - obstacle > 40
+        - lane_offset < 25
+        - intervention <= 15
+        - clear weather
+        - active sensors
+        reasoning: 'The LLM identifies several numeric thresholds, including driver_intervention_time
+          > 15 (inverse of intervention <= 15), lane_offset < 25, speed-dependent
+          safe distances, sensor confidence >= 70, and dead zone boundaries. ImandraX
+          specifies: obstacle > 40, lane_offset < 25, intervention <= 15, plus categorical
+          conditions (clear weather, active sensors). The LLM identifies more granular
+          thresholds (dead zones, speed dependencies) but misses or misinterprets
+          the obstacle > 40 threshold (the LLM focuses on ''close obstacle'' but not
+          the safe distance boundary itself). LLM identifies 5 of 5 core thresholds,
+          though with different emphasis. Score ~1.0 as all key thresholds are represented,
+          though interpretation differs.'
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: 'The LLM provides qualitative descriptions of violation scenarios
+          rather than precise numeric conditions. However, it does identify specific
+          thresholds like ''driver_intervention_time > 15'', ''obstacle_distance <
+          safe_dist'', ''lane_offset < 25'', and mentions dead zone boundaries (48-52,
+          38-42, 28-32). ImandraX provides precise numeric constraints: obstacle >
+          40, lane_offset < 25, intervention <= 15. The LLM''s approach is more scenario-focused
+          than precision-focused, identifying categories of violations rather than
+          exact numeric distributions of the property holding vs. violating regions.
+          Score 0.0 because the LLM does not provide precise numeric outcome distributions
+          comparable to ImandraX''s formal constraints.'
+      direction_accuracy:
+        score: 0.0
+        reasoning: 'Fundamental disagreement on the core conclusion: LLM claims the
+          property CAN be violated (YES answer), while ImandraX proves the property
+          ALWAYS HOLDS under the stated conditions (PROVEN answer). The LLM''s reasoning
+          appears to conflate different interpretations of the property. The LLM assumes
+          ''clear weather + active sensors'' alone should allow driving, but then
+          correctly identifies override conditions. However, the question asks if
+          the property can EVER be violated—the LLM answers YES, but ImandraX''s formal
+          decomposition establishes the property is proven true when specific bounds
+          are respected. The LLM''s conclusion is directionally opposite to ImandraX.
+          Score 0.0 for completely wrong direction.'
+      coverage_completeness:
+        score: 0.5
+        reasoning: 'The LLM identifies 3 categories of violation scenarios: (1) long
+          driver intervention time, (2) close obstacle, (3) invalid state. These represent
+          partial coverage of the decision landscape. However, the LLM does not enumerate
+          the full space or count distinct regions. ImandraX provides a single characterized
+          region where the property holds, suggesting the LLM''s coverage is incomplete
+          and lacks formal decomposition. Rubric (c) applies: LLM identifies 3 outcome
+          categories vs. the decomposed structure. Score 0.5 reflects acknowledgment
+          of multiple scenarios but incomplete structured coverage compared to ImandraX''s
+          proven region.'
+      overall_summary: >2
+
+        The LLM and ImandraX provide fundamentally contradictory answers. ImandraX
+        PROVES the property always holds under precisely specified conditions (clear
+        weather, active sensors, obstacle > 40, lane_offset < 25, intervention ≤ 15).
+        The LLM claims the property CAN be violated (YES answer) and identifies three
+        categories of violation scenarios: long driver intervention time, close obstacles,
+        and invalid states.
+
+
+        **Key Disagreement:** The LLM's interpretation of the property appears to
+        be broader/weaker than ImandraX's formal specification. The LLM seems to ask
+        "does clear weather + active sensors ALONE guarantee driving?" and correctly
+        concludes no—override conditions can still apply. ImandraX, conversely, formally
+        specifies additional constraints (obstacle > 40, lane_offset < 25, intervention
+        ≤ 15) and proves the property holds within that bounded region.
+
+
+        **Strengths of LLM response:**
+
+        - Correct identification of override patterns and their precedence
+
+        - Comprehensive edge case analysis (5 distinct violation scenarios)
+
+        - Good short-circuit behavior understanding
+
+        - Identifies multiple thresholds (intervention > 15, speed dependencies, dead
+        zones)
+
+        - Reasoning shows sophisticated understanding of quorum-based override logic
+
+
+        **Weaknesses of LLM response:**
+
+        - Direction accuracy score is 0.0: answers opposite to ImandraX's proven conclusion
+
+        - Lacks formal decomposition or region-based verification
+
+        - Does not recognize or attempt to identify the bounded region where property
+        holds
+
+        - Outcome precision is purely qualitative, not numeric
+
+        - State space estimation is unknown/not explicit
+
+
+        **ImandraX Strengths:**
+
+        - Provides formal proof structure and precise numeric bounds
+
+        - Clear specification of property-holding region
+
+        - Definitive PROVEN conclusion with rigorous decomposition
+
+
+        The core issue is interpretation: the LLM addresses an unqualified property
+        ("clear weather + active sensors allow driving"), while ImandraX addresses
+        a bounded property with additional constraints. Under ImandraX's interpretation,
+        the property is proven true; under the LLM's broader interpretation, it is
+        correctly violated.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:49:40'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 498
+        reasoning: The LLM explicitly states '4 distinct control mode scenarios'.
+          The ImandraX answer provides '498 scenarios', which is taken as the exact
+          decomposition count.
+        score: -7.948367231584678
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies the sequential branching: invalid
+          state first (early return to MANUAL_OVERRIDE), then OR conditions for unsafe/manual/visibility
+          leading to MANUAL_OVERRIDE, then check for FULL_AUTONOMOUS, else ASSISTED_DRIVING.
+          This captures precedence (overall structure), if-else-like branching, short-circuit
+          on invalid/unsafe, and override logic where safety/manual trumps autonomous
+          modes.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone invalid state (48≤obstacle≤52 AND 38≤speed≤42 AND 28≤lane_offset≤32)
+          - complex conjunctive equality range
+        - Out-of-bounds invalid (e.g., obstacle<5 or >100, etc.) - negation of common
+          bounds
+        - Both sensors DEGRADED requiring manual override - negation of common case
+          (sensors working)
+        - Night visibility with degraded sensors (time<6 or ≥18 AND sensor_conf<70
+          in clear) - safety-critical contradiction to expectation
+        - Driver intervention >15s - rare override case
+        total_edge_cases: 12
+        reasoning: LLM identifies 5 edge cases involving complex constraints (dead
+          zone), negations (out-of-bounds, degraded sensors), counterintuitive safety
+          (night degraded), and rare triggers (driver time). Decomposition likely
+          has more due to 498 scenarios, estimated at 12 based on interactions like
+          dead zones, visibility-time-sensor combos, and weather-speed-obstacle boundaries;
+          LLM misses finer edges like exact time thresholds 12/20 or lane 35.
+        edge_case_count: 5
+        score: 0.4166666666666667
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance <5, >100
+        - speed <10, >80
+        - lane_offset <10, >60
+        - 'dead zone: obstacle 48-52, speed 38-42, lane 28-32'
+        - 'safe_distance: 10 (clear base), 15 (rain base), 13 (clear >=40), 19 (rain
+          >=40)'
+        - speed >15 (close obstacle)
+        - speed >=40 (safe distance increase)
+        - time_of_day <6 or >=18 (night)
+        - sensor_conf <70 (clear night vis), >=75? wait <75? for rain vis
+        - sensor_conf >=90 (full auto)
+        - lane_offset <25 (full auto)
+        - driver_intervention_time >15
+        - lane_offset >35 (alert in assisted)
+        - 'sensor_conf values: 95,75,70,40'
+        thresholds_from_decomp:
+        - 'time_of_day: 6,12,18,20'
+        - 'sensor_confidence: 70,75,90,95'
+        - 'speed: 40'
+        - 'lane_offset: 25,28,32,35'
+        - 'driver_intervention_time: 15'
+        - 'obstacle_distance: 48,52'
+        - 'dead_zone speeds: 38,42'
+        - 'dead_zone offsets: 28,32'
+        reasoning: LLM identifies many thresholds including out-of-bounds (5,10,60,80,100),
+          dead zone (38,42,48,52,28,32), safe dist (10,13,15,19), speed (15,40), time
+          (6,18), conf (40,70,75,90,95), lane (25,35), driver (15). Misses time 12,20;
+          exact dead speeds 38,42 mentioned but not as thresholds; decomp focuses
+          on key boundaries without out-of-bounds explicitly listed, but LLM covers
+          ~80% of core ones (e.g., all conf, speed 40, lane 25/28/32/35 partially,
+          etc.), extras like 5/100 are likely present.
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: No numeric distributions provided; outcomes are categorical modes
+          (MANUAL_OVERRIDE, FULL_AUTONOMOUS, ASSISTED_DRIVING). LLM lists thresholds
+          qualitatively but not as distributions (e.g., no 'X% chance of mode Y under
+          Z'). Qualitatively directionally correct (identifies modes tied to thresholds),
+          but lacks precision in outcome frequencies or exact condition probabilities,
+          scoring low per rubric.
+      direction_accuracy:
+        score: 0.0
+        reasoning: LLM concludes 4 scenarios, fundamentally wrong vs ImandraX's 498,
+          missing combinatorial explosion from variables like time_of_day (binned),
+          sensor states (4 combos), weather, speed ranges, etc. Reasoning traces main
+          branches but overlooks multi-variable interactions leading to many regions.
+          No partial credit as core count is orders of magnitude off.
+      coverage_completeness:
+        score: 0.0
+        reasoning: 'Rubric (a): Explicit count 4 vs decomp 498, proportion ~0.008.
+          LLM enumerates 4 high-level paths but ignores sub-scenarios from variable
+          combinations (e.g., 4 sensor conf levels × weather × time bins × etc.).
+          No scenario enumeration beyond modes; acknowledges multiplicity qualitatively
+          (''every decision path'') but not quantitatively, warranting 0.0.'
+      overall_summary: '"The LLM significantly underestimates the state space (4 vs
+        498 scenarios), failing to capture combinatorial complexity from interdependent
+        variables (sensors, weather, time, speed, offsets), leading to incomplete
+        coverage and wrong conclusions. Strengths: solid grasp of top-level control
+        flow (branches, overrides) and identification of most key thresholds (e.g.,
+        conf levels, speed 40, lane 25). Weaknesses: misses nuanced boundaries (time
+        12/20, exact dead zone speeds) and edge cases from interactions; no decomposition
+        into full regions. ImandraX excels in exhaustive verification, revealing hidden
+        multiplicity; LLM better for intuitive high-level explanation but inaccurate
+        for precise counting."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 36
+        reasoning: The LLM answer does not provide any explicit or implicit numerical
+          estimate of the total number of scenarios. It describes conditions qualitatively
+          (e.g., direct triggers with variations in weather and speed, invalid paths,
+          combined conditions) but does not count or approximate the total state space.
+          The ImandraX answer explicitly states 36 scenarios, so n_decomposition_exact_scenarios
+          is 36.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: >-
+          Precedence of conditions: correct - LLM accurately describes the OR expression
+          (close_obstacle or needs_manual or not visibility_ok) leading to MANUAL_OVERRIDE,
+          implying correct evaluation order without mentioning but implicitly handling
+          AND within close_obstacle check (distance < safe AND speed >15).
+
+          Branching structure: correct - LLM outlines the main if-condition for MANUAL_OVERRIDE
+          and separates the invalid state path, correctly distinguishing direct triggers
+          from overrides.
+
+          Short-circuit behavior: partial - LLM mentions the direct OR trigger but
+          does not explicitly discuss early returns or guard clauses; however, it
+          implies short-circuiting via the OR but lacks detail on execution flow like
+          early exits in sub-functions.
+
+          Override logic: correct - LLM highlights how close_obstacle (safety check)
+          directly trumps to MANUAL_OVERRIDE, and invalid states force override with
+          zeroed outputs, showing understanding of safety overriding normal operation.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid state path where obstacle_distance < 5 (out of bounds, safety-critical
+          override)
+        - Close obstacle with degraded sensors (not fully failed, negation of common
+          case, counterintuitive with moderate speeds)
+        total_edge_cases: 8
+        reasoning: 'The LLM identifies two edge cases: the invalid state for obstacle_distance
+          <5 (equality/boundary at 5, safety-critical, contradicts naive expectation
+          of valid ranges), and close obstacles combined with degraded (not failed)
+          sensors (negation of working sensors, counterintuitive override even at
+          moderate speeds). The decomposition (ImandraX) implies multiple edge cases
+          within the 36 scenarios, such as interactions with degraded sensors, night
+          visibility with clear weather, and quorum overrides; estimating conservatively
+          8 total edge cases based on core logic mentions (e.g., sensor fusion, weather-speed
+          interactions, emergency overrides). LLM misses others like exact boundary
+          equalities or multi-constraint combinations (e.g., ≥3 conjuncts in safety
+          distance calc).'
+        edge_case_count: 2
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - obstacle_distance < 10 (clear, speed <40)
+        - obstacle_distance < 13 (clear, speed >=40)
+        - obstacle_distance < 15 (rain, speed <40)
+        - obstacle_distance < 19 (rain, speed >=40)
+        - speed > 15
+        - obstacle_distance < 5 (invalid)
+        thresholds_from_decomp:
+        - 'obstacle_distance < safe_distance (varying by weather/speed: 10/13/15/19)'
+        - speed > 15
+        - obstacle_distance < 5 (invalid)
+        - sensor degradation thresholds (e.g., confidence < threshold for degraded)
+        - visibility constraints (e.g., night + degraded > certain level)
+        - driver intervention time >= quorum (e.g., >5s)
+        reasoning: LLM identifies the core obstacle distance thresholds based on weather
+          and speed bins, plus speed >15 and invalid <5, which are precise and match
+          key boundaries. However, it misses thresholds related to sensor confidence
+          (e.g., for degraded vs failed), visibility interactions (e.g., night-specific),
+          and driver time quorum, which are part of the decomposed conditions enabling
+          close-obstacle triggers in the full 36 scenarios.
+        score: 1.0
+      outcome_precision:
+        score: 0.9
+        reasoning: LLM provides highly precise numeric thresholds for safe distances
+          (e.g., <10, <13 exact matches to model variations by weather/speed) and
+          speed >15, aligning closely with decomposed logic. The invalid <5 is exact.
+          Slight deduction for not specifying units (m/kmh) or exact speed factors
+          in all cases, but operators and values are correct and directionally precise
+          vs ImandraX example (<30 for moderate speed, which aligns with <13-19 range).
+          No qualitative vagueness; all numeric.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes that ManualOverride can trigger with
+          close obstacles, directly matching the ImandraX affirmative answer. Reasoning
+          is complete and accurate, detailing direct, invalid, and combined paths
+          with precise conditions, countering any naive expectation that close obstacles
+          always lead to EmergencyBraking instead. No flaws in direction or partiality;
+          fully aligns with the 36 verified scenarios.
+      coverage_completeness:
+        score: 0.3
+        reasoning: 'Applied (b) SCENARIO ENUMERATION: LLM explicitly describes ~5-6
+          distinct scenarios (4 direct weather-speed combos for close_obstacle, 1
+          invalid <5, and qualitative combined with degraded/visibility/driver time).
+          This covers a subset of the 36 decomposed scenarios. Most generous interpretation
+          acknowledges multiplicity but doesn''t reach category coverage (e.g., misses
+          sensor status variations, night interactions fully); score as 5/36 ≈0.14,
+          rounded up to 0.3 for partial enumeration of key paths.'
+      overall_summary: 'The LLM answer is strong in directional correctness, precise
+        numeric boundaries, and basic control flow, effectively answering the question
+        with relevant conditions for ManualOverride on close obstacles. However, it
+        lacks comprehensive state space estimation or full scenario coverage (only
+        partial enumeration vs 36), misses some edge cases (e.g., sensor confidence
+        edges) and thresholds (e.g., visibility quorums), making it less exhaustive
+        than ImandraX''s decomposed verification. Strengths: practical, detailed reasoning;
+        weaknesses: no quantification of scenario multiplicity, incomplete interaction
+        coverage.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not provide an explicit count of scenarios for the
+          state space related to the property; it qualitatively describes 'several
+          specific scenarios' focused on potential violations but does not quantify
+          the total decision regions. For the decomposition, since ImandraX proves
+          the property always holds under the antecedent conditions, we treat it as
+          verifying 1 unified scenario (the conjunction implying the outcome) without
+          violations.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - LLM accurately describes the
+          OR logic in _requires_manual_override (both_degraded OR long_intervention)
+          and independent checks for close_obstacle and invalid state. Branching structure:
+          correct - LLM outlines the override pattern where safety checks (close_obstacle,
+          needs_manual, invalid) trump normal operation via if-else-like prioritization
+          leading to MANUAL_OVERRIDE. Short-circuit behavior: partial - LLM mentions
+          overrides but does not explicitly discuss early returns or guard clauses
+          in detail, though implies trumping logic. Override logic: correct - LLM
+          clearly explains how safety checks (e.g., long intervention) override even
+          perfect sensor conditions.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: No edge cases of property violation exist in the decomposition,
+          as it is proven to always hold. The LLM's described scenarios (long intervention,
+          close obstacle, invalid state) do not violate the property because they
+          fail the antecedent's 'good conditions' (e.g., intervention >15 or obstacle
+          close violates assumptions). Thus, LLM identifies 0 relevant edge cases
+          for violation, matching the decomposition perfectly.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - driver_intervention_time > 15
+        - obstacle_distance < safe_dist (e.g., 10 for speed < 40, 13 for speed >=
+          40)
+        - lane_offset < 25
+        - speed > 15
+        - sensor_confidence >= 70
+        thresholds_from_decomp:
+        - intervention <= 15
+        - obstacle > 40
+        - lane_offset < 25
+        reasoning: 'The LLM identifies key thresholds relevant to the logic: intervention
+          time (15 seconds), lane offset (25 units), and obstacle distance boundaries
+          tied to speed (capturing the safe distance concept, though exact numbers
+          like 40 in decomp may reflect a specific safe threshold in clear weather;
+          LLM''s 10/13 approximates weather/speed-dependent distances). It also notes
+          sensor confidence (70) and speed (15), but the core three from decomp are
+          covered conceptually. Missed exact obstacle >40 but identified the boundary
+          mechanism.'
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM reaches the incorrect conclusion that the property can
+          be violated, providing counterexamples that actually fall outside the property's
+          antecedent (e.g., long driver intervention or close obstacles violate 'good
+          conditions' like intervention <=15 and obstacle >40). ImandraX proves it
+          always holds under the full conditions (Clear && Active sensors && obstacle
+          >40 && lane_offset <25 && intervention <=15 ==> FullAutonomous OR AssistedDriving).
+          The reasoning is flawed as it treats necessary safety overrides as property
+          violations rather than exclusions from the antecedent, leading to completely
+          wrong direction.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using rubric (c) OUTCOME CATEGORY COVERAGE: The LLM identifies
+          all key decision categories/scenarios from the decomposition, including
+          clear weather, active sensors, no close obstacle (via safe_dist check),
+          valid state, driver_intervention_time <=15, and lane_offset <25 for mode
+          distinction. This matches the decomp''s conditions (5 categories), providing
+          complete coverage of when/why the property holds, even if misframed around
+          violations.'
+      overall_summary: The LLM demonstrates strong grasp of the system's control flow,
+        override logic, and key thresholds, effectively enumerating relevant conditions
+        and scenarios. However, it fundamentally misinterprets the safety property
+        by excluding implicit 'good conditions' (e.g., no close obstacles, short intervention,
+        centered lane) from the antecedent, leading to an incorrect conclusion that
+        violations exist. ImandraX's decomposition and verification precisely formulate
+        and prove the property holds, highlighting the LLM's weakness in direction
+        accuracy and property scoping but strengths in coverage, flow understanding,
+        and boundary clarity. Overall, the LLM is insightful on mechanics but erroneous
+        on the specific query's implication.

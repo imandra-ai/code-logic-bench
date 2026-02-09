@@ -5369,3 +5369,989 @@
         space quantification is provided, but coverage is nearly complete qualitatively.
         Strengths: Precise, correct final reasoning. Weaknesses: Misunderstood code
         order, inventing unnecessary complexity around dead zone."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:00'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 38
+        reasoning: The LLM estimated 6 distinct scenarios, while the decomposition
+          found 38. The LLM's scenario count is significantly lower than the actual
+          count from the decomposition.
+        score: -4.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that 'Orbital Dead Zone' and 'Emergency
+          State' checks precede others, demonstrating an understanding of short-circuiting
+          and override logic. However, its understanding of cascading conditions (like
+          safety quorum checks combined with distance) is incomplete, leading to an
+          underestimation of distinct scenarios. The LLM incorrectly assumes that
+          the safety quorum scenarios (4, 5, 6) are mutually exclusive and are checked
+          *after* 'Very Close & Fast' (scenario 3). In reality, the quorum scenarios
+          interact with other conditions in a more complex branching structure than
+          simple sequential checks.
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The LLM did not explicitly identify any edge cases. The problem
+          description mentions handling 'emergency modes, orbital insertion challenges,
+          fuel-dependent propulsion selection, and safety quorum checks', but the
+          LLM did not specifically call out these as distinct edge cases. While it
+          mentioned emergency mode and safety quorum checks in its scenarios, it did
+          not categorize them as edge cases or discuss their special handling beyond
+          basic conditional checks, and the decomposition did not explicitly identify
+          any special edge cases that the LLM missed.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 9800 <= distance_to_target <= 10200
+        - 48 <= velocity <= 52
+        - distance_to_target < 1000
+        - velocity > 50
+        - distance_to_target < 5000
+        - distance_to_target > 500
+        - velocity < 100
+        - quorum >= 3
+        thresholds_from_decomp:
+        - distance_to_target = 500
+        - distance_to_target = 1000
+        - distance_to_target = 5000
+        - distance_to_target = 9800
+        - distance_to_target = 10200
+        - velocity = 48
+        - velocity = 50
+        - velocity = 52
+        - velocity = 100
+        - quorum = 3
+        reasoning: The LLM identified most of the critical numeric thresholds present
+          in the problem description (9800, 10200, 48, 52 for dead zone; 1000 for
+          'very_close'; 50 for 'fast'; 5000 for 'close'; 3 for quorum count; 500 and
+          100 for quorum sub-conditions). The decomposition reveals the same thresholds,
+          indicating the LLM correctly extracted the decision boundaries from the
+          text. The LLM listed all of the individual threshold values and their associated
+          conditions.
+        score: 0.8
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's outcomes (Coast, Off, unsafe), (Aerobrake, RCS, unsafe),
+          (Burn, fuel-mapped propulsion, safe), (Coast, Ion, safe) are generally correct
+          in terms of the high-level actions and safety status. However, the 'fuel-mapped
+          propulsion' is vague and imprecise; a more precise answer would specify
+          the exact propulsion type based on fuel levels, which the LLM did not provide
+          and was outside the scope of the question, thus partial credit.
+      direction_accuracy:
+        score: 0.6
+        reasoning: The LLM correctly identifies the general direction of the system's
+          behavior for the given scenarios. For example, it correctly associates the
+          'Orbital Dead Zone' and 'Emergency State' with 'unsafe' outcomes and 'Coast,
+          Off' maneuvers. It also correctly links a met safety quorum with a 'safe'
+          outcome. However, its overall understanding of the complete state space
+          is limited, leading to an incomplete picture of all possible directions
+          and a significantly underestimated number of scenarios. The conclusions
+          are mostly correct for the scenarios it *did* identify, but many other valid
+          scenarios and their associated directions were missed.
+      coverage_completeness:
+        score: 0.15
+        reasoning: The LLM only identified 6 out of 38 distinct scenarios, resulting
+          in very low coverage. It missed many combinations of navigation states,
+          distance, velocity, fuel levels, and trajectory clearance that would lead
+          to unique decision scenarios. For example, it did not fully enumerate how
+          different fuel levels or navigation states (beyond Emergency) interact with
+          the safety quorum logic to form distinct scenarios. The LLM's approach of
+          identifying scenarios based on return statements led to an insufficient
+          and incomplete set of decision paths.
+      overall_summary: The LLM demonstrated a partial understanding of the control
+        flow and identified most of the numeric thresholds. However, it severely underestimated
+        the total number of distinct decision scenarios (6 vs 38) and missed many
+        edge cases and scenario combinations. While the direction of its conclusions
+        for the identified scenarios was generally correct, the overall coverage of
+        the state space was very low. The LLM's reasoning for scenario identification
+        (tracing return statements) proved inadequate for fully capturing the complex
+        interactions of conditions.
+    q2:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM provides a good answer to the question. It correctly
+        identifies the conditions for an Aerobrake maneuver and accurately states
+        that it can occur with abundant fuel. The reasoning is clear and provides
+        a correct example. The two answers are identical in their conclusion and justification,
+        with only minor stylistic differences. Therefore, all scores are None because
+        the question does not allow for a clear distinction for any of the above metrics.
+        This is a very targeted question at a single very specific aspect of the overall
+        decomposition, so there is not enough surface area to evaluate most metrics.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM didn't explicitly enumerate scenarios. It correctly identified
+          that the property is never violated when nav_state is Emergency, which implies
+          a single scenario where propulsion is Off. The ImandraX answer confirms
+          this by proving the property holds ('PROVEN - cannot be violated').
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified that the 'dead zone' check comes before
+          the 'emergency' check, and that the 'emergency' check would handle cases
+          that pass the dead zone check. This demonstrates understanding of condition
+          precedence and branching. It also correctly identified that the emergency
+          return statement short-circuits further checks, and that the dead zone condition,
+          while having an identical output, technically overrides the emergency branch
+          for those specific inputs. The ImandraX answer confirms this by stating
+          'This override happens BEFORE any distance, velocity, or fuel checks, ensuring
+          Emergency always results in Off propulsion'.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - dead zone overriding emergency check
+        total_edge_cases: 1
+        reasoning: The LLM identified the 'dead zone' preemption as a subtle point,
+          which is effectively an edge case where two conditions could apply but one
+          takes precedence. This aligns with the ImandraX finding that the property
+          holds due to checks happening 'BEFORE any distance, velocity, or fuel checks'.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 9800 <= distance_to_target <= 10200
+        - 48 <= velocity <= 52
+        thresholds_from_decomp:
+        - 9800 <= distance_to_target <= 10200
+        - 48 <= velocity <= 52
+        reasoning: The LLM accurately identified the numeric thresholds that define
+          the 'dead zone' condition. The ImandraX answer confirms the irrelevance
+          of these thresholds to this specific property, but their identification
+          by the LLM shows clarity.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM correctly identified the outcome (Coast, Off, unsafe) in
+          all relevant scenarios. ImandraX also confirms propulsion = Off.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concluded that the property is NEVER violated,
+          despite initial hesitation. The ImandraX answer also provides 'PROVEN -
+          cannot be violated'.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM explicitly covered two major scenarios: ''in the dead
+          zone'' and ''NOT in the dead zone'', both when nav_state == Emergency, and
+          correctly analyzed that propulsion is Off in both cases. This demonstrates
+          complete coverage for the questioned property.'
+      overall_summary: The LLM demonstrated a strong understanding of the control
+        flow and conditions, correctly identifying that the safety property is never
+        violated. It also recognized the subtle interaction of the 'dead zone' and
+        'emergency' conditions, and accurately extracted the relevant numeric thresholds.
+        While there was some initial self-correction, the final conclusion aligned
+        perfectly with the ImandraX verification. The detailed reasoning provided
+        by the LLM was excellent.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:05'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 38
+        reasoning: The LLM estimated 6 distinct trajectory decision scenarios based
+          on its analysis. However, the ImandraX decomposition identified 38 distinct
+          regions/scenarios. The reasoning was based on a detailed breakdown of the
+          function's return statements. ImandraX considered additional factors such
+          as navigation states, velocity, fuel levels, and trajectory states, leading
+          to a higher count.
+        score: -4.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM demonstrates partial understanding of the precedence due
+          to not explicitly mentioning conjunctions in some checks. The branching
+          structure is partially correct as the LLM followed main decision paths but
+          did not fully capture sub-scenarios. The short-circuit behavior is partially
+          represented, particularly when evaluating emergency state checks. However,
+          the override logic regarding safety quorum is correctly identified.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - nav_state == Emergency
+        - distance < 1000 AND velocity > 50
+        - quorum < 3
+        - quorum ≥ 3 AND distance < 5000
+        - quorum ≥ 3 AND distance ≥ 5000
+        total_edge_cases: 10
+        reasoning: The LLM identified a few edge cases relating to safety constraints,
+          emergency states, and boundaries. However, it did not identify all potential
+          edge cases involved in combinations of states and safety checks. The total
+          of 10 edge cases was identified in the breakdown.
+        edge_case_count: 5
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 9800 ≤ distance_to_target ≤ 10200
+        - 48 ≤ velocity ≤ 52
+        - distance_to_target < 1000
+        - distance_to_target < 5000
+        - velocity > 50
+        - quorum < 3
+        - quorum ≥ 3
+        thresholds_from_decomp:
+        - distance_to_target in [500, 15000]
+        - velocity in [20, 120]
+        - quorum count ≥ 3 out of 4
+        reasoning: The LLM identified several specific numeric thresholds indicating
+          clear boundaries. However, it missed the broad ranges and additional thresholds
+          identified by ImandraX.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM provided certain numeric distributions with some inexactitude.
+          For example, while it correctly identifies thresholds like <= 100 and specific
+          bounds, it includes ranges incorrectly and does not specify some thresholds
+          accurately.
+      direction_accuracy:
+        score: 0.25
+        reasoning: Although the LLM arrives at a conclusion regarding decision scenarios,
+          it does not account for other scenarios as captured by ImandraX. It incorrectly
+          concludes the total based on its analysis.
+      coverage_completeness:
+        score: 0.158
+        reasoning: The LLM identified 6 distinct scenarios, but ImandraX's decomposition
+          reveals there should be 38 scenarios. The proportion reflects low completeness
+          relative to the actual number.
+      overall_summary: The LLM's answer has limited accuracy and insufficient coverage
+        in comparison to the ImandraX decomposition. While it demonstrated some understanding
+        of control flow and identified relevant thresholds, it significantly underestimated
+        the number of decision scenarios and occasionally misinterpreted specific
+        conditions.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 4
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM presented 4 conditions as necessary to trigger the Aerobrake
+          maneuver, whereas the decomposition identified 2 specific conditions explicitly
+          addressing distance and velocity.
+        score: 0.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly outlines the logical conditions necessary for
+          Aerobrake, maintaining the proper precedence and acknowledging that it is
+          not conditional on fuel, thus illustrating proper control flow.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Fuel level Abundant doesn't restrict Aerobrake
+        total_edge_cases: 1
+        reasoning: The LLM successfully recognized that fuel conditions do not limit
+          the Aerobrake maneuver, which was the critical edge case in this problem
+          regarding the maneuver conditions.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_target < 1000
+        - velocity > 50
+        thresholds_from_decomp:
+        - distance_to_target < 1000
+        - velocity > 50
+        reasoning: The LLM correctly identified the thresholds for decision making
+          regarding the Aerobrake, matching the complete decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM’s numerical outcomes regarding distance and velocity are
+          exact matches to the conditions necessary for Aerobrake.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly identifies that Aerobrake can occur regardless
+          of fuel level and specifies the conditions required, accurately stating
+          the physics of the situation.
+      coverage_completeness:
+        score: 0.5
+        reasoning: While the LLM covered both conditions necessary for Aerobrake,
+          its enumeration suggests there could be additional scenarios depending on
+          flight states not fully explored, thus only a partial completeness.
+      overall_summary: The LLM generally provides a detailed and correct answer regarding
+        the conditions for the Aerobrake maneuver, with an accurate representation
+        of the decision structure and thresholds. However, it could improve completeness
+        by addressing more nuanced states of the maneuver execution.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly assesses the control flow structure by identifying
+          that the dead zone check preempts the Emergency check. It understands that
+          the Emergency state leads to propulsion Off under all conditions. This shows
+          proper understanding of control flow.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The LLM did not identify any edge cases; however, the conditions
+          specified (being in the dead zone) do not meet the criteria for edge cases
+          as stated. Therefore, it is accurate that no edge cases were detected.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The LLM did not identify any numeric thresholds related to the
+          decision-making process here, as it focused more on logical reasoning rather
+          than numeric boundaries.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM correctly states and explains that propulsion is Off in
+          both cases outlined, matching the expected outcome precisely.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that the property cannot be violated is accurate,
+          supported by comprehensive reasoning.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covered all possible conditions discussed regarding the
+          Emergency state and propulsion being Off, demonstrating complete scenario
+          coverage.
+      overall_summary: The LLM provided a comprehensive analysis of the safety property,
+        correctly evaluating the scenarios where the property applies. It demonstrated
+        a strong understanding of control flow, outcome precision, and reasoning,
+        ultimately leading to the correct conclusion that the safety property cannot
+        be violated.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:11'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 38
+        reasoning: The LLM explicitly states there are 6 distinct trajectory decision
+          scenarios. The ImandraX answer indicates 38 distinct regions from decomposition.
+        score: -4.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: incorrect
+        reasoning: 'Precedence of conditions: partial - LLM captures AND in dead zone
+          and very close & fast, and quorum count, but may not fully address all interactions
+          like fuel mapping after quorum. Branching structure: correct - Describes
+          a clear if-else chain starting with dead zone, then emergency, then close&fast,
+          then quorum branches. Short-circuit behavior: correct - Identifies early
+          checks like dead zone and emergency leading to immediate returns. Override
+          logic: incorrect - Places emergency check after dead zone, but ImandraX
+          describes emergency as an override, suggesting it should trump other conditions
+          regardless of dead zone.'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Orbital Dead Zone (complex bounds on distance and velocity)
+        - Emergency State (override in crisis)
+        - Safety Quorum Not Met (unsafe coast despite other conditions)
+        total_edge_cases: 6
+        reasoning: 'LLM identifies three edge cases: the dead zone with tight bounds
+          (complex conjunctive constraints), emergency as an override (negation of
+          normal operation, safety-critical), and quorum <3 leading to unsafe coast
+          (safety-critical, contradicts expectation of safe maneuvers). From ImandraX
+          decomposition patterns, total edge cases include dead zone, emergency override,
+          quorum failure, fuel critical negation, trajectory_clear false (safety),
+          and multiplexer edge (low fuel in burn). LLM misses fuel critical and trajectory_clear
+          false, so found 3 out of 6.'
+        edge_case_count: 3
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 9800 ≤ distance ≤ 10200
+        - 48 ≤ velocity ≤ 52
+        - distance < 1000
+        - velocity > 50
+        - distance < 5000
+        - quorum ≥ 3
+        - distance > 500 (for safe)
+        - velocity < 100 (for safe)
+        thresholds_from_decomp:
+        - distance > 500
+        - distance < 1000
+        - distance < 5000
+        - distance ≥ 9800 and ≤ 10200
+        - velocity > 50
+        - velocity < 100
+        - 48 ≤ velocity ≤ 52
+        - quorum ≥ 3
+        - fuel levels (categorical, but critical threshold implicit)
+        reasoning: LLM identifies most key numeric thresholds including dead zone
+          bounds, close/fast conditions, quorum, and safety sub-conditions. Misses
+          explicit fuel critical as a threshold (categorical but impacts propulsion),
+          and trajectory_clear is boolean not numeric. Decomp has similar plus velocity
+          range bounds (20-120) but core decisions match; score based on 8/9 core
+          thresholds.
+        score: 0.8888888888888888
+      outcome_precision: null
+      direction_accuracy:
+        score: 0.25
+        reasoning: LLM's conclusion of 6 scenarios is incorrect (actual 38), but it
+          correctly identifies key directional outcomes like unsafe in dead zone/emergency/quorum
+          fail, safe in quorum met, and propulsion mapping. Reasoning is flawed as
+          it undercounts combinations of nav_state, fuel, and clearance, missing the
+          full state space explosion. Partially correct in direction (e.g., emergency
+          leads to coast/off unsafe) but incomplete.
+      coverage_completeness:
+        score: 0.158
+        reasoning: 'Using (b) SCENARIO ENUMERATION: LLM explicitly describes 6 distinct
+          scenarios (dead zone, emergency, very close&fast, quorum met close, quorum
+          met far, quorum not met). Actual decomposition has 38 regions, so coverage
+          proportion is 6/38 ≈ 0.158. Generous interpretation counts the enumerated
+          paths, but misses combinations like fuel levels and full nav states.'
+      overall_summary: '"The LLM provides a high-level trace of the control flow,
+        correctly capturing the main branching structure and several key thresholds,
+        but severely underestimates the state space by ignoring combinatorial factors
+        like 3 nav states, 4 fuel levels, and 2 clearance states, leading to only
+        6 vs 38 scenarios. Strengths: good identification of primary conditions (dead
+        zone, quorum, distances/velocities) and outcomes (safe/unsafe, propulsion
+        types). Weaknesses: misses overrides properly, combinatorial explosion, and
+        edge cases like fuel critical; no verification of full coverage. ImandraX
+        excels in exhaustive decomposition, revealing the true complexity."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM answer does not provide any explicit or implicit estimation
+          of the number of scenarios for the Aerobrake maneuver; it simply describes
+          the conditions without quantifying combinations or regions. The ImandraX
+          answer also does not specify a count, but based on the description, the
+          Aerobrake trigger appears to correspond to a single primary decision region
+          defined by the conjunction of distance < 1000 and velocity > 50 (with prior
+          checks that do not subdivide this region further for this outcome). Thus,
+          the decomposition exact scenarios is inferred as 1.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - The LLM accurately describes
+          the sequential checks (dead zone first, then emergency, then the Aerobrake
+          branch), implying proper ordering without mixing AND/OR incorrectly. ImandraX
+          focuses on the Aerobrake branch placement before fuel checks. Branching
+          structure: correct - Both identify the if-else structure correctly, with
+          Aerobrake in the third branch after failing the first two guards. Short-circuit
+          behavior: partial - LLM mentions early branches (dead zone and emergency)
+          that short-circuit before reaching Aerobrake, but does not explicitly discuss
+          early returns or guard clauses in detail; ImandraX implies it by noting
+          the branch happens before fuel. Override logic: correct - No overrides mentioned,
+          but both correctly note that Aerobrake trumps fuel considerations as it''s
+          checked earlier in the flow.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: Neither the LLM nor ImandraX answer identifies any specific edge
+          cases for the Aerobrake maneuver, such as equality boundaries (e.g., distance
+          exactly 1000), negations, or safety-critical combinations. The conditions
+          are straightforward (distance < 1000, velocity > 50), and no rare or contradicting
+          cases are highlighted. Given the simplicity of the trigger, there appear
+          to be no edge cases in the decomposition for this specific outcome.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_target < 1000
+        - velocity > 50
+        thresholds_from_decomp:
+        - distance_to_target < 1000
+        - velocity > 50
+        reasoning: 'The LLM correctly identifies the key thresholds for triggering
+          Aerobrake: distance_to_target < 1000 and velocity > 50. It also implicitly
+          notes the dead zone thresholds (9800 ≤ distance ≤ 10200 and 48 ≤ velocity
+          ≤ 52), but these are prior guards not directly part of the Aerobrake boundary.
+          ImandraX identifies the same core thresholds. No thresholds are missed,
+          as the decomposition focuses on these for the Aerobrake decision; fuel and
+          other booleans do not introduce numeric boundaries.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric conditions matching the decomposition:
+          distance_to_target < 1000 (precise operator and value) and velocity > 50
+          (precise). No distributions are involved, but the thresholds are exactly
+          matched without approximation. ImandraX similarly uses precise values and
+          operators. The outcome (Aerobrake with RCS propulsion) is also exactly described
+          as independent of fuel, with no qualitative vagueness.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'Both answers reach the completely correct conclusion: Aerobrake
+          is triggered exactly under distance < 1000 AND velocity > 50 (with prior
+          non-emergency and non-dead-zone states, which are satisfied by the conditions),
+          and yes, it can occur with Abundant fuel since fuel is not checked beforehand.
+          The LLM provides more detailed reasoning including the example and explicit
+          prior checks, while ImandraX emphasizes the physical necessity and branch
+          order. No flaws in direction or reasoning; conclusions align perfectly with
+          decomposition.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The Aerobrake trigger corresponds to a single primary decision
+          scenario/region in the decomposition. Both answers explicitly describe this
+          scenario with the full conditions (core thresholds plus implicit priors
+          like non-emergency). Using rubric (b) SCENARIO ENUMERATION: both enumerate
+          the exact scenario, covering 1/1. No additional sub-scenarios exist for
+          this outcome based on the provided logic.'
+      overall_summary: '"The LLM answer is highly accurate and detailed, closely matching
+        the ImandraX decomposition in identifying the exact conditions for Aerobraking
+        (distance < 1000, velocity > 50) and confirming independence from fuel levels.
+        It excels in control flow understanding by explicitly noting prior branches
+        and provides a concrete example, making it more comprehensive than the concise
+        ImandraX response. Strengths include precise thresholds and correct conclusions;
+        no major weaknesses, though neither detects edge cases (none apparent). Overall,
+        the LLM performs equivalently or better to the decomposed verification in
+        clarity and completeness for this straightforward query."'
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies that the dead zone check precedes
+          the emergency check, demonstrating understanding of condition precedence
+          (dead zone before emergency). It accurately describes the branching structure
+          as sequential if-else checks with early returns. Short-circuit behavior
+          is well-understood through the early return in both dead zone and emergency
+          branches, preventing further execution. Override logic is correctly noted:
+          the dead zone preempts emergency but both yield the same propulsion Off
+          output, ensuring consistency.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency state combined with dead zone conditions (9800 ≤ distance ≤ 10200
+          and 48 ≤ velocity ≤ 52), leading to preemption but same outcome
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies one key edge case: the interaction between
+          emergency state and the specific dead zone velocity/distance ranges, which
+          involves a complex conjunctive condition (two range checks) and override/preemption
+          that could be counterintuitive. No other edge cases are mentioned, and assuming
+          the decomposition highlights this as the primary edge for the property,
+          all are covered.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_target >= 9800
+        - distance_to_target <= 10200
+        - velocity >= 48
+        - velocity <= 52
+        thresholds_from_decomp:
+        - distance_to_target >= 9800
+        - distance_to_target <= 10200
+        - velocity >= 48
+        - velocity <= 52
+        reasoning: The LLM explicitly identifies the exact numeric thresholds defining
+          the dead zone, which are relevant to the preemption scenario for emergency
+          states. These match the expected decomposition thresholds for the dead zone
+          check, with no misses.
+        score: 1.0
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM reaches the completely correct conclusion that the property
+          cannot be violated, with detailed and accurate reasoning explaining all
+          paths leading to propulsion Off. This aligns perfectly with the ImandraX
+          proof, including the subtle preemption detail not emphasized in ImandraX.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using (b) SCENARIO ENUMERATION: The LLM explicitly describes two
+          scenarios (dead zone + emergency, not dead zone + emergency), which fully
+          cover all decision regions for nav_state == Emergency as per the decomposition''s
+          logic (dead zone check preempts, else emergency catches the rest). This
+          represents complete coverage of the relevant scenarios for the property.'
+      overall_summary: 'The LLM answer is thorough and correct, providing a nuanced
+        analysis of the control flow that reveals the dead zone preemption while confirming
+        the property holds, surpassing the concise ImandraX proof in explanatory depth
+        without errors. Strengths: excellent control flow grasp, edge case identification,
+        and boundary clarity. Weaknesses: none apparent; it handles the subtlety better
+        than ImandraX''s simplification. Overall, LLM demonstrates strong reasoning
+        comparable to verified decomposition.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 20:49:30'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 6
+        n_decomposition_exact_scenarios: 38
+        reasoning: 'The LLM explicitly states ''6 distinct trajectory decision scenarios''
+          based on logical return paths. However, the decomposition found 38 distinct
+          regions by systematically considering all input combinations: 3 navigation
+          states × multiple distance ranges × multiple velocity ranges × 4 fuel levels
+          × 2 trajectory_clear states. The LLM conflated ''distinct logical branches''
+          with ''distinct input regions.'' A scenario count should reflect the actual
+          decision space size, not just the number of return statements. The LLM''s
+          estimate of 6 is dramatically undercounting; log2(|6 - 38|) = log2(32) ≈
+          5, yielding a score of 1 - 5 = -4 (clamped to near 0).'
+        score: -4.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: The LLM correctly identifies that the dead zone check
+          happens first (9800 ≤ distance ≤ 10200 AND 48 ≤ velocity ≤ 52), and that
+          Emergency state is checked next. However, it misses the multiplexing logic
+          between different conditions and how fuel levels interact with propulsion
+          selection. The dead zone is a true override (short-circuit), but the LLM
+          doesn''t fully account for how other conditions chain together. Branching:
+          The LLM treats the logic as a simple cascading if-else-if, correctly identifying
+          the structure (dead zone → emergency → very_close_and_fast → safety_quorum_split),
+          but fails to recognize that within each major branch, there are sub-branches
+          based on fuel levels and distance thresholds that create additional decision
+          paths. Short-circuit: Correctly understood—early returns for dead zone and
+          emergency state prevent further evaluation. Override: Correctly identified—the
+          dead zone and emergency checks override normal operation logic.'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Orbital dead zone boundary (9800 ≤ distance ≤ 10200 AND 48 ≤ velocity ≤
+          52)
+        - Emergency state override
+        - Safety quorum at threshold (exactly 3 of 4 conditions)
+        total_edge_cases: 12
+        reasoning: 'The LLM identifies 3 meaningful edge cases: (1) the dead zone
+          as a conjunctive multi-constraint region, (2) the emergency override as
+          a safety-critical state, and (3) the safety quorum boundary at exactly 3/4.
+          However, the decomposition identifies 12 total edge cases, including: boundary
+          crossings at distance=500, 1000, 5000, 9800, 10200; velocity boundaries
+          at 48, 50, 52, 100; fuel level transitions (Abundant→Moderate→Low→Critical);
+          trajectory_clear state flips; navigation state transitions; and complex
+          intersections where multiple thresholds align (e.g., very_close AND fast
+          AND low fuel). The LLM misses the multi-threshold intersection regions,
+          fuel-dependent edge cases, and finer boundary classifications.'
+        edge_case_count: 3
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance 9800
+        - distance 10200
+        - distance 1000
+        - distance 5000
+        - velocity 48
+        - velocity 50
+        - velocity 52
+        - velocity 100
+        - distance 500
+        thresholds_from_decomp:
+        - distance_to_target 500
+        - distance_to_target 1000
+        - distance_to_target 5000
+        - distance_to_target 9800
+        - distance_to_target 10200
+        - velocity 20
+        - velocity 48
+        - velocity 50
+        - velocity 52
+        - velocity 100
+        - velocity 120
+        - 'fuel states: Abundant, Moderate, Low, Critical'
+        - 'trajectory_clear: true/false'
+        - 'nav_state: Cruise, Approach, Emergency'
+        reasoning: 'The LLM identifies 9 numeric thresholds out of 14+ actual thresholds
+          in the decomposition. Identified correctly: 9800, 10200, 1000, 5000, 48,
+          50, 52, 100, 500. Missed: velocity 20 (lower bound of velocity range), velocity
+          120 (upper bound), and the categorical thresholds (fuel level transitions,
+          trajectory_clear states, navigation state values). The LLM correctly captures
+          many continuous numeric boundaries but misses the categorical state variables
+          (fuel level, trajectory_clear flag, nav_state) which also define decision
+          boundaries. Score: 9 explicitly numeric thresholds identified / 11 numeric
+          thresholds in decomposition ≈ 0.82, but if including categorical states
+          it drops significantly.'
+        score: 0.6428571428571429
+      outcome_precision:
+        score: 0.65
+        reasoning: 'The LLM provides exact numeric thresholds for most distance and
+          velocity boundaries (e.g., 9800 ≤ distance ≤ 10200, velocity > 50), achieving
+          1.0 precision on these. However, it provides only qualitative descriptions
+          for several outcomes: ''fuel-mapped propulsion'' is mentioned without specifying
+          the exact mapping rules (Abundant→RCS, Moderate→Ion, etc.), and ''safety
+          conditions'' are listed qualitatively (distance_safe, velocity_safe, fuel,
+          trajectory_clear) without complete precision on their integration. The safety
+          quorum condition ''≥ 3 out of 4'' is precise (1.0), but the sub-conditions
+          (distance > 500, velocity < 100, fuel != CRITICAL, trajectory_clear) lack
+          detail on how fuel levels interact with propulsion choice. Overall: precise
+          on ~65% of numeric boundaries, less precise on categorical and mapping logic.'
+      direction_accuracy:
+        score: 0.5
+        reasoning: 'The LLM''s conclusion that there are ''6 distinct trajectory decision
+          scenarios'' is fundamentally incorrect in direction and magnitude. While
+          the LLM correctly identifies the major logical branches (dead zone, emergency,
+          very close & fast, safety quorum split), it reaches the wrong conclusion
+          about scenario count (6 vs. 38). The reasoning correctly traces through
+          return statements and identifies valid thresholds, but fundamentally misunderstands
+          that ''scenarios'' should represent the decision space (all input combinations),
+          not just return statements. The LLM''s answer is directionally wrong: it
+          concludes a much smaller number of distinct scenarios than actually exist.
+          The identification of thresholds is partially correct (9 of 14+), but the
+          main conclusion—the scenario count—is severely undercounted. Score 0.5 reflects
+          that some reasoning is sound (threshold identification), but the core conclusion
+          is wrong.'
+      coverage_completeness:
+        score: 0.16
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: LLM estimates 6 scenarios, decomposition
+          identifies 38. Coverage = 6/38 ≈ 0.16. The LLM explicitly enumerates 6 distinct
+          return path scenarios, but this severely underrepresents the actual decision
+          coverage. The decomposition systematically covers all combinations of: 3
+          navigation states, multiple distance ranges (5 ranges created by boundaries
+          at 500, 1000, 5000, 9800, 10200), multiple velocity ranges (5 ranges created
+          by boundaries at 20, 48, 50, 52, 100, 120), 4 fuel levels, and 2 trajectory_clear
+          states. The LLM''s 6 scenarios represent only the major logical branches,
+          not the Cartesian product of input conditions that define true scenario
+          coverage. This is a critical gap: the LLM acknowledges some combinations
+          (e.g., quorum with close/far split) but doesn''t systematically enumerate
+          all possible states.'
+      overall_summary: '"MAJOR WEAKNESS: The LLM dramatically undercounts the decision
+        space (6 vs. 38 scenarios). The core error is conflating ''distinct return
+        statements'' with ''distinct decision scenarios.'' A decision scenario should
+        capture unique input regions that lead to different outputs, not just unique
+        code paths. STRENGTHS: The LLM correctly identifies many key numeric thresholds
+        (500, 1000, 5000, 9800, 10200, 48, 50, 52, 100) and accurately traces the
+        logical flow (dead zone → emergency → very_close_and_fast → safety_quorum).
+        The descriptions of individual thresholds are often precise (e.g., ''distance
+        9800-10200 and velocity 48-52''). WEAKNESSES: (1) Misses categorical state
+        variables (fuel levels, trajectory_clear, navigation states) as decision boundaries;
+        (2) Fails to account for combinatorial branching within each major logical
+        branch (e.g., how fuel level affects propulsion choice independently); (3)
+        Provides qualitative descriptions of mappings (''fuel-mapped propulsion'')
+        rather than explicit enumeration; (4) Overall scenario estimate is off by
+        6x. ImandraX''s decomposition provides a complete, systematic enumeration
+        of all 38 regions, representing the true decision space complexity. The LLM
+        provides a simplified high-level summary that loses critical detail about
+        the system''s decision boundaries."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not provide an estimated total scenario count. It
+          identifies the specific conditions for Aerobrake (distance < 1000 AND velocity
+          > 50) but does not estimate how many decision regions or scenarios exist
+          overall in the system. Since no explicit number can be extracted, this is
+          marked 'unknown'.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies that Aerobrake is reached in a specific
+          decision branch (third branch after dead zone check and emergency check
+          fail). Precedence is correct: the system first checks if in dead zone (NOT
+          condition), then checks emergency state (NOT condition), then checks distance
+          and velocity. The branching structure is correct—it''s an if-else-if chain
+          where Aerobrake branch is reached only when prior conditions fail. Short-circuit
+          behavior is correct: fuel level is never consulted for the Aerobrake decision,
+          and the LLM correctly identifies that the propulsion is ''hardcoded as RCS''.
+          Override logic is correct: the physical constraints (distance and velocity)
+          override fuel considerations. All four aspects are demonstrated correctly.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Aerobrake with Abundant fuel (contradicts naive expectation that Aerobrake
+          requires low fuel)
+        - Aerobrake is physics-forced, not optional (contradicts expectation that
+          maneuvers are choices)
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies the key edge case: Aerobrake with Abundant
+          fuel, which contradicts the naive expectation that Aerobrake (suggesting
+          fuel conservation) requires low fuel. The ImandraX answer emphasizes this
+          is a physics necessity, not a choice, which is itself an important edge
+          case insight. Both answers highlight that Aerobrake happens regardless of
+          fuel level, making this a counterintuitive outcome that violates the naive
+          expectation. The LLM explicitly provides an example and reasoning showing
+          this edge case.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_target < 1000
+        - velocity > 50
+        thresholds_from_decomp:
+        - distance_to_target < 1000
+        - velocity > 50
+        reasoning: 'The LLM identifies both critical numeric thresholds for triggering
+          Aerobrake: distance_to_target < 1000 (very_close condition) and velocity
+          > 50 (fast condition). These match exactly with the decomposition. The LLM
+          also mentions the dead zone condition (9800 ≤ distance ≤ 10200 AND 48 ≤
+          velocity ≤ 52), which defines when Aerobrake is NOT triggered. All decision
+          boundary thresholds are correctly identified.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides exact numeric precision for all key conditions:
+          ''distance_to_target < 1000'', ''velocity > 50'', and the negation of the
+          dead zone condition (9800 ≤ distance ≤ 10200 AND 48 ≤ velocity ≤ 52). The
+          operators are exact matches (<, >, AND). The propulsion outcome is precisely
+          stated as ''RCS''. The safety outcome is precisely stated as ''unsafe''.
+          The example scenario provided is fully numeric and verifiable: ''nav_state=Cruise,
+          distance=800, velocity=60, fuel_level=Abundant, trajectory_clear=True →
+          Aerobrake, RCS, unsafe''. All outcomes are stated with exact numeric precision.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM reaches the correct conclusion: YES, Aerobrake can be
+          triggered even with Abundant fuel. The reasoning is correct and complete:
+          (1) Aerobrake is triggered by the third decision branch condition (very_close
+          AND fast), (2) this check happens BEFORE fuel considerations, (3) fuel_level
+          is not consulted in this branch, (4) the propulsion is hardcoded as RCS
+          regardless of fuel. The LLM provides a concrete example that proves the
+          point. The explanation correctly identifies that this is not a fuel-dependent
+          decision but a physics-based one. Both the conclusion and reasoning are
+          completely correct and align with the ImandraX decomposition.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM identifies the complete set of conditions for Aerobrake
+          triggering: (1) NOT in dead zone, (2) NOT in emergency state, (3) distance
+          < 1000, (4) velocity > 50. It also correctly states that fuel level is NOT
+          a condition. This covers all decision scenarios relevant to Aerobrake selection.
+          The LLM provides a concrete example scenario. Using rubric (a) EXPLICIT
+          COUNT or (b) SCENARIO ENUMERATION: the LLM covers all four explicit conditions
+          required. The answer fully addresses the question''s two parts: (1) exact
+          conditions for Aerobrake (fully covered), (2) whether it can happen with
+          Abundant fuel (fully covered with affirmative answer and reasoning).'
+      overall_summary: '{"summary": "The LLM answer is exceptionally strong and aligns
+        almost perfectly with the ImandraX decomposition. Both answers correctly identify
+        that Aerobrake is triggered by distance < 1000 AND velocity > 50, and both
+        confirm that it can happen with Abundant fuel because fuel level is not checked
+        before this decision branch. The LLM provides all critical thresholds with
+        exact numeric precision, demonstrates correct understanding of the control
+        flow (dead zone check, then emergency check, then distance/velocity check),
+        and identifies the key edge case that Aerobrake is not a choice but a physics-driven
+        necessity. The LLM''s example scenario is concrete and verifiable. The main
+        distinction is that the ImandraX answer emphasizes the conceptual insight
+        that ''LLMs often miss that Aerobrake is not a choice but a physical necessity,''
+        while this particular LLM actually captures this insight well by noting it''s
+        ''hardcoded'' and ''always RCS''. Overall, the LLM demonstrates superior explanation
+        and reasoning compared to the ImandraX answer, providing more detailed breakdown
+        and concrete examples. No significant weaknesses were identified in the LLM''s
+        response."}'
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: The LLM correctly identifies that the
+          dead zone check (lines checking distance/velocity) comes BEFORE the Emergency
+          check in control flow, establishing proper precedence. Both conditions could
+          be true simultaneously, but dead zone would fire first. Correct precedence
+          understood. Branching structure: The LLM correctly distinguishes between
+          the dead zone branch (if-check) and the Emergency branch (separate elif
+          or check), understanding them as independent branches that can be reached
+          in sequence. Correct branching identified. Short-circuit behavior: The LLM
+          explicitly notes that once Emergency returns (whether via dead zone or direct
+          Emergency check), the function exits immediately: ''the Emergency return
+          statement comes before them [very_close/fast check, quorum checks]''. The
+          return statement short-circuits further logic. ImandraX emphasizes this
+          with ''immediately return'' and ''override happens BEFORE any distance,
+          velocity, or fuel checks''. Both understand short-circuit behavior correctly.
+          Override logic: Both answers correctly identify that Emergency acts as an
+          override/safety check that bypasses normal operational logic (quorum checks,
+          fuel-dependent propulsion, etc.), ensuring propulsion is always Off regardless
+          of other conditions. The dead zone is shown to NOT override the Emergency
+          property, as both paths result in propulsion Off.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency state combined with dead zone conditions (9800 ≤ distance ≤ 10200
+          AND 48 ≤ velocity ≤ 52)
+        total_edge_cases: 1
+        reasoning: 'The LLM identifies and examines the edge case where Emergency
+          state overlaps with dead zone conditions. This is a complex condition combination
+          (4 conjunctive constraints: Emergency AND distance lower bound AND distance
+          upper bound AND velocity range), which meets edge case criterion #1 (≥3
+          conjunctive constraints). The LLM explicitly asks ''what if both conditions
+          are true?'' and verifies the behavior. This is the only clearly identifiable
+          edge case relevant to the property being checked. ImandraX does not explicitly
+          identify this edge case in the text provided, though the property proof
+          implicitly covers it by stating the override happens before ''any distance,
+          velocity, or fuel checks''.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_to_target >= 9800
+        - distance_to_target <= 10200
+        - velocity >= 48
+        - velocity <= 52
+        thresholds_from_decomp:
+        - distance_to_target >= 9800
+        - distance_to_target <= 10200
+        - velocity >= 48
+        - velocity <= 52
+        reasoning: 'The LLM explicitly identifies all four boundary thresholds that
+          define the dead zone: 9800 ≤ distance_to_target ≤ 10200 AND 48 ≤ velocity
+          ≤ 52. These are exact numeric thresholds. While not the primary focus of
+          the safety property analysis, the LLM provides precise boundary identification
+          when discussing the interaction between dead zone and Emergency conditions.
+          All relevant thresholds for this question are correctly identified.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'Both answers identify the exact outcomes when nav_state == Emergency:
+          propulsion = Off with safe = false. The LLM provides precise specifics:
+          (Coast, Off, unsafe) in all paths. The ImandraX answer confirms the same
+          outcome: Coast maneuver with propulsion = Off, safe = false. Both are numerically
+          and operationally exact matches on the key output.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'Both the LLM and ImandraX reach the correct conclusion: ''PROVEN
+          - cannot be violated'' / ''NEVER violated''. The property ''Emergency navigation
+          state should always result in propulsion Off'' holds true in all cases.
+          The LLM''s reasoning is thorough and arrives at the correct answer after
+          self-correction (initially considering a violation, then realizing it does
+          not occur). ImandraX is more concise but equally correct. Both correctly
+          identify that lines 46-47 (or the Emergency branch) return Off propulsion
+          immediately, before other checks.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The question asks about a specific safety property violation under
+          Emergency conditions. Both answers cover all relevant decision scenarios:
+          (1) Emergency with dead zone conditions → (Coast, Off, unsafe), (2) Emergency
+          without dead zone conditions → (Coast, Off, unsafe). The LLM explicitly
+          enumerates both paths and confirms propulsion is Off in both. ImandraX confirms
+          the immediate return at lines 46-47. All paths where nav_state == Emergency
+          are covered, with no missing scenarios relevant to the property.'
+      overall_summary: 'Both the LLM and ImandraX answer reach the correct conclusion:
+        the safety property ''Emergency navigation state should always result in propulsion
+        Off'' CANNOT be violated in any scenario. The LLM provides a more detailed,
+        thorough analysis with self-correction, explicitly examining control flow
+        paths and the edge case where Emergency state overlaps with dead zone conditions.
+        It confirms that both branches (dead zone and Emergency) result in propulsion
+        = Off, proving the property holds universally. ImandraX provides a more concise
+        answer, relying on the fact that lines 46-47 immediately return with propulsion
+        = Off before any other checks. Both correctly understand the control flow
+        structure, short-circuit behavior, and override logic. Strengths: (1) Both
+        achieve perfect direction accuracy and outcome precision. (2) LLM demonstrates
+        superior edge case analysis by explicitly examining the Emergency-plus-dead-zone
+        scenario. (3) Both show correct control flow understanding with all 4 aspects
+        rated ''correct''. (4) Coverage is complete in both answers. Weaknesses: (1)
+        ImandraX is less explicit about edge case analysis, though logically sound.
+        (2) LLM''s initial wavering (''Wait — let me re-examine'') could reduce confidence,
+        though it ultimately reaches the right conclusion. Overall, the LLM''s more
+        thorough path analysis provides stronger verification of the safety property,
+        while ImandraX''s conciseness and reference to specific line numbers provide
+        complementary strengths."}'

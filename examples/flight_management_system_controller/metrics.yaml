@@ -6031,3 +6031,625 @@
         how all code paths guarantee the property. Overall, the LLM answer is higher
         quality due to its comprehensiveness, clarity of reasoning, and identification
         of a subtle design concern that ImandraX missed.'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 20:48:12'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 278
+        reasoning: The LLM estimated 10 unique decision scenarios, which is significantly
+          lower than the 278 scenarios identified by ImandraX. The LLM's initial calculation
+          of total input combinations was correct (630), but its subsequent enumeration
+          of distinct output tuples was incomplete and heuristic. The LLM failed to
+          identify many distinct output scenarios, especially those resulting from
+          subtle interactions between conditional logic.
+        score: -7.066089190457772
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: 'Precedence: The LLM partially understood precedence. It identified
+          the ''dead zone'' and ''emergency disconnect'' as having higher precedence,
+          but its manual tracing missed many scenarios where combinations of conditions
+          would lead to distinct outcomes. Branching Structure: The LLM attempted
+          to categorize branching into ''paths'' (Path 1, Path 2, etc.), which shows
+          a partial understanding, but it failed to fully explore the combinatorial
+          explosion within these branches. Short-circuit behavior: The LLM correctly
+          identified short-circuiting in its analysis of ''dead zones'' and ''phase
+          not allowed'' conditions, where these immediately lead to a specific output
+          without further evaluation. Override Logic: The LLM recognized an ''emergency
+          disconnect'' as an override (mode_allowed=False, emergency=True), but its
+          enumeration of the outcomes under this override was incomplete and thus
+          only a partial understanding.'
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone hit
+        - Phase not allowed (GROUND or LANDING)
+        - Emergency disconnect (count >= 2)
+        total_edge_cases: 3
+        reasoning: The LLM explicitly identified the 'dead zone hit', 'phase not allowed',
+          and 'emergency disconnect' as distinct cases, which align with major edge
+          cases in the system. However, the problem statement description mentions
+          'dead zones for ambiguous altitude+phase+weather combinations' which is
+          a broader category and likely represents more than one specific 'dead zone
+          hit' scenario.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: The question asks for the number of distinct scenarios, not numerical
+          thresholds. Therefore, this metric is not applicable.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's estimated number of distinct scenarios (10) is very imprecise
+          compared to the ImandraX's verified count (278). The LLM's method of manual
+          enumeration is prone to errors and incompleteness, leading to a drastically
+          underestimated number.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion that there are 'approximately 10 distinct
+          output tuples' is incorrect. The actual number is 278. While the LLM correctly
+          identified the initial input space, its subsequent analysis was deeply flawed,
+          leading to a wrong overall direction regarding the complexity of the decision
+          space.
+      coverage_completeness:
+        score: 0.036
+        reasoning: The LLM identified only 10 out of 278 actual distinct decision
+          scenarios (10/278 = 0.036). This score indicates very poor coverage of the
+          decision space. The rubric used is a direct comparison of the LLM's identified
+          scenario count against the verified count from decomposition.
+      overall_summary: The LLM gravely underestimated the number of distinct autopilot
+        mode decision scenarios, identifying only 10 compared to ImandraX's verified
+        278. While the LLM correctly calculated the total input combinations and identified
+        major control flow elements like 'dead zones' and 'emergency disconnects'
+        as high-precedence conditions, its manual enumeration method was insufficient
+        for capturing the full complexity of the system's decision logic. This led
+        to a very low score in outcome precision, direction accuracy, and coverage
+        completeness. The LLM showed partial understanding of control flow and override
+        logic, but its ability to analyze combinatorial branching was significantly
+        limited. This highlights the difficulty of accurately estimating scenario
+        counts in complex systems without rigorous, automated verification.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 8
+        n_decomposition_exact_scenarios: 7
+        reasoning: The LLM identified 8 scenarios (combinations of health, weather,
+          alt_state) that would allow autopilot engagement with copilot monitoring.
+          The decomposition provided by ImandraX found 7 such scenarios. The difference
+          primarily comes from the LLM misinterpreting the emergency disconnect conditions
+          at alt_state=VERY_LOW, especially for 'DEGRADED' health.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: Precedence of conditions and branching structure are partially
+          understood due to errors in emergency disconnect logic application, specifically
+          around how 'or' conditions for emergency disconnect combine. The LLM correctly
+          identified that 'requires_monitoring' is true unless (weather=CLEAR AND
+          health=NORMAL), showing understanding of short-circuit behavior. Override
+          logic is partially understood, as the emergency disconnect logic, which
+          overrides normal operation, was misapplied in several cases.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - emergency disconnect conditions
+        - dead zones
+        total_edge_cases: 4
+        reasoning: The LLM identified that emergency disconnect conditions and dead
+          zones are important edge cases. However, it missed the nuances of the 'requires_copilot_monitor'
+          condition (i.e. that it's an edge case where monitoring ISN'T required during
+          Approach), and also didn't explicitly separate out the special behavior
+          of alt_state=VERY_LOW in combination with DEGRADED health. The total edge
+          cases found in the decomposition are 'Very Low Altitude + Degraded Health',
+          'Clear Weather + Normal Health', 'Emergency Disconnect Quorum', and 'Dead
+          Zones'.
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - alt_state ∈ {VERY_LOW, LOW, MEDIUM}
+        - health ≠ FAILED
+        - weather ≠ CLEAR OR health ≠ NORMAL
+        - emergency disconnect conditions count < 2
+        thresholds_from_decomp:
+        - phase = Approach
+        - NOT (alt_state = HIGH OR alt_state = VERY_HIGH OR alt_state = GROUND)
+        - health ≠ FAILED
+        - NOT (weather = CLEAR AND health = NORMAL)
+        - NOT (c1 OR (c2 AND c3) OR (c2 AND c4) OR (c3 AND c4)) (where cX are specific
+          emergency conditions)
+        - NOT (dead zone conditions)
+        reasoning: The LLM identified several key thresholds and conditions, such
+          as the valid alt_state range and the criteria for needing copilot monitoring.
+          However, its interpretation of the emergency disconnect thresholds, especially
+          the quorum logic, led to inaccuracies. The ImandraX answer gives a more
+          precise breakdown of the emergency conditions as individual clauses and
+          their combinations, as well as the 'dead zone' condition, which the LLM
+          correctly identified as generally not applying to the Approach phase but
+          didn't list as a specific boundary.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.6
+        reasoning: The LLM's outcome precision is partial. While it correctly identified
+          the general conditions for autopilot engagement and copilot monitoring during
+          the Approach phase, its detailed enumeration of scenarios and application
+          of emergency disconnect logic led to several incorrect inclusions and exclusions.
+          For example, it incorrectly concluded that NORMAL+SEVERE+VERY_LOW and NORMAL+ICING+VERY_LOW
+          cause an emergency disconnect (count=2 incorrectly for NORMAL), and that
+          DEGRADED+ANY_WEATHER+VERY_LOW always causes an emergency. This demonstrates
+          a flawed understanding of the specific conditions leading to an outcome.
+      direction_accuracy:
+        score: 0.7
+        reasoning: The LLM correctly concluded that the autopilot can be engaged during
+          the Approach phase while requiring copilot monitoring, and identified many
+          of the relevant conditions. However, its accuracy suffered due to miscalculations
+          in the emergency disconnect scenarios, leading to an incorrect count of
+          valid scenarios and some flawed reasoning about specific combinations. While
+          the overall 'direction' was correct, the detailed conditions provided were
+          not entirely accurate.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM partially covered the decision scenarios. It attempted
+          to enumerate all possible valid scenarios, but errors in applying the emergency
+          disconnect logic resulted in an incomplete and partly incorrect set of conditions.
+          It missed some valid scenarios by incorrectly triggering an emergency and
+          included some invalid ones. The ImandraX answer found 7 precise scenarios,
+          while the LLM's 8 included some incorrect ones and missed others (though
+          the exact mapping of what was missed vs. incorrect is complex due to its
+          reasoning process).
+      overall_summary: The LLM correctly identified that autopilot engagement with
+        copilot monitoring is possible during the Approach phase and outlined many
+        of the necessary conditions. However, it struggled significantly with the
+        precise application of the emergency disconnect quorum logic, particularly
+        around 'VERY_LOW' altitude states and 'DEGRADED' health. This led to an overestimation
+        of scenarios (8 vs 7) and several inaccuracies in its detailed breakdown,
+        affecting outcome precision and coverage completeness. Its control flow understanding
+        of override logic and precedence of conditions was also impacted by these
+        misinterpretations. The ImandraX answer is more precise by correctly identifying
+        all 7 scenarios and explaining a key counter-intuitive aspect regarding conditional
+        monitoring during the Approach phase.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding: null
+      edge_case_detection: null
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy: null
+      coverage_completeness: null
+      overall_summary: The LLM correctly concluded that the safety property is never
+        violated and provided a detailed, accurate trace through the code's logic.
+        It identified that 'mode_allowed' is always false when health is FAILED due
+        to explicit checks and early exits. The LLM even proactively highlighted a
+        nuanced design concern regarding `emergency_disconnect` not always triggering,
+        which was not explicitly asked but adds value. The ImandraX answer confirmed
+        the property holds and provided concise reasons, also mentioning relevant
+        edge cases. This task was designed to test the LLM's understanding of complex
+        control flow and its ability to identify edge cases, in which it performed
+        well.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 20:48:16'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 278
+        reasoning: The LLM estimated 10 distinct output tuples based on its systematic
+          analysis of the decision logic, while the actual decomposition revealed
+          278 distinct scenarios through a thorough breakdown of viable combinations
+          across all input parameters.
+        score: -7.066089190457772
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM showed partial understanding in control flow, as it could
+          somewhat follow the branching structures but lacked clarity in conditions,
+          short-circuit logic outputs, and nuances in emergency overrides, resulting
+          in a lower grasp of the flow.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - failure during approach phase
+        - health fails at critical phases
+        - weather-induced mode downgrades
+        total_edge_cases: 10
+        reasoning: The LLM identified some edge cases, but its coverage was limited
+          compared to the total potential edge cases that could result from the complex
+          interplay of conditions, yielding a lower edge case detection score.
+        edge_case_count: 3
+        score: 0.3
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 7 phases
+        - 3 health states
+        - 6 altitude states
+        - 5 weather conditions
+        thresholds_from_decomp:
+        - 7 phases
+        - 3 health states
+        - 6 altitude states
+        - 5 weather conditions
+        reasoning: Both the LLM and the decomposition identified the same parameters
+          concerning thresholds, as the LLM initially stated the correct count but
+          did not clarify their implications or behavioral outcomes at those boundaries.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM approximated the counts of decision scenarios but did not
+          provide the precision required for clarity. It was approximate and descriptive
+          rather than exact.
+      direction_accuracy:
+        score: 0.25
+        reasoning: The direction of conclusions reached by the LLM was partially correct
+          in identifying some scenarios, but it ultimately resulted in a conclusion
+          that was inaccurate with respect to the true conditions.
+      coverage_completeness:
+        score: 0.036
+        reasoning: The LLM's estimate of 10 scenarios represented a very small fraction
+          of the 278 deduced from decomposition, leading to limited coverage completeness.
+      overall_summary: The LLM demonstrated high theoretical complexity in the problem
+        context but misestimated the real decision scenario count significantly. Its
+        control flow understanding, while partially correct, lacked the depth and
+        accuracy required for more complex edge cases and conditions. The overall
+        approach led to a significantly underwhelming conclusion.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 8
+        n_decomposition_exact_scenarios: 7
+        reasoning: The LLM provided 8 specific scenarios describing conditions for
+          AP engagement during Approach phase, which directly corresponds to the 7
+          distinct cases derived in the ImandraX decomposition. The LLM's enumeration
+          of conditions includes several scenarios that qualify under the stated rules,
+          allowing for a comprehensive estimate.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: correct
+        reasoning: The LLM captures the precedence correctly, maintaining that health
+          and state conditions dictate monitoring. However, the branching structure
+          could be counted as partial as the LLM does not fully elucidate the independence
+          of conditions beyond stated examples, causing some scenarios to be missing
+          or misidentified. Short-circuit behavior isn't accurately expressed as conditions
+          relating to emergencies may lead to sudden disengagement without appropriate
+          clarification.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - VERY_LOW
+        - HEALTH=FAILED
+        - weather=CLEAR and health=NORMAL
+        total_edge_cases: 7
+        reasoning: The LLM identifies critical edge cases, including states where
+          health fails, specific altitude conditions, and the interaction of clear
+          weather with normal health. However, it could maximize its detection further
+          considering additional edge cases that involve combinations not explicitly
+          detailed.
+        edge_case_count: 3
+        score: 0.42857142857142855
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - health=NORMAL
+        - health=DEGRADED
+        - weather=CLEAR
+        - alt_state=VERY_LOW
+        thresholds_from_decomp:
+        - health=NORMAL
+        - health=DEGRADED
+        - weather=CLEAR
+        - alt_state=VERY_LOW
+        - weather=LIGHT_TURBULENCE
+        - weather=MODERATE_TURBULENCE
+        - weather=SEVERE
+        - weather=ICING
+        reasoning: The LLM identifies some key numeric thresholds, but misses several
+          potential boundaries that relate to all the weather conditions and their
+          cascading effects on altitude. The ImandraX decomposition presents a wider
+          spectrum of explicit thresholds for decision making.
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM accurately outlines the conditions with precise operator
+          usage for monitoring requirements and permissible conditions for autopilot
+          engagement.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The LLM reaches a correct conclusion that the autopilot can engage
+          during the approach; however, the reasoning surrounding some monitoring
+          conditions is slightly convoluted and could mislead to partial inaccuracies
+          based on the complexity.
+      coverage_completeness:
+        score: 0.75
+        reasoning: The LLM mentioned multiple valid scenarios (8) during the approach
+          phase leading to copilot monitoring but does not explicitly cover all identified
+          in the decomposed answer (7); it does however acknowledge a robust understanding
+          of phase-based engagement definitions.
+      overall_summary: The LLM provides a detailed answer that captures many scenarios
+        for autopilot engagement during the Approach phase and offers a comprehensive
+        assessment of the conditions under which monitoring is necessary. However,
+        it falls short in explicitly delineating all conditional thresholds, producing
+        some confusion around edge case identification and the deeper intricacies
+        of control flow, revealing the potential for missing key scenarios.
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM identifies the correct order of checks and conditions without
+          mistake and understands the override logic properly, also representing short-circuit
+          behavior as intended.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 3
+        reasoning: While the LLM did examine specific cases, it concluded that there
+          were no edge cases violating the safety property, missing the consideration
+          of failed health directly affecting operational decisions.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - health = Failed
+        - mode_allowed = false
+        reasoning: The LLM did not identify specific thresholds even though they are
+          explicit in the decomposition.
+        score: 0.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The conclusion regarding the safety property is exact and aligns
+          with the logical reasoning provided, showing comprehensive understanding.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that the property is never violated is aligned with
+          the decomposition and validated reasoning.
+      coverage_completeness:
+        score: 0.7
+        reasoning: While it discusses specific paths, the LLM did not enumerate all
+          decision scenarios (only paths) compared to ImandraX's approach.
+      overall_summary: The LLM provides a strong narrative supporting its answer with
+        logical reasoning, but lacks for edge case identification and clarity on thresholds
+        which are more thoroughly covered by ImandraX.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 20:48:55'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 10
+        n_decomposition_exact_scenarios: 278
+        reasoning: The LLM explicitly states that the number of distinct decision
+          scenarios (unique output tuples) is 10, after attempting to enumerate reachable
+          output combinations. The ImandraX answer provides the actual number as 278
+          scenarios, based on decomposition considering reductions from dead zones
+          and incompatibilities.
+        score: -7.066089190457772
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - the LLM correctly identifies
+          that emergency disconnect (quorum >=2) is checked early and trumps other
+          logic, and capability/monitor/downgraded are computed based on health/weather/phase
+          independently. Branching structure: partial - the LLM outlines main branches
+          (dead zone, phase not allowed, emergency, normal flow with alt_ok and health
+          checks) but treats them as leading to few distinct outputs, missing finer
+          sub-branches and combinations within. Short-circuit behavior: partial -
+          acknowledges early paths like dead zone or emergency leading directly to
+          outputs without full evaluation, but does not deeply analyze guard clauses
+          or early returns in sub-logic like capability computation. Override logic:
+          correct - clearly notes emergency disconnect overriding normal operation
+          to set mode_allowed=False regardless of other factors.'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone for ambiguous altitude+phase+weather combinations
+        - Emergency disconnect with exactly 2 of 4 conditions (quorum-based)
+        - Approach phase + VERY_LOW altitude triggering condition c2
+        - VERY_LOW altitude + DEGRADED health triggering c4
+        - Phase-disallowed (GROUND/LANDING) overriding other checks
+        - Incompatible altitude for phase (alt_ok=False) with normal health leading
+          to allowed=False without emergency
+        total_edge_cases: 15
+        reasoning: The LLM identifies several edge cases related to dead zones, quorum
+          thresholds, specific condition combinations for emergency, and incompatible
+          phase-altitude pairs. I estimate total edge cases from decomposition as
+          around 15, based on mentions of dead zones, incompatible combinations, and
+          the reduction from 630 to 278 suggesting multiple rare or complex constraint
+          regions (e.g., equality-like boundaries in categorical states, negations
+          like alt_ok=False, safety-critical emergencies). The LLM misses many combinatorial
+          edges that contribute to the 278 total scenarios.
+        edge_case_count: 6
+        score: 0.4
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - emergency disconnect if count >= 2
+        - alt_ok depending on phase-altitude pairs (e.g., VERY_LOW in APPROACH)
+        thresholds_from_decomp:
+        - emergency disconnect count >= 2
+        - alt_ok boundaries (phase-specific altitude minima/maxima, e.g., GROUND only
+          for GROUND phase, VERY_LOW incompatible with CRUISE etc.)
+        - dead zone thresholds for ambiguous phase-altitude-weather overlaps
+        reasoning: The LLM identifies the key quorum threshold (>=2 conditions for
+          emergency) and implicitly some altitude-phase compatibilities for alt_ok.
+          However, it misses explicit decomposition thresholds like specific dead
+          zone boundaries for ambiguous combinations and finer phase-altitude incompatibilities
+          that create multiple regions. Score based on 2/3 identified.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.0
+        reasoning: 'The LLM provides a precise numeric estimate of 10 distinct scenarios,
+          but this is entirely incorrect compared to the actual 278. No distributions
+          are discussed; it''s a single wrong count with no approximation even in
+          the right order of magnitude (10 vs 278). Rubric: completely wrong numeric
+          value.'
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion of only 10 distinct scenarios is completely
+          wrong; the actual number is 278, showing a massive underestimate. The reasoning
+          focuses on unique output tuples but fails to account for the many distinct
+          input regions leading to those outputs, missing the combinatorial nature
+          of the decision space. No correct direction in the conclusion.
+      coverage_completeness:
+        score: 0.036
+        reasoning: 'Using rubric (a) EXPLICIT COUNT: the LLM states an explicit count
+          of 10 distinct scenarios vs. 278 in decomposition, yielding proportion 10/278
+          ≈ 0.036. Alternatively, under (b) SCENARIO ENUMERATION, the LLM describes
+          around 10 specific output tuples and paths, covering a tiny fraction of
+          the actual 278 decision regions. This is the most generous interpretation.'
+      overall_summary: The LLM demonstrates partial understanding of the control flow
+        by tracing major decision paths, identifying key overrides like emergency
+        disconnect and some edge cases such as dead zones and quorum triggers. However,
+        it severely underestimates the state space, concluding only 10 distinct scenarios
+        (focusing on unique outputs) while the decomposition reveals 278 actual decision
+        regions due to combinatorial interactions in inputs. This indicates a failure
+        to decompose the input space fully, leading to poor coverage, zero accuracy
+        in count and direction, and low precision. ImandraX excels in exhaustive verification,
+        capturing reductions from incompatibilities and dead zones that the LLM overlooks.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 20
+        n_decomposition_exact_scenarios: 7
+        reasoning: 'The LLM does not provide an explicit total count of scenarios
+          but enumerates specific combinations of health, weather, and altitude states
+          where the conditions hold. Counting the described cases: for NORMAL health
+          with LIGHT_TURBULENCE (3 alts), MODERATE (3), SEVERE (2), ICING (2) totals
+          10; for DEGRADED with all 5 weathers each with 2 alts (LOW/MEDIUM) totals
+          10; grand total 20 estimated scenarios. The decomposition has exactly 7
+          such scenarios for Approach phase with monitoring required. This indicates
+          the LLM overestimates by treating each (health, weather, alt_state) tuple
+          as separate without merging into regions as per decomposition.'
+        score: -2.700439718141092
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: correct - The LLM accurately handles
+          the independent boolean conditions for emergency disconnect (c1-c4) by summing
+          them to check quorum >=2, correctly identifying combinations like c2+c3
+          or c2+c4 without misapplying AND/OR precedence. Branching structure: correct
+          - Clearly delineates the main branches: first emergency check (quorum),
+          then health != FAILED, then phase_allows_ap and altitude_phase_compatible
+          conjunction, with monitoring as a separate post-engagement check. Short-circuit
+          behavior: correct - Recognizes emergency disconnect as an early override
+          that short-circuits to disallowed, preventing further checks. Override logic:
+          correct - Properly treats safety/emergency conditions (e.g., VERY_LOW in
+          Approach) as trumping normal operation, excluding cases regardless of other
+          factors.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - 'NORMAL health + SEVERE weather + VERY_LOW altitude: triggers emergency
+          disconnect (c2 + c3 = 2, safety-critical)'
+        - 'NORMAL health + ICING weather + VERY_LOW altitude: triggers emergency disconnect
+          (c2 + c3 = 2, safety-critical)'
+        - 'DEGRADED health + ANY weather + VERY_LOW altitude: triggers emergency disconnect
+          (c2 + c4 = 2, safety-critical)'
+        - 'CLEAR weather + NORMAL health in Approach: no monitoring required (counterintuitive
+          exception contradicting naive ''always monitor in Approach'')'
+        total_edge_cases: 4
+        reasoning: 'The LLM identifies key edge cases involving safety-critical emergency
+          triggers at VERY_LOW altitude during Approach (complex conjunctive constraints
+          with c2/c3/c4, contradicting expectation of allowance in low altitudes,
+          negation of normal operation). It also implicitly covers the counterintuitive
+          monitoring exception. These align with decomposition''s likely edges: 3
+          safety-critical VERY_LOW emergencies and 1 monitoring exception. No misses
+          apparent, but total from decomp inferred as 4 based on context.'
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM correctly concludes ''yes'' with detailed conditions matching
+          the decomposition: monitoring required for Degraded health OR non-Clear
+          weather during Approach (with AP engaged), excluding the Clear + Normal
+          exception and emergency cases. Reasoning is complete and accurate, identifying
+          exact exclusions like VERY_LOW emergencies, aligning with ImandraX''s affirmative
+          direction and conditions.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using (b) SCENARIO ENUMERATION rubric generously: The LLM explicitly
+          describes all relevant combinations covering the 7 decomposition scenarios
+          (e.g., non-CLEAR with NORMAL across alts excluding specific VERY_LOW emergencies,
+          all DEGRADED with LOW/MEDIUM). No actual scenarios missed; over-description
+          due to granular tuples vs merged regions, but full coverage of conditions
+          like degraded/non-clear and emergency overrides ensures completeness.'
+      overall_summary: '"The LLM provides a strong, detailed analysis that correctly
+        captures the decision logic, conditions for engagement and monitoring, and
+        key exclusions (emergencies, dead zones), outperforming the brief ImandraX
+        summary in depth. It overestimates scenario count (20 vs 7) likely by not
+        merging regions, but achieves full coverage and accurate direction. Excellent
+        control flow grasp and edge detection; non-numeric nature makes some metrics
+        inapplicable. Overall, LLM demonstrates superior qualitative reasoning for
+        this categorical decision problem, though quantification could improve with
+        decomposition awareness."}'
+    q3:
+      state_space_estimation_accuracy: null
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately traces the control flow starting with dead zone
+          checks (early return/short-circuit), then phase checks (independent branching),
+          followed by emergency disconnect quorum evaluation (which involves conditional
+          precedence in the OR for quorum), and finally the normal flow with explicit
+          health check (override via emergency trumping normal operation). All aspects
+          are correctly understood and described without errors.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - FAILED + APPROACH + VERY_LOW + CLEAR (emergency triggers)
+        - FAILED + CLIMB + HIGH + CLEAR (no emergency, normal flow blocks)
+        - FAILED + CRUISE + MEDIUM + MODERATE_TURBULENCE (no emergency, normal flow
+          blocks)
+        - FAILED in any dead zone combo (immediate false)
+        total_edge_cases: 3
+        reasoning: The LLM identifies 4 specific edge cases covering dead zones, emergency
+          trigger scenarios, and non-emergency normal flow blocks with FAILED health.
+          The ImandraX decomposition analyzes 3 edge cases (dead zone + Failed, perfect
+          conditions + Failed, emergency disconnect). The LLM finds all 3 from ImandraX
+          plus an additional detailed combo, but since total is 3 per ImandraX, it
+          covers them comprehensively; score will be capped at 1.0 but calculation
+          uses 4/3 >1 adjusted.
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity: null
+      outcome_precision: null
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX conclude that the property always holds
+          (never violated), which is correct as per the proven status. The LLM provides
+          complete reasoning tracing all paths, matching the ImandraX verification
+          that failed health always results in mode_allowed=false via multiple mechanisms.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM performs an exhaustive path analysis covering all possible
+          flows for health=FAILED: dead zones, phase restrictions, emergency quorum,
+          and normal flow. This enumerates and verifies all decision scenarios leading
+          to mode_allowed=false, matching the full coverage implied by ImandraX''s
+          ''PROVEN - always holds'' with decomposition. Uses (b) SCENARIO ENUMERATION
+          rubric, covering 100% of paths/categories.'
+      overall_summary: 'The LLM answer demonstrates strong analytical depth by exhaustively
+        tracing control flows and edge cases, closely aligning with ImandraX''s verified
+        decomposition. It correctly identifies that the property holds universally,
+        with detailed reasoning that covers more explicit examples than ImandraX.
+        Strengths: excellent control flow understanding and coverage; no weaknesses
+        in direction or edge detection. ImandraX provides concise proof but less detail;
+        LLM excels in explanatory quality without decomposition tools.'
