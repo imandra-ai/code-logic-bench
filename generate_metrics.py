@@ -13,12 +13,13 @@ Generate evaluation metrics comparing LLM answers to CodeLogician answers.
 - target: examples/*/metrics.yaml
 """
 
+from __future__ import annotations
 import argparse
 import asyncio
 import fcntl
 import os
 from datetime import datetime
-from math import log2
+import math
 from pathlib import Path
 from typing import Any, Literal
 
@@ -101,177 +102,340 @@ def append_to_yaml_atomic(file_path: Path, new_data: dict[str, Any]) -> None:
 # ====================
 
 
-class StateSpaceEstimationAccuracy(BaseModel):
-    """Ratio of LLM's estimated scenario count to actual region count from decomposition."""
+class EvaluationResult(BaseModel):
+    """
+    Complete Evaluation Result.
 
-    n_llm_estimated_scenarios: int | Literal['unknown'] = Field(
-        description='Number of scenarios estimated by LLM, or "unknown" if cannot be extracted.'
+    Description:
+        Aggregated metrics comparing LLM answers (without decomposition)
+        vs ImandraX answers (with decomposition and verification).
+
+    Contains seven key metrics:
+        1. state_space_estimation_accuracy - Scenario count estimation
+        2. outcome_precision - Numeric distribution precision
+        3. direction_accuracy - Conclusion correctness
+        4. coverage_completeness - Decision scenario coverage
+        5. control_flow_understanding - Control structure comprehension
+        6. edge_case_detection - Rare case identification
+        7. decision_boundary_clarity - Threshold identification
+
+    If a metric is not applicable / irrelevant to the specific question, set the metric to None.
+    Think carefully, don't rush to a conclusion for a metric that is not applicable.
+    """
+
+    state_space_estimation_accuracy: StateSpaceEstimationAccuracy | None = Field(
+        description="Accuracy of LLM's scenario count estimation vs actual decomposition count"
+    )
+    control_flow_understanding: ControlFlowUnderstanding | None = Field(
+        description="Assessment of LLM's understanding of control flow structures"
+    )
+    edge_case_detection: EdgeCaseDetection | None = Field(
+        description="How many edge cases the LLM identifies"
+    )
+    decision_boundary_clarity: DecisionBoundaryClarity | None = Field(
+        description="How many numeric thresholds the LLM identifies"
+    )
+    outcome_precision: OutcomePrecision | None = Field(
+        description="Precision of numeric distributions provided by the LLM"
+    )
+    direction_accuracy: DirectionAccuracy | None = Field(
+        description="Correctness of conclusions reached by the LLM"
+    )
+    coverage_completeness: CoverageCompleteness | None = Field(
+        description="Proportion of decision scenarios found by the LLM"
+    )
+    overall_summary: str = Field(
+        description="High-level assessment summarizing strengths and weaknesses of LLM vs ImandraX answers"
+    )
+
+
+class StateSpaceEstimationAccuracy(BaseModel):
+    """
+    State Space Estimation Accuracy.
+
+    Description:
+        Ratio of LLM's estimated scenario count to actual region count from decomposition.
+
+    Instructions for LLM:
+        - Extract n_llm_estimated_scenarios and n_decomposition_exact_scenarios
+        - Provide reasoning for your extraction
+        - the 'score' field will be computed automatically
+
+    Formula (auto-computed):
+        score = 1 - abs(log2(|n_llm_estimated_scenarios - n_decomposition_exact_scenarios|))
+
+    Output Type:
+        float | Literal['unknown']
+    """
+
+    n_llm_estimated_scenarios: int | Literal["unknown"] = Field(
+        description="""Number of scenarios estimated by LLM, or 'unknown' if cannot be extracted.
+
+Extraction rules:
+(a) Explicit number: use directly (e.g., "76 scenarios" → 76)
+(b) Range: use midpoint (e.g., "50-80 scenarios" → 65)
+(c) Approximation: extract number (e.g., "approximately 50" → 50, "~40-60" → 50)
+(d) Qualitative with implicit numbers:
+    - "many combinations" + mentions "4 × 5 × 3" → compute 60
+    - "numerous paths" + context suggests X paths → use X
+(e) Pure qualitative (no numbers): Extract best estimate from context
+(f) Only if truly impossible to extract any number: mark as unknown = "unknown"
+"""
     )
     n_decomposition_exact_scenarios: int = Field(
-        description='Exact number of regions from decomposition'
+        description="Exact number of regions from decomposition"
     )
     reasoning: str = Field(
-        description='Explain how you extracted n_llm_estimated_scenarios and found n_decomposition_exact_scenarios.'
+        description="Explain how you extracted n_llm_estimated_scenarios and found n_decomposition_exact_scenarios."
     )
 
     @computed_field
     @property
-    def score(self) -> float | Literal['unknown']:
-        if self.n_llm_estimated_scenarios == 'unknown':
-            return 'unknown'
+    def score(self) -> float | Literal["unknown"]:
+        """Computed accuracy score using formula: 1 - abs(log2(|n_llm - n_decomp|))."""
+        if self.n_llm_estimated_scenarios == "unknown":
+            return "unknown"
         diff = abs(
             self.n_llm_estimated_scenarios - self.n_decomposition_exact_scenarios
         )
         if diff == 0:
             return 1.0
-        return 1.0 - abs(log2(diff))
+        return 1.0 - abs(math.log2(diff))
 
 
 class OutcomePrecision(BaseModel):
-    """Measures how precisely the LLM provides exact numeric distributions."""
+    """
+    Outcome Precision.
+
+    Description:
+        Measures how precisely the LLM provides exact numeric distributions
+        compared to qualitative descriptions only.
+
+    Scoring Rubric:
+        - 1.0: Exact match (value and operator)
+        - 0.8: Value correct, operator approximate (">= 20" vs "> 19")
+        - 0.5: Value approximate (">= 20" vs ">= 18")
+        - 0.2: Qualitative but directionally correct ("high" when should be "> 620")
+        - 0.0: Wrong or missing
+
+    Output Type:
+        float (0.0-1.0)
+    """
 
     score: float = Field(
-        description='Precision score for numeric distributions (0.0-1.0)',
+        description="Precision score for numeric distributions (0.0-1.0)",
         ge=0.0,
         le=1.0,
     )
     reasoning: str = Field(
-        description='Detailed explanation of how the score was determined'
+        description="Detailed explanation of how the score was determined for each outcome/condition"
     )
 
 
 class DirectionAccuracy(BaseModel):
-    """Whether the LLM reaches conclusions in the correct direction."""
+    """
+    Direction Accuracy.
+
+    Description:
+        Whether the LLM reaches conclusions in the correct direction
+        (e.g., "DV victims are never rejected" vs decomposition showing rejection).
+
+    Scoring Rubric:
+        - 1.0: Completely correct conclusion + correct reasoning
+        - 0.75: Correct conclusion, flawed/incomplete reasoning
+        - 0.5: Partially correct (e.g., finds some but not all counterexamples)
+        - 0.25: Wrong conclusion but identifies relevant factors
+        - 0.0: Completely wrong
+
+    Output Type:
+        float (0.0-1.0)
+    """
 
     score: float = Field(
-        description='Score for correctness of conclusions (0.0-1.0)', ge=0.0, le=1.0
+        description="Score for correctness of conclusions (0.0-1.0)", ge=0.0, le=1.0
     )
     reasoning: str = Field(
-        description='Detailed explanation of the conclusion correctness'
+        description="Detailed explanation of the conclusion correctness and reasoning quality"
     )
 
 
 class CoverageCompleteness(BaseModel):
-    """Proportion of actual decision scenarios found by the LLM."""
+    """
+    Coverage Completeness.
+
+    Description:
+        Proportion of actual decision scenarios found by the LLM.
+
+    Scoring Rubric (use highest applicable):
+        (a) EXPLICIT COUNT: use stated number/range vs decomp count
+        (b) SCENARIO ENUMERATION: count explicitly described scenarios
+        (c) OUTCOME CATEGORY COVERAGE: (# categories LLM identifies) / (# in decomp)
+        (d) QUALITATIVE ONLY: 0.25 for acknowledging multiplicity
+        (e) NO COVERAGE: 0.0
+
+    Use the most generous applicable interpretation.
+
+    Output Type:
+        float (0.0-1.0)
+    """
 
     score: float = Field(
-        description='Score for coverage of decision scenarios (0.0-1.0)',
+        description="Score for coverage of decision scenarios (0.0-1.0)",
         ge=0.0,
         le=1.0,
     )
     reasoning: str = Field(
-        description='Explanation of which rubric was applied and how coverage was assessed'
+        description="Explanation of which rubric was applied and how coverage was assessed"
     )
 
 
 class ControlFlowUnderstanding(BaseModel):
-    """Assess whether LLM captures the structure of branches, guards, overrides, and short-circuits."""
+    """
+    Control Flow Understanding.
 
-    precedence_of_conditions: Literal['correct', 'partial', 'incorrect'] = Field(
-        description='Assessment of precedence understanding'
+    Description:
+        Assess whether LLM captures the structure of branches, guards, overrides, and short-circuits.
+        Evaluates understanding of:
+        1. Correct precedence of conditions (AND before OR, priority ordering)
+        2. Correct branching structure (if-else-if vs independent checks)
+        3. Short-circuit behavior (early returns, guard clauses)
+        4. Override logic (safety checks trumping normal operation)
+
+    Instructions for LLM:
+        - Assess each of the 4 aspects as 'correct', 'partial', or 'incorrect'
+        - Provide reasoning for your assessments
+        - the 'score' field will be computed automatically
+
+    Formula (auto-computed):
+        score = (# correct + 0.5 * # partial) / 4
+
+    Output Type:
+        float (0.0-1.0)
+    """
+
+    precedence_of_conditions: Literal["correct", "partial", "incorrect"] = Field(
+        description="Assessment of precedence understanding (AND before OR, priority ordering)"
     )
-    branching_structure: Literal['correct', 'partial', 'incorrect'] = Field(
-        description='Assessment of branching structure understanding'
+    branching_structure: Literal["correct", "partial", "incorrect"] = Field(
+        description="Assessment of branching structure understanding (if-else-if vs independent checks)"
     )
-    short_circuit_behavior: Literal['correct', 'partial', 'incorrect'] = Field(
-        description='Assessment of short-circuit behavior understanding'
+    short_circuit_behavior: Literal["correct", "partial", "incorrect"] = Field(
+        description="Assessment of short-circuit behavior understanding (early returns, guard clauses)"
     )
-    override_logic: Literal['correct', 'partial', 'incorrect'] = Field(
-        description='Assessment of override logic understanding'
+    override_logic: Literal["correct", "partial", "incorrect"] = Field(
+        description="Assessment of override logic understanding (safety checks trumping normal operation)"
     )
-    reasoning: str = Field(description='Explain each of the 4 assessments.')
+    reasoning: str = Field(description="Explain each of the 4 assessments.")
 
     @computed_field
     @property
     def score(self) -> float:
+        """Computed control flow score using formula: (# correct + 0.5 * # partial) / 4."""
         assessments = [
             self.precedence_of_conditions,
             self.branching_structure,
             self.short_circuit_behavior,
             self.override_logic,
         ]
-        correct_count = sum(1 for a in assessments if a == 'correct')
-        partial_count = sum(1 for a in assessments if a == 'partial')
+        correct_count = sum(1 for a in assessments if a == "correct")
+        partial_count = sum(1 for a in assessments if a == "partial")
         return (correct_count + 0.5 * partial_count) / 4
 
 
 class EdgeCaseDetection(BaseModel):
-    """How many rare or policy-violating edge cases the LLM finds."""
+    """
+    Edge Case Detection.
+
+    Description:
+        How many rare or policy-violating edge cases the LLM finds.
+
+        Edge case = region with ANY of:
+        1. ≥3 conjunctive constraints (complex condition combination)
+        2. Equality constraint (exactly at boundary: x = 10 not x > 10)
+        3. Negation of common case (sensor failed, not working)
+        4. Contradicts naive expectation (counterintuitive outcome)
+        5. Safety-critical (violates invariant, reaches error state)
+
+    Instructions for LLM:
+        - List the edge cases found by the LLM in edge_cases_found
+        - Provide total_edge_cases from decomposition
+        - Provide reasoning
+        - the 'edge_case_count' and 'score' fields will be computed automatically
+
+    Formula (auto-computed):
+        edge_case_count = len(edge_cases_found)
+        score = edge_case_count / total_edge_cases
+
+    Output Type:
+        float (0.0-1.0)
+    """
 
     edge_cases_found: list[str] = Field(
-        description='List of edge cases identified by the LLM'
+        description="List of edge cases identified by the LLM (strings describing each edge case)"
     )
     total_edge_cases: int = Field(
-        description='Total number of edge cases in decomposition'
+        description="Total number of edge cases in decomposition"
     )
     reasoning: str = Field(
-        description='Explain which edge cases were found and which were missed.'
+        description="Explain which edge cases were found and which were missed."
     )
 
     @computed_field
     @property
     def edge_case_count(self) -> int:
+        """Number of edge cases found by LLM (computed from list length)."""
         return len(self.edge_cases_found)
 
     @computed_field
     @property
     def score(self) -> float:
+        """Ratio of found to total edge cases (edge_case_count / total_edge_cases)."""
         if self.total_edge_cases == 0:
             return 1.0
         return min(len(self.edge_cases_found) / self.total_edge_cases, 1.0)
 
 
 class DecisionBoundaryClarity(BaseModel):
-    """Whether the LLM identifies exact numeric thresholds for decisions."""
+    """
+    Decision Boundary Clarity.
+
+    Description:
+        Whether the LLM identifies exact numeric thresholds for decisions.
+        Thresholds include: deviation >= 80cm, SOC < 20%, 3+ network connections, etc.
+
+    Instructions for LLM:
+        - List thresholds identified by the LLM in thresholds_identified_by_llm
+        - List all thresholds from decomposition in thresholds_from_decomp
+        - Provide reasoning
+        - the 'score' field will be computed automatically
+
+    Formula (auto-computed):
+        score = len(thresholds_identified_by_llm) / len(thresholds_from_decomp)
+
+    Output Type:
+        float (0.0-1.0)
+    """
 
     thresholds_identified_by_llm: list[str] = Field(
-        description='List of thresholds identified by LLM'
+        description="List of thresholds identified by LLM (e.g., ['SOC < 20%', 'deviation >= 80cm', 'speed > 100'])"
     )
     thresholds_from_decomp: list[str] = Field(
-        description='List of all thresholds from decomposition'
+        description="List of all thresholds that exist in the decomposition"
     )
     reasoning: str = Field(
-        description='Explain which thresholds were identified and which were missed.'
+        description="Explain which thresholds were identified and which were missed."
     )
 
     @computed_field
     @property
     def score(self) -> float:
+        """Ratio of identified to total thresholds (len(identified) / len(from_decomp))."""
         if len(self.thresholds_from_decomp) == 0:
             return 1.0
         return min(
             len(self.thresholds_identified_by_llm) / len(self.thresholds_from_decomp),
             1.0,
         )
-
-
-class EvaluationResult(BaseModel):
-    """Complete evaluation result comparing LLM answers vs ImandraX answers."""
-
-    state_space_estimation_accuracy: StateSpaceEstimationAccuracy | None = Field(
-        description="Accuracy of LLM's scenario count estimation"
-    )
-    control_flow_understanding: ControlFlowUnderstanding | None = Field(
-        description="Assessment of LLM's control flow understanding"
-    )
-    edge_case_detection: EdgeCaseDetection | None = Field(
-        description='How many edge cases the LLM identifies'
-    )
-    decision_boundary_clarity: DecisionBoundaryClarity | None = Field(
-        description='How many numeric thresholds the LLM identifies'
-    )
-    outcome_precision: OutcomePrecision | None = Field(
-        description='Precision of numeric distributions provided by the LLM'
-    )
-    direction_accuracy: DirectionAccuracy | None = Field(
-        description='Correctness of conclusions reached by the LLM'
-    )
-    coverage_completeness: CoverageCompleteness | None = Field(
-        description='Proportion of decision scenarios found by the LLM'
-    )
-    overall_summary: str = Field(
-        description='High-level assessment summarizing strengths and weaknesses'
-    )
 
 
 # Core function
