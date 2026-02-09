@@ -52,6 +52,24 @@ METRIC_LABELS = {
 
 COLORS = ['#E63946', '#457B9D', '#F77F00', '#06A77D', '#9D4EDD', '#E9C46A', '#264653']
 
+# q1, q2 use decomp; q3 uses vg
+QUESTION_METHOD: dict[str, str] = {
+    'q1': 'decomp',
+    'q2': 'decomp',
+    'q3': 'vg',
+}
+
+# Which methods each metric applies to
+METRIC_APPLICABLE_METHODS: dict[str, list[str]] = {
+    'state_space_estimation_accuracy': ['decomp'],
+    'control_flow_understanding': ['vg', 'decomp'],
+    'edge_case_detection': ['vg', 'decomp'],
+    'decision_boundary_clarity': ['vg', 'decomp'],
+    'outcome_precision': ['vg', 'decomp'],
+    'direction_accuracy': ['vg'],
+    'coverage_completeness': ['vg', 'decomp'],
+}
+
 
 def get_label(metric: str, multiline: bool = True) -> str:
     """Get display label for a metric."""
@@ -124,6 +142,12 @@ def aggregate_metrics() -> pl.DataFrame:
 
                 for metric_name, metric_value in question_metrics.items():
                     if metric_name == 'overall_summary' or metric_value is None:
+                        continue
+
+                    # Skip metrics not applicable to this question's method
+                    question_method = QUESTION_METHOD[question_id]
+                    applicable = METRIC_APPLICABLE_METHODS[metric_name]
+                    if question_method and applicable and question_method not in applicable:
                         continue
 
                     if metric_name == 'state_space_estimation_accuracy':
