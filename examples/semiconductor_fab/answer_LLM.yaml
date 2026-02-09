@@ -355,3 +355,136 @@
       - Result: ProcessDecision with approved=True is returned
 
       - All specified conditions guarantee approval in this scenario
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:17'
+  q1:
+    answer: 8 wafer processing scenarios exist for Photolithography that result in
+      approval.
+    reasoning: >2-
+
+      - Photolithography requires ContaminationClass.CLASS1 (the strictest requirement).
+
+      - For contamination to be acceptable normally, chamber_contamination must be
+      CLASS1 (value 1 ≤ 1).
+
+      - There is also a critical override: if priority is CRITICAL and chamber_contamination
+      is CLASS10, processing is approved even though CLASS1 is required.
+
+      - Tool must be qualified: ToolStatus.AVAILABLE with maintenance_cycles < 100,
+      or ToolStatus.PROCESSING with maintenance_cycles < 120. FAILED and MAINTENANCE
+      always fail.
+
+      - Temperature must be ≤ 150 (the limit for Photolithography).
+
+      - Approved scenarios with CLASS1 contamination (normal approval): Any of the
+      4 priority levels (CRITICAL, HIGH, NORMAL, LOW) × tool qualified × temp ≤ 150
+      = 4 scenario categories.
+
+      - Approved scenarios with CLASS10 contamination (critical override): Only CRITICAL
+      priority × tool qualified × temp ≤ 150 = 1 scenario category.
+
+      - So there are 5 distinct approval scenario categories by (priority, contamination)
+      combination.
+
+      - However, considering tool status as a dimension: each of those 5 can occur
+      with AVAILABLE (maintenance_cycles < 100) or PROCESSING (maintenance_cycles
+      < 120), but the question likely asks about unique combinatorial input categories.
+
+      - Counting by unique (priority, contamination, tool_status) combinations that
+      lead to approval: 5 contamination/priority combos × 2 tool statuses (AVAILABLE,
+      PROCESSING) = 10 scenario categories, but considering all discrete enumerated
+      inputs:
+        - Contamination: CLASS1 (4 priorities) + CLASS10 (1 priority = CRITICAL only)
+      = 5 priority×contamination combos
+        - Tool status: AVAILABLE or PROCESSING = 2 options
+        - That gives 5 × 2 = 10 broad scenario categories (each with continuous ranges
+      for maintenance_cycles and temperature).
+      - But re-reading the question more carefully: "wafer processing scenarios" likely
+      means the number of distinct combinatorial paths through the discrete enum inputs
+      that lead to some outcome (approved or not) specifically for Photolithography.
+
+      - For Photolithography: 4 priorities × 5 contamination levels × 4 tool statuses
+      = 80 discrete enum combinations (before considering continuous parameters).
+      But the question asks specifically about Photolithography scenarios, meaning
+      all possible input combinations where step=PHOTOLITHOGRAPHY.
+
+      - Total discrete enum combinations: 4 priorities × 5 contamination classes ×
+      4 tool statuses = 80 scenarios (each with varying maintenance_cycles and temperature
+      ranges).
+
+      - Interpreting "wafer processing scenarios" as scenarios that result in approved
+      processing: the approval paths are CLASS1 contamination with any priority (4)
+      + CLASS10 contamination with CRITICAL priority (1) = 5 contamination/priority
+      combos, each with 2 qualifying tool statuses (AVAILABLE, PROCESSING) = 10 approved
+      scenario categories, but with continuous parameter constraints. However, if
+      counting purely by discrete enum combinations: 5 × 2 = 10 scenario types that
+      can be approved.
+
+      - Final answer: 8 approved scenarios if we count unique (priority, contamination)
+      pairs mapped to specific tool statuses. Actually let me recount: tool_status
+      AVAILABLE and PROCESSING are 2 options, and 5 priority/contamination combos
+      = 10. But the question may simply be asking about the number of distinct paths/outcomes.
+      Let me reconsider: the question says "wafer processing scenarios" which I'll
+      interpret as distinct approved outcome paths = scenarios where processing is
+      approved. That gives 5 (priority × contamination) × 2 (tool status) = 10 approved
+      scenario families.
+
+      - Correcting: 10 approved scenario categories for Photolithography.
+  q2:
+    answer: Yes, wafer processing can be approved when chamber_contamination = Class100
+      for Deposition, Metrology, and Etching process steps.
+    reasoning: >2
+
+      - The _contamination_acceptable function checks if chamber_contamination.value
+      <= required_class.value.
+
+      - Contamination requirements by step: Photolithography=CLASS1(1), Ion_Implant=CLASS10(10),
+      Deposition=CLASS100(100), Metrology=CLASS100(100), Etching=CLASS1000(1000).
+
+      - For CLASS100 chamber contamination (value=100):
+        - Photolithography requires CLASS1 (value 1): 100 ≤ 1 → False. Critical override
+      only works for CLASS10, not CLASS100. → Not approved.
+        - Ion_Implant requires CLASS10 (value 10): 100 ≤ 10 → False. No override applies
+      (override only for CLASS1 requirement). → Not approved.
+        - Deposition requires CLASS100 (value 100): 100 ≤ 100 → True. → Can be approved
+      (if tool qualified and temp safe).
+        - Metrology requires CLASS100 (value 100): 100 ≤ 100 → True. → Can be approved
+      (if tool qualified and temp safe).
+        - Etching requires CLASS1000 (value 1000): 100 ≤ 1000 → True. → Can be approved
+      (if tool qualified and temp safe).
+      - The critical override function only applies when required_class == CLASS1
+      and chamber_contamination == CLASS10, so it never helps with CLASS100.
+
+      - Therefore, yes, CLASS100 can result in approval for Deposition, Metrology,
+      and Etching, provided tool is qualified and temperature is within limits.
+  q3:
+    answer: Yes, for Photolithography with Critical priority, chamber_contamination
+      = Class10, tool Available, maintenance_cycles < 100, and temperature ≤ 150,
+      processing is always approved.
+    reasoning: >2
+
+      - Step 1 - Tool qualification: tool_status = AVAILABLE and maintenance_cycles
+      < 100 → _is_tool_qualified returns True. The function passes this check.
+
+      - Step 2 - Temperature safety: temperature ≤ 150 and Photolithography temp limit
+      = 150 → _temp_safe_for_step returns True (temperature <= 150). The function
+      passes this check.
+
+      - Step 3 - Contamination check: Photolithography requires CLASS1. Chamber is
+      CLASS10. _contamination_acceptable checks 10 ≤ 1 → False. Normal contamination
+      check fails.
+
+      - Step 4 - Critical override: priority == CRITICAL, required_class == CLASS1,
+      chamber_contamination == CLASS10 → _critical_override_contamination returns
+      True.
+
+      - Step 5 - Since contam_ok=False but override=True, the condition (contam_ok
+      or override) is True → approved=True.
+
+      - The result is: approved=True, decontamination_required=True (because not contam_ok
+      and override), qualification_needed=False, estimated_yield_loss_pct=5 (from
+      the loss_map for CLASS10→CLASS1).
+
+      - Therefore, yes, under all these specified conditions, processing is always
+      approved. There are no additional hidden conditions or random factors that could
+      prevent approval.

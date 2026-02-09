@@ -255,3 +255,99 @@
 
       • Conclusion: Extreme weather + Critical priority ALWAYS results in assignment_approved
       = True
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:44:58'
+  q1:
+    answer: 640 distinct input scenarios exist (4 × 5 × 4 × 4 × 2), producing 5 distinct
+      output patterns when considering the unique combinations of decision field values.
+    reasoning: >2
+
+      - The input space is the Cartesian product of all parameters:
+        - PriorityLevel: 4 values (Critical, High, Medium, Low)
+        - MedicalCondition: 5 values (NoMedical, Minor, Chronic, Acute, Disabled)
+        - WeatherCondition: 4 values (Clear, Rain, Storm, Extreme)
+        - CapacityStatus: 4 values (Full, NearFull, Available, Ample)
+        - special_req: 2 values (True, False)
+      - Total input combinations: 4 × 5 × 4 × 4 × 2 = 640 distinct assignment scenarios.
+
+      - Each of these 640 scenarios follows a deterministic code path producing an
+      AssignmentDecision with specific field values (assignment_approved, assigned_shelter_type,
+      requires_emergency_override, priority_escalated, decision_valid).
+
+      - The dead zone path (NearFull + High + Minor) accounts for 8 scenarios (4 weather
+      × 2 special_req), all producing: approved=False, shelter=Standard, override=False,
+      escalated=False, valid=False.
+
+      - The remaining 632 scenarios produce varying combinations of the output fields
+      based on the logic branches (capacity checks, emergency overrides, priority
+      escalation, shelter type selection).
+
+      - In terms of distinct output *patterns* (unique tuples of the 5 output fields),
+      there are multiple distinct result combinations covering approved/rejected with
+      various shelter types, override flags, escalation flags, and validity.
+  q2:
+    answer: Yes, Critical priority evacuees with medical needs can be rejected, but
+      only under very specific conditions.
+    reasoning: >2
+
+      - Let's analyze Critical priority with medical needs (Chronic, Acute, or Disabled):
+
+      - First, the dead zone check: requires NearFull + High + Minor. Critical priority
+      and medical needs (Chronic/Acute/Disabled) never match this, so the dead zone
+      is not triggered.
+
+      - For emergency override (quorum of 2/3): c1 = True (Critical), c2 = weather_severe,
+      c3 = special_req. Since c1 is always True, we need only one of c2 or c3 to be
+      True for override.
+
+      - If weather is Storm or Extreme: c2=True, so override=True (count≥2). Override
+      bypasses capacity → approved.
+
+      - If special_req=True: c3=True, so override=True (count≥2). Override bypasses
+      capacity → approved.
+
+      - The only case without override: weather is Clear or Rain AND special_req=False.
+      Then emergency_override=False.
+
+      - With no override: can_assign = has_cap (needs Available or Ample capacity).
+
+      - If capacity is Full: is_blocked = True (Full, no override, non-Extreme weather).
+      final_approval = False. **REJECTED.**
+
+      - If capacity is NearFull: has_cap=False, can_assign=False. final_approval =
+      False. **REJECTED.**
+
+      - If capacity is Available or Ample: has_cap=True, is_blocked=False. final_approval
+      = True. Approved.
+
+      - So Critical priority evacuees with medical needs ARE rejected when: capacity
+      is Full or NearFull, weather is Clear or Rain, AND special_req is False.
+
+      - Example: Critical + Acute + Clear + Full + special_req=False → rejected.
+  q3:
+    answer: Yes, Extreme weather with Critical priority always gets approved, regardless
+      of all other inputs.
+    reasoning: >2
+
+      - Dead zone check: requires NearFull + High + Minor. With Critical priority,
+      this never triggers (needs High), so we always pass through.
+
+      - Priority escalation: escalate_priority only changes Medium→High or Low→Medium
+      when NearFull. Critical is never changed, so escalated_priority = Critical.
+
+      - Emergency override quorum: c1 = True (Critical), c2 = True (Extreme weather
+      is in {Extreme, Storm}), c3 = special_req (either True or False). Count is at
+      least 2, so emergency_override = True always.
+
+      - can_assign = emergency_override or has_cap = True (since override is True).
+
+      - is_blocked check: capacity == Full AND not emergency_override AND weather
+      != Extreme. Since emergency_override=True, is_blocked = False. (Even if override
+      were somehow False, weather==Extreme would also make is_blocked=False.)
+
+      - final_approval = can_assign and not is_blocked = True and True = True.
+
+      - This holds for ALL capacity statuses (Full, NearFull, Available, Ample), ALL
+      medical conditions, and both special_req values.
+
+      - Therefore, Extreme weather + Critical priority is ALWAYS approved.

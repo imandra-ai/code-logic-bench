@@ -52,8 +52,9 @@ class Answers(BaseModel):
 
 
 DEFAULT_MODELS: list[str] = [
+    'anthropic/claude-opus-4.6',
     'anthropic/claude-opus-4.5',
-    'anthropic/claude-sonnet-4',
+    'anthropic/claude-sonnet-4.5',
     'openai/gpt-5.2',
     'google/gemini-3-pro-preview',
     'x-ai/grok-code-fast-1',
@@ -188,8 +189,30 @@ Model definition:
 # ====================
 
 
-async def process_example(example_dir: Path, models: list[str]) -> None:
+def get_existing_models(example_dir: Path) -> set[str]:
+    """Get the set of model names that already have answers in answer_LLM.yaml."""
+    answer_path = example_dir / 'answer_LLM.yaml'
+    if not answer_path.exists():
+        return set()
+    data = yaml.safe_load(answer_path.read_text())
+    if not data or not isinstance(data, list):
+        return set()
+    return {entry['model'] for entry in data if isinstance(entry, dict) and 'model' in entry}
+
+
+async def process_example(
+    example_dir: Path, models: list[str], *, skip_existing: bool = False
+) -> None:
     """Process a single example with all specified models."""
+    if skip_existing:
+        existing = get_existing_models(example_dir)
+        remaining = [m for m in models if m not in existing]
+        if len(remaining) < len(models):
+            skipped = len(models) - len(remaining)
+            print(f'Skipping {skipped} existing model(s) for {example_dir.name}')
+        if not remaining:
+            return
+        models = remaining
     await asyncio.gather(*[ask_llm(example_dir, model) for model in models])
 
 
@@ -251,25 +274,18 @@ async def main() -> None:
         print('Error: Specify example names or use --all')
         raise SystemExit(1)
 
-    # Filter existing if requested
-    if args.skip_existing:
-        original_count = len(example_dirs)
-        example_dirs = [d for d in example_dirs if not (d / 'answer_LLM.yaml').exists()]
-        skipped = original_count - len(example_dirs)
-        if skipped:
-            print(f'Skipping {skipped} examples with existing answer_LLM.yaml')
-
     if not example_dirs:
         print('No examples to process')
         return
 
     models = args.models
+    skip_existing = args.skip_existing
     print(f'Processing {len(example_dirs)} examples with {len(models)} models')
 
     # Process examples
     async def safe_process(example_dir: Path) -> None:
         try:
-            await process_example(example_dir, models)
+            await process_example(example_dir, models, skip_existing=skip_existing)
         except Exception as e:
             print(f'Error processing {example_dir.name}: {e}')
             if args.fail_fast:
@@ -277,7 +293,7 @@ async def main() -> None:
 
     if args.fail_fast:
         for example_dir in example_dirs:
-            await process_example(example_dir, models)
+            await process_example(example_dir, models, skip_existing=skip_existing)
     else:
         await asyncio.gather(*[safe_process(d) for d in example_dirs])
 

@@ -384,3 +384,113 @@
 
       - The dead zone logic completely bypasses the _backup_required function which
       normally only requires backup for CRITICAL_MEDICAL, CRITICAL_FIRE, and SERIOUS_FIRE
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:08'
+  q1:
+    answer: 'The system has a theoretically infinite number of scenarios due to continuous
+      integer parameters (distance_to_incident and fuel_level), but in terms of distinct
+      behavioral combinations from the enumerated categorical parameters alone, there
+      are 6 × 5 × 4 × 4 × 2 = 960 distinct parameter combinations per (distance, fuel_level)
+      pair. Considering the discrete categorical parameters only: 6 IncidentCategories
+      × 5 ResourceTypes × 4 WeatherConditions × 4 TrafficLevels × 2 resource_ready
+      states = 960 categorical combinations. Each of these interacts with the continuous
+      distance and fuel_level parameters, making the total number of distinct behavioral
+      scenarios unbounded in the continuous sense but 960 in the categorical dimension.'
+    reasoning: >-
+      - IncidentCategory has 6 values: ROUTINE_MEDICAL, SERIOUS_MEDICAL, CRITICAL_MEDICAL,
+      ROUTINE_FIRE, SERIOUS_FIRE, CRITICAL_FIRE
+
+      - ResourceType has 5 values: AMBULANCE, FIRE_TRUCK, POLICE_UNIT, HELICOPTER,
+      HAZMAT_TEAM
+
+      - WeatherCondition has 4 values: CLEAR, RAIN, SNOW, STORM
+
+      - TrafficLevel has 4 values: LIGHT, MODERATE, HEAVY, GRIDLOCK
+
+      - resource_ready is boolean: 2 values (True, False)
+
+      - distance_to_incident and fuel_level are integers with no explicit bounds,
+      making them effectively continuous/unbounded parameters
+
+      - Categorical combinations: 6 × 5 × 4 × 4 × 2 = 960
+
+      - Each of these 960 categorical combos can produce different outcomes depending
+      on the integer values of distance and fuel_level (which affect dead zone checks,
+      critical override checks, response time calculations, fuel threshold comparisons)
+
+      - The system has multiple decision paths: dead zone path, critical override
+      path, normal quorum path (score ≥ 4, score 3, score < 3), each producing different
+      DispatchDecision outputs
+
+      - So the total distinct scenario space is 960 categorical combinations × the
+      range of (distance, fuel_level) pairs, which is technically infinite for unbounded
+      integers
+  q2:
+    answer: 'Yes, Helicopters can be dispatched during Storm weather conditions under
+      specific conditions. There are three paths: (1) If fuel_level is 25-35% AND
+      distance is 15-25 units, the dead zone logic triggers first, dispatching the
+      helicopter regardless of weather with requires_backup=True and escalation_needed=True.
+      (2) In normal quorum logic, a Helicopter in Storm weather gets weather_safe=False
+      (one factor failed), but if the other 4 factors (compatible, fuel_ok, time_ok,
+      resource_ready) are all True (score=4), dispatch is still approved. (3) Even
+      with score=3 (3 of 5 factors met), a borderline dispatch with escalation is
+      approved. Note: Critical override cannot apply during Storm (weather_ok=False
+      blocks it).'
+    reasoning: >-
+      - The dead zone check happens FIRST in the function, before any weather safety
+      check. If fuel_level is 25-35% and distance is 15-25, the helicopter is dispatched
+      with backup and escalation regardless of Storm weather. The dead zone does not
+      check compatibility or weather at all.
+
+      - The critical override explicitly requires weather != STORM (weather_ok = False
+      for Storm), so this path cannot dispatch a Helicopter in Storm.
+
+      - In normal quorum logic, weather_safe is False when resource_type is HELICOPTER
+      and weather is STORM or SNOW. This means one of the 5 quorum factors is already
+      failed.
+
+      - However, the quorum only requires 4 out of 5 factors. So if compatible=True,
+      fuel_ok=True, time_ok=True, and resource_ready=True (all other 4 factors are
+      True), the score is 4, which meets the ≥4 threshold, and dispatch is approved.
+
+      - For Helicopter+Storm compatibility: Helicopters are compatible with ROUTINE_MEDICAL,
+      SERIOUS_MEDICAL, CRITICAL_MEDICAL, SERIOUS_FIRE, CRITICAL_FIRE (5 categories).
+      So compatible=True is achievable.
+
+      - Helicopter weather multiplier in Storm is 100, traffic multiplier is always
+      10, so response_time = distance × 100 × 10 / 100 = distance × 10. For time_ok
+      (≤30 min), distance must be ≤3 units.
+
+      - So for example: CRITICAL_MEDICAL, Helicopter, Storm, distance=1, fuel_level=50%,
+      resource_ready=True → compatible=True, fuel_ok=True (50≥25), time_ok=True (response_time=10≤30),
+      resource_ready=True, weather_safe=False → score=4 → dispatch approved.
+
+      - Even with score=3 (e.g., time_ok also fails), borderline dispatch with escalation
+      is approved.
+  q3:
+    answer: Yes, when fuel level is in the dead zone (25-35%) with moderate distance
+      (15-25 units), the system ALWAYS requires backup resources (requires_backup=True).
+      It also always sets escalation_needed=True and dispatch_approved=True, regardless
+      of incident category, resource type, compatibility, resource readiness, weather,
+      or traffic conditions.
+    reasoning: >-
+      - The dead zone check is the FIRST decision point in the determine_dispatch_decision
+      function, evaluated before critical override or normal quorum logic.
+
+      - The _in_fuel_dead_zone function returns True when 25 <= fuel_level <= 35 AND
+      15 <= distance <= 25.
+
+      - When in_dead_zone is True, the function immediately returns a DispatchDecision
+      with:
+        - dispatch_approved=True
+        - response_time_minutes=calculated response time (varies by resource/weather/traffic)
+        - requires_backup=True (ALWAYS)
+        - escalation_needed=True (ALWAYS)
+      - This return happens unconditionally — no other checks (compatibility, fuel
+      minimum, weather safety, resource readiness, quorum score) are evaluated.
+
+      - Therefore, backup is ALWAYS required when in the dead zone, regardless of
+      any other parameter values.
+
+      - The only field that varies in the dead zone response is response_time_minutes,
+      which depends on distance, resource_type, weather, and traffic.

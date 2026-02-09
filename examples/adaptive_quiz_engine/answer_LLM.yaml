@@ -561,3 +561,230 @@
       (correct_answered * 100 // total_answered), but this doesn't affect the safety
       property - it only affects WHEN emergency triggers, not WHAT happens during
       emergency
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:21'
+  q1:
+    answer: >-
+      There are 3 distinct progression scenarios, determined by the following numeric
+      thresholds:
+
+
+      **Scenario 1: Invalid Progression (Dead Zone / Invalid Data)**
+
+      - Dead zone: total_answered in [5, 7] AND correct_answered in [2, 3] AND current_streak
+      == 0
+
+      - OR invalid data: correct_answered > total_answered OR current_streak < 0
+
+      - Result: difficulty=EASY, intervention=True, confidence_change=0, valid_progression=False,
+      emergency_reset=False
+
+
+      **Scenario 2: Emergency Reset**
+
+      - Requires valid progression (not in Scenario 1) AND total_answered >= 10 AND
+      (correct_answered*100//total_answered < 20 OR current_confidence < 15)
+
+      - Result: difficulty=EASY, intervention=True, confidence_change=20, valid_progression=True,
+      emergency_reset=True
+
+
+      **Scenario 3: Normal Progression**
+
+      - All remaining valid, non-emergency cases
+
+      - Difficulty increases when: result==CORRECT AND current_streak >= 3 AND response_time
+      < avg_response_time*80//100 AND confidence_level >= 7
+
+      - Difficulty decreases when: (result==INCORRECT AND current_streak == 0 AND
+      response_time > avg_response_time*150//100) OR result==TIMEOUT
+
+      - Intervention via quorum (≥2 of 4 conditions): (c1) new_total>=5 AND new_correct*100//new_total<40;
+      (c2) current_streak==0 AND new_total>=5 (note: hardcoded 0 is passed); (c3)
+      new_confidence<30; (c4) new_total>=8 AND new_correct*100//new_total<25
+
+      - Confidence change thresholds: CORRECT gives +5 if confidence_level>=8, else
+      +3; PARTIAL gives +1; INCORRECT gives -2 if confidence_level<=3, else -4; TIMEOUT
+      gives -6
+    reasoning: >-
+      - The function `determine_student_progression` has three distinct return paths,
+      each representing a different progression scenario.
+
+      - Path 1 (Invalid): Checked first via `_is_valid_progression`. The dead zone
+      is defined by 5 <= total_answered <= 7, 2 <= correct_answered <= 3, and current_streak
+      == 0. Invalid data is correct_answered > total_answered or current_streak <
+      0.
+
+      - Path 2 (Emergency Reset): Checked second via `_needs_emergency_reset`. Requires
+      total_answered >= 10 AND (correct_answered*100//total_answered < 20 OR current_confidence
+      < 15).
+
+      - Path 3 (Normal): All remaining cases go through normal progression logic with
+      difficulty increase/decrease checks, confidence change calculation, and intervention
+      quorum voting.
+
+      - Key numeric thresholds: dead zone [5,7] total and [2,3] correct; emergency
+      requires >=10 total and <20% correct or <15 confidence; difficulty increase
+      needs streak>=3, response_time < 80% of avg, confidence_level>=7; difficulty
+      decrease needs streak==0 and response_time > 150% of avg (for incorrect); intervention
+      quorum needs >=2 of 4 conditions with thresholds at 5 total, 40%, 30 confidence,
+      8 total, 25%.
+  q2:
+    answer: >-
+      Yes, a student with current_streak >= 3 can trigger an emergency reset, but
+      only through the emergency reset path (Scenario 2), not through the invalid
+      progression path.
+
+
+      **Exact conditions:**
+
+      1. The student must pass the validity check: since current_streak >= 3 (not
+      0), the dead zone condition (which requires current_streak == 0) is automatically
+      false, and current_streak >= 3 means it's not < 0, so validity always passes
+      (assuming correct_answered <= total_answered).
+
+      2. total_answered >= 10
+
+      3. Either:
+         - correct_answered * 100 // total_answered < 20 (i.e., less than 20% accuracy),
+      OR
+         - current_confidence < 15
+
+      **Concrete example:** A student has current_streak = 3, total_answered = 10,
+      correct_answered = 1 (10% accuracy), current_confidence = 50. This passes validity
+      (not in dead zone, not invalid data), and triggers emergency reset because 1*100//10
+      = 10 < 20.
+
+
+      **Another example via confidence:** current_streak = 5, total_answered = 15,
+      correct_answered = 5 (33% accuracy, ≥20%), but current_confidence = 10 (< 15).
+      This also triggers emergency reset.
+
+
+      Note: A streak of 3+ correct answers with <20% overall accuracy is unlikely
+      but mathematically possible (e.g., the last 3 answers were correct but the first
+      7+ were all wrong).
+    reasoning: >-
+      - The emergency reset check in `_needs_emergency_reset` depends on current_confidence,
+      total_answered, and correct_answered. It does NOT depend on current_streak at
+      all.
+
+      - The validity check `_is_valid_progression` is the only gate before emergency
+      reset. The dead zone requires current_streak == 0, so a student with current_streak
+      >= 3 automatically avoids the dead zone.
+
+      - With current_streak >= 3 (which is ≥ 0) and assuming correct_answered <= total_answered,
+      the validity check always passes.
+
+      - Therefore, the emergency reset path is reachable whenever total_answered >=
+      10 AND (correct_answered*100//total_answered < 20 OR current_confidence < 15),
+      regardless of streak value.
+
+      - A streak of 3 with very low overall accuracy is possible: e.g., a student
+      got the last 3 correct but had many incorrect answers before, giving them total_answered=10,
+      correct_answered=3 (30% — this doesn't trigger the <20% condition). For <20%,
+      they'd need correct_answered=1 with total_answered=10, meaning streak of 1 max
+      if the last answer was correct. But if current_streak=3 and correct_answered=1,
+      that's contradictory (3 consecutive correct implies at least 3 correct total).
+
+      - However, the function does NOT validate that current_streak is consistent
+      with correct_answered. The inputs are taken at face value. So current_streak=3
+      with correct_answered=1 would still be processed (no validation rejects this).
+
+      - More practically, the current_confidence < 15 condition is independent of
+      streak, so a student with streak=3 and low confidence (e.g., confidence=10)
+      with total_answered>=10 would trigger emergency reset regardless of their accuracy
+      percentage.
+
+      - Even with consistent data: streak=3, total_answered=20, correct_answered=3
+      (15% < 20%) is consistent if the 3 correct were the last 3 answers.
+  q3:
+    answer: >-
+      No, the safety property 'emergency reset always sets difficulty to Easy and
+      enables intervention' is NEVER violated within the emergency reset path itself.
+      When emergency_reset=True is returned, it always has new_difficulty=EASY and
+      intervention_needed=True.
+
+
+      However, there are important edge cases and boundary conditions to consider:
+
+
+      **1. The safety property holds perfectly for the emergency reset path:**
+
+      The only place `emergency_reset=True` is set is in the emergency reset return
+      block, which hardcodes `new_difficulty=DifficultyLevel.EASY` and `intervention_needed=True`.
+      There is no conditional logic that could alter these values.
+
+
+      **2. Edge case — Invalid progression shadows emergency reset:**
+
+      A student who meets BOTH the invalid progression criteria AND the emergency
+      reset criteria will get the invalid progression response (emergency_reset=False,
+      but still difficulty=EASY and intervention=True). The emergency reset is never
+      triggered because the validity check occurs first and returns early. This means
+      the student doesn't get the confidence_change=20 boost that emergency reset
+      provides. While this doesn't violate the stated safety property (since emergency_reset
+      is False), it could be considered a functional concern — the student is severely
+      struggling but doesn't get the emergency reset treatment.
+
+
+      **Specific boundary example:** total_answered=10 is the minimum for emergency
+      reset, but only total_answered in [5,7] can be in the dead zone, so at total_answered=10
+      this shadowing cannot occur. However, if correct_answered > total_answered (invalid
+      data), then emergency reset conditions could also be met, but the invalid path
+      returns first with emergency_reset=False.
+
+
+      **3. Edge case — Emergency conditions met but confidence threshold boundary:**
+
+      At current_confidence=15 exactly, the `< 15` check is False, so emergency reset
+      is NOT triggered via the confidence path. The student at confidence=15 must
+      rely on the accuracy condition (<20%). At current_confidence=14, emergency reset
+      triggers. This is a sharp boundary but does not violate the safety property.
+
+
+      **4. Edge case — Integer division boundary at exactly 20%:**
+
+      With total_answered=10 and correct_answered=2: 2*100//10 = 20, which is NOT
+      < 20, so emergency reset is NOT triggered via accuracy. With correct_answered=1:
+      1*100//10 = 10 < 20, emergency reset triggers. This boundary behavior is correct
+      but worth noting.
+
+
+      **Conclusion:** The safety property as stated is never violated. Every time
+      emergency_reset=True is returned, difficulty is EASY and intervention is True.
+    reasoning: >-
+      - There is exactly one code path that sets emergency_reset=True: the emergency
+      reset return block at lines following the `if emergency:` check.
+
+      - This block hardcodes: new_difficulty=DifficultyLevel.EASY, intervention_needed=True,
+      confidence_change=20, valid_progression=True, emergency_reset=True.
+
+      - There are no conditional branches within this block — the values are always
+      the same.
+
+      - The normal progression path always returns emergency_reset=False, so it cannot
+      violate the property (it never claims to be an emergency reset).
+
+      - The invalid progression path also returns emergency_reset=False.
+
+      - Key edge case: The validity check happens BEFORE the emergency check. If both
+      conditions are met simultaneously, the invalid path takes precedence and emergency_reset
+      is set to False. This means the emergency reset is effectively suppressed, but
+      the safety property isn't violated because emergency_reset is False in that
+      return.
+
+      - However, this suppression could be a design concern: correct_answered > total_answered
+      (invalid data) with total_answered >= 10 could mask a genuine emergency. But
+      since the data is invalid anyway, returning to EASY with intervention is arguably
+      the right behavior, just without the confidence boost.
+
+      - The dead zone (total_answered 5-7) cannot overlap with emergency reset (total_answered
+      >= 10), so that particular shadowing cannot occur.
+
+      - Integer division boundaries: at exactly 20% accuracy (e.g., 2/10), emergency
+      is NOT triggered. At exactly confidence=15, emergency is NOT triggered via confidence.
+      These are sharp boundaries but not violations.
+
+      - No race conditions or mutable state issues exist since this is a pure function
+      with no side effects.

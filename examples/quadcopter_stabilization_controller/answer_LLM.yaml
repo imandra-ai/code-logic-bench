@@ -302,3 +302,125 @@
       check short-circuits the logic
 
       • Therefore, battery_pct < 15 ALWAYS results in force_emergency_landing=True
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:44:57'
+  q1:
+    answer: 7 distinct control decision scenarios exist across all flight modes.
+    reasoning: >-
+      Tracing through the code, I identify the following distinct decision paths (each
+      producing a unique scenario):
+
+
+      1. **Emergency landing** (applies to ALL modes): `requires_emergency_landing`
+      returns True → `ControlDecision(approved=False, force_emergency_landing=True,
+      limit_max_tilt=True, reduce_responsiveness=True)`. This is triggered by critical
+      battery (<15%), or (dangerous tilt >45° AND altitude <3m), or IMU failed.
+
+
+      2. **Autonomous + severe sensor degradation**: Mode is autonomous (AltHold/Hover/ReturnHome),
+      no emergency, but sensors severely degraded (IMU failed OR both IMU and GPS
+      degraded) → `ControlDecision(approved=False, force_emergency_landing=False,
+      limit_max_tilt=True, reduce_responsiveness=True)`. Note: IMU failed would actually
+      be caught by emergency first, so in practice this path is reached when IMU=DEGRADED
+      and GPS=DEGRADED.
+
+
+      3. **Autonomous + low battery (15 ≤ battery < 30)**: Mode is autonomous, no
+      emergency, sensors OK, but battery low → `ControlDecision(approved=False, force_emergency_landing=False,
+      limit_max_tilt=True, reduce_responsiveness=False)`.
+
+
+      4. **Autonomous + fully approved**: Mode is autonomous, no emergency, sensors
+      OK, battery ≥ 30 → `ControlDecision(approved=True, force_emergency_landing=False,
+      limit_max_tilt=False, reduce_responsiveness=False)`.
+
+
+      5. **Non-autonomous (Manual/Stabilize/Emergency mode) with limit_tilt=True AND
+      reduce_resp=True**: No emergency, battery low OR IMU degraded, AND GPS degraded
+      → `ControlDecision(approved=True, force_emergency_landing=False, limit_max_tilt=True,
+      reduce_responsiveness=True)`.
+
+
+      6. **Non-autonomous with limit_tilt=True AND reduce_resp=False**: No emergency,
+      battery low OR IMU degraded, GPS not degraded → `ControlDecision(approved=True,
+      force_emergency_landing=False, limit_max_tilt=True, reduce_responsiveness=False)`.
+
+
+      7. **Non-autonomous with limit_tilt=False AND reduce_resp=True**: No emergency,
+      battery ≥ 30 AND IMU healthy, GPS degraded → `ControlDecision(approved=True,
+      force_emergency_landing=False, limit_max_tilt=False, reduce_responsiveness=True)`.
+
+
+      8. **Non-autonomous with limit_tilt=False AND reduce_resp=False**: No emergency,
+      battery ≥ 30 AND IMU healthy, GPS not degraded → `ControlDecision(approved=True,
+      force_emergency_landing=False, limit_max_tilt=False, reduce_responsiveness=False)`.
+
+
+      Wait — that's 8 paths, but scenario 4 and scenario 8 produce the same ControlDecision
+      tuple: (True, False, False, False). However, they are distinct *scenarios* because
+      they arise from different flight modes and conditions. The question asks about
+      "distinct control decision scenarios," which I interpret as distinct code paths/branches.
+
+
+      So: 1 emergency path + 3 autonomous paths + 4 non-autonomous paths = 8 distinct
+      scenarios. However, if "distinct" means unique ControlDecision output tuples,
+      there are 7, since scenarios 4 and 8 both yield (True, False, False, False),
+      and scenarios 3 and 6 both yield different tuples — let me recheck:
+
+
+      - Path 1: (False, True, True, True)
+
+      - Path 2: (False, False, True, True)
+
+      - Path 3: (False, False, True, False)
+
+      - Path 4: (True, False, False, False)
+
+      - Path 5: (True, False, True, True)
+
+      - Path 6: (True, False, True, False)
+
+      - Path 7: (True, False, False, True)
+
+      - Path 8: (True, False, False, False)
+
+
+      Paths 4 and 8 produce the same tuple. So 7 distinct output tuples, 8 distinct
+      scenario paths. The answer is 7 distinct decision outcomes (unique ControlDecision
+      tuples) or 8 distinct scenario paths.
+  q2:
+    answer: No. Autonomous flight modes (AltHold, Hover, ReturnHome) are never approved
+      when battery_pct < 30.
+    reasoning: >-
+      - When battery_pct < 30, there are two sub-cases for autonomous modes:
+        - **battery_pct < 15 (critical)**: The `requires_emergency_landing` function
+      returns True (critical battery triggers emergency). The function returns `approved=False`
+      with `force_emergency_landing=True` before ever reaching the autonomous mode
+      logic.
+        - **15 ≤ battery_pct < 30 (low but not critical)**: Emergency check passes.
+      The code enters the autonomous branch, sensors may or may not be OK. If sensors
+      are degraded, `approved=False`. If sensors are OK, the `battery_low` check triggers
+      (battery_pct < 30), and the code returns `approved=False` with `limit_max_tilt=True`.
+      - In both sub-cases, `approved=False` for autonomous modes.
+
+      - Therefore, autonomous flight modes can NEVER be approved when battery_pct
+      < 30.
+  q3:
+    answer: Yes. battery_pct < 15 (critical battery) always triggers force_emergency_landing=True,
+      regardless of all other conditions.
+    reasoning: >-
+      - The `requires_emergency_landing` function checks `battery_critical(battery_pct)`
+      first, which returns True when `battery_pct < 15`.
+
+      - The function uses OR logic: `critical_battery or (dangerous_tilt and near_ground)
+      or sensor_failed`. Since `critical_battery` is True, the entire expression is
+      True regardless of tilt, altitude, or sensor values.
+
+      - In `determine_control_mode`, the emergency check is the FIRST condition evaluated,
+      before any mode-specific logic.
+
+      - When `emergency_needed` is True, the function immediately returns `ControlDecision(approved=False,
+      force_emergency_landing=True, limit_max_tilt=True, reduce_responsiveness=True)`.
+
+      - No other code path is reachable when battery_pct < 15, so `force_emergency_landing=True`
+      is guaranteed in all cases with critical battery.

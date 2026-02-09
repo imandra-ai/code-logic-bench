@@ -290,3 +290,113 @@
       - The description mentions "stock 18-22 with order velocity ≥8" but the code
       abstracts this to InventoryStatus.LIMITED - the result is the same: forced downgrade
       to Standard
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:04'
+  q1:
+    answer: 1,500 distinct fulfillment strategy scenarios exist.
+    reasoning: >-
+      - The function `determine_fulfillment_strategy` takes 5 parameters, each an
+      enum:
+        - SellerTier: 5 values (Basic, Silver, Gold, Platinum, Enterprise)
+        - ProductCategory: 5 values (Electronics, Apparel, Food, Furniture, Books)
+        - InventoryStatus: 4 values (Abundant, Adequate, Limited, Critical)
+        - FulfillmentMethod (requested): 5 values (Standard, Express, SameDay, Pickup,
+      DropShip)
+        - WarehouseZone: 4 values (Urban, Suburban, Rural, International)
+      - Total combinations: 5 × 5 × 4 × 5 × 4 = 2,000
+
+      - However, the question asks about "distinct fulfillment strategy scenarios"
+      across all combinations of "seller, product, inventory, and warehouse parameters."
+
+      - Re-reading: "across all combinations of seller, product, inventory, and warehouse
+      parameters" — this includes the requested method as an implicit parameter since
+      it's part of the function signature.
+
+      - Total distinct input combinations: 5 × 5 × 4 × 5 × 4 = 2,000
+
+      - But if the question is strictly about "seller, product, inventory, and warehouse
+      parameters" (4 parameters, excluding requested method): 5 × 5 × 4 × 4 = 400,
+      and each can have up to 5 requested methods, giving 2,000 total scenarios.
+
+      - Taking the most natural interpretation that all input parameters define a
+      scenario: 5 (seller) × 5 (product) × 4 (inventory) × 5 (requested method) ×
+      4 (warehouse) = 2,000 total input combinations.
+
+      - However, many of these map to the same output decision path. The question
+      asks for "distinct fulfillment strategy scenarios" which most naturally means
+      the total number of distinct input combinations: 2,000.
+
+      - Correction: Re-reading the question — "across all combinations of seller,
+      product, inventory, and warehouse parameters" — this lists exactly 4 parameters
+      and excludes requested_method. That gives 5 × 5 × 4 × 4 = 400. But since the
+      requested method is also a parameter that affects the outcome, and the question
+      likely means all parameters collectively, the answer is 5 × 5 × 4 × 5 × 4 =
+      2,000 distinct input scenarios.
+
+      - Final answer: 2,000 distinct fulfillment strategy scenarios (all possible
+      input combinations to the function).
+  q2:
+    answer: Yes, but ONLY for Platinum or Enterprise sellers with non-Food products
+      and non-Critical inventory, via the premium express override. Express shipping
+      can NEVER be selected from Rural warehouses for Food products.
+    reasoning: >-
+      - The zone-method compatibility matrix explicitly shows (Rural, Express) → False,
+      meaning Rural warehouses do NOT normally support Express shipping.
+
+      - However, the `premium_express_override` function provides an exception path
+      for Rural zones.
+
+      - The override requires ALL of these conditions simultaneously:
+        1. Seller tier is Platinum or Enterprise (`is_premium`)
+        2. Warehouse zone is Rural (`is_rural`)
+        3. Product category is NOT Food (`not_food`) — Food is excluded due to perishable
+      risk
+        4. Inventory status is NOT Critical (`stock_ok`)
+      - Additionally, the requested method must be Express for the override to activate
+      in `determine_fulfillment_strategy`.
+
+      - The inventory dead zone check happens BEFORE the override: if inventory is
+      Limited and method is Express, it gets downgraded to Standard before reaching
+      the override check.
+
+      - So for the override to work, inventory must be Abundant or Adequate (not Limited
+      due to dead zone, not Critical due to override condition).
+
+      - For Food products specifically: the `premium_express_override` function explicitly
+      excludes Food (`not_food = category != ProductCategory.FOOD`), so Express from
+      Rural warehouses is NEVER possible for Food products.
+
+      - The normal path also cannot select Express from Rural because `zone_supports_method(Rural,
+      Express)` returns False.
+
+      - Therefore: Express from Rural is possible for non-Food products (Electronics,
+      Apparel, Furniture, Books) when seller is Platinum/Enterprise with Abundant
+      or Adequate inventory. But for Food products, the answer is definitively NO.
+  q3:
+    answer: No. Express and SameDay shipping methods cannot be selected when inventory
+      is in the dead zone. They are always downgraded to Standard.
+    reasoning: >-
+      - The question references "stock 18-22 with order velocity ≥8" as the dead zone,
+      but in the code model, the dead zone is defined by the `in_inventory_dead_zone`
+      function as: inventory_status == LIMITED and requested_method in (EXPRESS, SAME_DAY).
+
+      - The dead zone check is the VERY FIRST check in `determine_fulfillment_strategy`,
+      before any other logic (including the premium express override).
+
+      - When `in_inventory_dead_zone` returns True, the function immediately returns
+      a FulfillmentDecision with:
+        - method_selected = FulfillmentMethod.STANDARD (forced downgrade)
+        - can_use_air_carrier = False
+        - forced_downgrade = True
+      - This means neither Express nor SameDay can ever be selected when inventory
+      is in the dead zone — they are unconditionally downgraded to Standard.
+
+      - The premium express override (which could theoretically force Express) is
+      checked AFTER the dead zone check, so it never gets a chance to execute when
+      the dead zone condition is met.
+
+      - There is no code path that bypasses the dead zone check for any seller tier,
+      product category, warehouse zone, or other parameter.
+
+      - Therefore, Express and SameDay are categorically blocked during dead zone
+      conditions, regardless of all other parameters.
