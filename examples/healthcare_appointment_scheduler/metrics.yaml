@@ -5294,3 +5294,784 @@
         issues it exposes."
 
         }
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:03'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2304
+        n_decomposition_exact_scenarios: 869
+        reasoning: The LLM estimated 2304 distinct scenarios based on the combinatorial
+          parameter space without fully verifying the boundaries and effective categories
+          as done by ImandraX. ImandraX provided a breakdown revealing only 869 distinct
+          scenarios after thoroughly evaluating the decision-making process, indicating
+          a significant discrepancy in scenario estimation.
+        score: -9.486835021563051
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: incorrect
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM failed to recognize the true precedence and branching structure
+          of the conditions set within the model. Specific combinations and effective
+          thresholds, such as no_show_count, were misunderstood. It did capture some
+          conditions but did not accurately reflect their priority or interaction.
+          The override logic was incompletely captured.
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found:
+        - no_show_count is exactly 3 leads to rejection
+        - the overlap of patient_age with insurance verification criteria
+        - dead zone scenarios influence waitlisting
+        total_edge_cases: 5
+        reasoning: The LLM identified a few edge cases, mainly focusing on no_show_count
+          and its boundaries. However, it missed recognizing the full extent of interdependencies
+          and the urgency of decisions dictated by overlapping conditions, which ImandraX
+          caught with a more thorough approach. ImandraX's full edge case assessment
+          was able to pinpoint broader and more nuanced scenarios.
+        edge_case_count: 3
+        score: 0.6
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - <3 for no_show_count
+        - ≤90 for days_in_advance
+        thresholds_from_decomp:
+        - 'no_show_count: [2, 3]'
+        - 'days_in_advance: [90]'
+        - 'time_slot: [720, 750]'
+        - 'daily_count: [18, 20]'
+        - 'patient_age: [65]'
+        - 'approval_score: [2, 3]'
+        reasoning: The LLM identified some thresholds, but it lacked the granularity
+          and completeness evident in the ImandraX decomposition. For instance, the
+          LLM did not provide the full set of critical thresholds that delineate decision-making,
+          particularly in context to the time_slot and daily_count.
+        score: 0.3333333333333333
+      outcome_precision:
+        score: 0.4
+        reasoning: The precision score reflects the lack of accuracy in the total
+          scenario count provided by the LLM. ImandraX's precisely calculated outcomes
+          contrasted sharply with the LLM's estimation, which assumed additional scenarios
+          that were not reflected in reality.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM's conclusions about the total number of scenarios were
+          misguided; it overestimated the complexity while missing the clearer mappings
+          provided by ImandraX regarding how patient parameters influence outcomes.
+      coverage_completeness:
+        score: 0.2
+        reasoning: Despite calculating a high number of scenarios, the LLM failed
+          to account for actual decision pathways and the nuances of the system's
+          logic. This led to an incomplete picture of the appointment scheduling decisions.
+      overall_summary: The LLM significantly overestimated the number of distinct
+        appointment scheduling scenarios due to a misunderstanding of condition precedence
+        and interactions. It failed to recognize effective boundaries, leading to
+        incorrect conclusions and a limited understanding of edge case behavior compared
+        to ImandraX's more precise and accurate evaluation.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 100
+        reasoning: The LLM estimates conditions under which Routine appointments with
+          Pending insurance can be approved to involve two main pathways, whereas
+          ImandraX states explicitly 100 scenarios. The LLM's reasoning includes pathways
+          that result in these 100 scenarios but fails to capture the full extent
+          of the scenarios by estimating only 2 pathways.
+        score: -5.614709844115208
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM captures the sequence of conditional checks correctly,
+          recognizing the flow through the quorum logic and the dependencies between
+          conditions. However, the recognition of the 'override logic' related to
+          how 'Pending' is treated in the context of a 'routine' appointment could
+          be more explicit.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Not satisfying all quorum conditions but still receiving approval via slot
+          availability and other conditions
+        total_edge_cases: 2
+        reasoning: The LLM identified the ability to approve despite 'Pending' insurance
+          but did not fully cover all potential edge conditions that would allow such
+          approvals.
+        edge_case_count: 1
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - provider_premium=True
+        - patient_age>=65
+        - slot_available=True
+        - pre_auth_ok
+        - no_show_ok
+        thresholds_from_decomp:
+        - provider_premium=True
+        - patient_age>=65
+        - slot_available=True
+        - pre_auth_ok
+        - no_show_ok
+        - days_in_advance<=90
+        reasoning: The LLM identifies several necessary thresholds for approval but
+          misses one specified threshold from decomposition regarding 'days_in_advance'.
+          There is a broader array of thresholds recognized in the decomposition.
+        score: 0.8333333333333334
+      outcome_precision:
+        score: 0.85
+        reasoning: The LLM articulates the conditions and potential outcomes with
+          high precision but has some ambiguity regarding the approval pathways, lowering
+          the overall precision slightly.
+      direction_accuracy:
+        score: 0.9
+        reasoning: The LLM concludes that Routine appointments with Pending insurance
+          can be approved, which aligns with the correct assessment of decision-making
+          processes in the model, justifying a high score.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM recognizes multiple scenarios but ultimately does not cover
+          the full landscape of decision pathways described by ImandraX, which details
+          specific examples leading to 100 scenarios.
+      overall_summary: The LLM provides a reasonable and mostly accurate reading of
+        how Routine appointments with Pending insurance can be approved, outlining
+        correct pathways and conditions. However, it lacks comprehensive coverage
+        in terms of all scenarios and potential edge cases, leading to a lower score
+        in decision coverage and an incomplete understanding of the insurance verification
+        rules.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM estimated that there are scenarios where emergency appointments
+          with 3 no-shows can be approved, citing details about the quorum conditions.
+          The actual structure decomposed shows only two distinct scenarios available
+          based on the combination of required conditions.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately captured the logical flow of the approval process,
+          identifying the roles of the emergency override and the quorum-based decision-making.
+          It understood that the no_show condition takes precedence and that satisfying
+          quorum conditions can lead to approval.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency appointments with 3+ no-shows can be approved
+        - Negative days_in_advance might lead to past appointments being booked
+        total_edge_cases: 2
+        reasoning: 'The LLM identified two key edge cases: emergency appointments
+          being approved despite having 3 no-shows and the peculiar behavior of negative
+          days_in_advance allowing past appointments to be booked. These nuances indicate
+          an understanding of rare or policy-violating scenarios.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - no_show_count < 3
+        - days_in_advance <= 90
+        thresholds_from_decomp:
+        - no_show_count < 3
+        - days_in_advance >= 0 && days_in_advance <= 90
+        reasoning: The LLM identified critical thresholds that affect decision-making,
+          notably that no_show_count must be below 3 to access the emergency override
+          path. However, it missed identifying the necessity for days_in_advance to
+          be non-negative in its answer.
+        score: 1.0
+      outcome_precision:
+        score: 0.75
+        reasoning: The LLM's conclusions about potential approval outcomes are mostly
+          accurate, but there are nuances around certain thresholds and conditions
+          that it did not fully capture.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concluded that emergency appointments with 3
+          or more no-shows can be approved through the quorum path, directly contradicting
+          the safety property.
+      coverage_completeness:
+        score: 0.8
+        reasoning: The LLM addressed a significant proportion of the decision scenarios
+          available but missed details around specific conditions that could further
+          clarify approval contexts.
+      overall_summary: The LLM provided a mostly accurate understanding of the healthcare
+        appointment scheduling logic, identifying key conditions and paths where safety
+        properties could be violated. However, there were minor oversights related
+        to decision boundaries.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:10'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3072
+        n_decomposition_exact_scenarios: 869
+        reasoning: The LLM estimated 3072 distinct scenarios by multiplying the effective
+          categories it identified for each parameter. The decomposition identifies
+          869 exact scenarios.
+        score: -10.105253779700883
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM's understanding of precedence is partial as it missed the
+          interaction between `no_show_count` and `emergency_override` which influences
+          the effective categories. Its branching structure understanding is partial
+          because it overestimates the number of scenarios, suggesting it doesn't
+          fully grasp how different conditions prune the state space. Short-circuit
+          behavior is partially understood because the LLM identified effective categories
+          for `time_slot` and `daily_count` related to the dead-zone, implying some
+          understanding of how combined conditions create a single logical unit. However,
+          this understanding is incomplete as it still results in an overestimation
+          of scenarios. Override logic for emergency overrides seems to be understood
+          correctly as it identified 2 categories for `no_show_count` which align
+          with the <3 for emergency override, and `patient_age` for pending insurance
+          with premium provider, which suggests it considered override logic properly.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - in_dead_zone
+        - not_in_dead_zone
+        - pending insurance with premium provider
+        total_edge_cases: 4
+        reasoning: 'The LLM identified ''in_dead_zone'' (720<=slot<=750 AND 18<=daily_count<=20)
+          and ''not_in_dead_zone'' as effective categories, which represents an edge
+          case for scheduling. It also identified ''patient_age: <65 vs >=65'' as
+          relevant only for ''pending insurance with premium provider'', which is
+          another edge case. However, it did not explicitly mention the edge cases
+          related to the quorum-based approval system (approval_score thresholds of
+          2 and 3).'
+        edge_case_count: 3
+        score: 0.75
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - no_show_count (<3 vs >=3)
+        - patient_age (<65 vs >=65)
+        - days_in_advance (<=90 vs >90)
+        - time_slot (720, 750)
+        - daily_count (18, 20)
+        thresholds_from_decomp:
+        - no_show_count (2, 3)
+        - days_in_advance (90)
+        - time_slot (720, 750)
+        - daily_count (18, 20)
+        - patient_age (65)
+        - approval_score (2, 3)
+        reasoning: The LLM correctly identified thresholds for `no_show_count`, `patient_age`,
+          `days_in_advance`, `time_slot`, and `daily_count`. However, it missed the
+          critical thresholds for `approval_score` (2 and 3) which are central to
+          the quorum-based approval system.
+        score: 0.8333333333333334
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM did not provide any numeric distributions or precise numeric
+          outcomes, only an estimated total scenario count. Therefore, the score for
+          outcome precision is 0.0.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's primary conclusion - the total number of distinct scenarios
+          - is significantly inaccurate (3072 vs 869). While it correctly identified
+          numerous contributing factors and their general impact on decision logic,
+          its numerical estimate is incorrect, rendering its direction accuracy in
+          this specific instance low.
+      coverage_completeness:
+        score: 0.7
+        reasoning: The LLM identified an exhaustive list of parameters and their relevant
+          categories, covering a significant portion of the input space. It considered
+          all logical conditions such as insurance status, no-show history, age, priority,
+          pre-authorization, scheduling dead zones, premium providers, and slot availability.
+          This results in wide coverage, indicating a thorough understanding of the
+          factors that influence the decision. However, its incorrect estimation of
+          the total number of scenarios (3072 vs 869) and the missing `approval_score`
+          thresholds suggest an incomplete understanding of how these factors interact
+          to prune the decision space. The score is 0.7 because while it identified
+          most of the inputs, its understanding of their interactions and the resulting
+          scenario count is incomplete.
+      overall_summary: The LLM demonstrated a strong ability to identify relevant
+        parameters and their distinct categories that influence scheduling decisions.
+        It correctly pinpointed several key thresholds and edge cases, such as the
+        'in_dead_zone' and the influence of 'patient_age' on 'pending insurance with
+        premium provider'. This suggests a good understanding of granular decision
+        logic, including override conditions. However, the LLM significantly overestimates
+        the total number of distinct decision scenarios, calculating 3072 compared
+        to the actual 869. This overestimation, along with the omission of the 'approval_score'
+        thresholds central to the quorum-based system, indicates a partial understanding
+        of how different conditions interact and prune the overall state space. While
+        its coverage of individual factors is good, its grasp of their combined effect
+        on the total number of unique scenarios and specific decision boundaries is
+        incomplete. The LLM also failed to provide any numeric distributions for the
+        outcomes.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 100
+        reasoning: The LLM identified two paths to approval but did not quantify the
+          number of scenarios for each path. The ImandraX answer stated precisely
+          100 scenarios.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM correctly identified the precedence of conditions and the
+          branching structure using the 'quorum logic' and 'emergency override path'.
+          It partially understood short-circuiting as it initially missed how 'insurance_ok=False'
+          could still lead to approval due to other conditions. The override logic
+          understanding is correct regarding the emergency path not being triggered
+          by routine priority.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - scheduling dead zone
+        - insurance=PENDING with provider_premium=True and age>=65
+        - minimum 3 of 5 quorum conditions
+        total_edge_cases: 3
+        reasoning: The LLM identified the key exception where 'Pending' insurance
+          can be approved (premium provider + age >= 65), the condition of 'not in
+          scheduling dead zone', and the quorum conditions for approval. It correctly
+          identified all explicit edge cases.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - age ",=", 65
+        - no_show_count ",<=", 2
+        - days_in_advance ",<=", 90
+        - quorum conditions greater than or equal to 3
+        thresholds_from_decomp:
+        - patient_age >= 65
+        - no_show_count <= 2
+        - days_in_advance <= 90
+        - quorum >= 3
+        reasoning: 'The LLM identified all numeric thresholds correctly: age >= 65,
+          no_show_count <= 2, days_in_advance <= 90, and the quorum condition (score
+          >= 3).'
+        score: 1.0
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM provided a precise set of conditions for approval after
+          a correction. The initial answer was less precise by not fully accounting
+          for the 'insurance_ok=False' path, leading to a slight reduction in precision.
+          After correction, the conditions are accurate, but the initial imprecision
+          reduces the score.
+      direction_accuracy:
+        score: 0.9
+        reasoning: The LLM correctly concluded that Routine appointments with Pending
+          insurance can be approved. Its initial set of conditions was slightly incomplete,
+          but the correction made the overall direction and conditions accurate. The
+          minor initial oversight prevents a perfect score.
+      coverage_completeness:
+        score: 0.85
+        reasoning: The LLM provided a good coverage of the conditions under which
+          a Routine and Pending appointment can be approved. It identified the main
+          path involving premium providers and senior patients, and after a correction,
+          also considered cases where 'insurance_ok' is false but other conditions
+          compensate. However, it didn't explicitly enumerate all possible combinations
+          within the quorum, leading to a score less than 1.0. It covered all the
+          significant decision scenarios that were highlighted in the ImandraX response.
+      overall_summary: The LLM demonstrated a strong understanding of the model's
+        logic, correctly identifying the core conditions for approval of routine appointments
+        with pending insurance. It accurately pinpointed critical decision boundaries
+        and edge cases. While there was a minor initial oversight in accounting for
+        all paths to approval, the LLM successfully self-corrected, demonstrating
+        robust control flow comprehension. The main area for improvement is in precise
+        quantification of scenarios, which the ImandraX answer provides. The LLM provided
+        a comprehensive qualitative explanation that aligned well with the decomposition.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: 'The LLM does not explicitly state the number of scenarios it considers.
+          However, it implicitly explores two main paths: the emergency override path
+          and the normal quorum-based approval path. The ImandraX answer implicitly
+          addresses the same two scenarios, but it is not a direct output like scenario
+          enumeration for other questions. Thus, the exact number is hard to compare
+          and unknown from LLM.'
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the `emergency_override` condition
+          (no_show_count < 3) takes precedence and, if not met, the request falls
+          through to the normal quorum-based logic. It also correctly describes the
+          branching structure between the emergency override and the normal quorum
+          path. The short-circuit behavior is understood as the LLM explains when
+          the `emergency_override` returns `False` and how that impacts the subsequent
+          evaluation. The override logic is correctly interpreted, as the LLM states
+          that the `emergency_override` path is not taken due to `no_show_count >=
+          3`, and the request then goes to the quorum-based approval.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Negative days_in_advance
+        total_edge_cases: 1
+        reasoning: The LLM explicitly highlights that 'days_in_advance <= 90' allows
+          for negative values, effectively booking appointments in the past. This
+          specific edge case (negative `days_in_advance`) is identified by both the
+          LLM and ImandraX. This is the only edge case mentioned in the ImandraX response.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - no_show_count < 3
+        - score >= 3
+        - no_show_count <= 2
+        - days_in_advance <= 90
+        thresholds_from_decomp:
+        - no_show_count < 3
+        - no_show_count <= 2
+        - quorum score >= 3
+        - days_in_advance <= 90
+        reasoning: 'The LLM correctly identifies all relevant numeric thresholds:
+          `no_show_count < 3` (for emergency override), `score >= 3` (for quorum approval),
+          `no_show_count <= 2` (for `no_show_ok`), and `days_in_advance <= 90` (for
+          `days_ok`). These match the thresholds extracted from the ImandraX decomposition.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'Both the LLM and ImandraX arrive at the same conclusion: Emergency
+          appointments with 3 or more no-shows CAN be approved through the quorum
+          path. Both provide consistent reasoning and example scenarios to support
+          this.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both the LLM and ImandraX provide a correct and consistent assessment
+          stating that the safety property 'Emergency appointments with 3+ no-shows
+          are never approved' does NOT hold. Both correctly identify that this is
+          due to the quorum approval path, not the emergency override path, and both
+          highlight this as a potential safety concern/bug.
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM covers all the conditions and paths that ImandraX does:
+          it considers both the `emergency_override` path and the `normal quorum-based
+          approval logic`. It identifies all the relevant conditions within the quorum
+          logic (`insurance_ok`, `slot_available`, `pre_auth_ok`, `no_show_ok`, `days_ok`)
+          and how their combination can lead to approval even with `no_show_count
+          >= 3`. The LLM provides a comprehensive explanation of how the approval
+          can occur, matching the depth and breadth of the ImandraX analysis.'
+      overall_summary: The LLM's answer is highly accurate and comprehensive, closely
+        aligning with the ImandraX decomposition. It correctly refutes the safety
+        property, identifies the underlying logic flaw (emergency override not applying
+        to the quorum path), and even catches the 'days_in_advance' edge case. Its
+        reasoning for control flow, decision boundaries, and overall outcome is excellent.
+        The main area for improvement is an explicit statement of explored scenarios
+        by the LLM.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:14'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3072
+        n_decomposition_exact_scenarios: 869
+        reasoning: 'The LLM explicitly states ''Total distinct abstract scenarios:
+          4 × 2 × 2 × 2 × 3 × 2 × 2 × 2 × 2 × 2 = 3,072'' in their reasoning, settling
+          on this number after an initial mention of 2,304. The ImandraX answer provides
+          the verified total of 869 scenarios from decomposition.'
+        score: -10.105253779700883
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: The LLM demonstrates partial understanding of condition precedence
+          by identifying key checks like insurance_acceptable, no_show_ok, and emergency_override,
+          but does not explicitly address the quorum-based approval_score [2,3] from
+          ImandraX, which likely integrates multiple conditions with scoring. Branching
+          structure is partially captured through equivalence classes for parameters
+          like Priority (3 values) and InsuranceStatus (4), but the combinatorial
+          multiplication overestimates regions, missing interactions or overrides
+          that reduce the space to 869. Short-circuit behavior is incorrectly handled
+          or ignored; the LLM does not discuss early exits or short-circuiting in
+          the logic (e.g., emergency overrides potentially bypassing other checks),
+          leading to an inflated count. Override logic is partially understood, as
+          they mention emergency_override eligibility based on no_show_count <3 and
+          Priority=EMERGENCY, but fail to integrate it fully with the approval quorum
+          system.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - no_show_count at 2/3 boundary
+        - days_in_advance at 90
+        - time_slot in 720-750 range
+        - daily_count 18-20 for dead zone
+        - patient_age at 65
+        total_edge_cases: 6
+        reasoning: 'The LLM identifies edge cases implicitly through effective categories:
+          no_show_count split at <3/≤2 (thresholds 2,3), days_in_advance ≤90 (threshold
+          90), dead zone as 720≤time_slot≤750 AND 18≤daily_count≤20 (thresholds 720,750,18,20),
+          and patient_age <65/≥65 (threshold 65). This covers 5 out of 6 key thresholds
+          from ImandraX. The missed edge case is around approval_score thresholds
+          [2,3], which the LLM does not mention, indicating incomplete detection of
+          quorum-based edges.'
+        edge_case_count: 5
+        score: 0.8333333333333334
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'no_show_count: 2,3'
+        - 'days_in_advance: 90'
+        - 'time_slot: 720,750'
+        - 'daily_count: 18,20'
+        - 'patient_age: 65'
+        thresholds_from_decomp:
+        - 'no_show_count: [2,3]'
+        - 'days_in_advance: [90]'
+        - 'time_slot: [720,750]'
+        - 'daily_count: [18,20]'
+        - 'patient_age: [65]'
+        - 'approval_score: [2,3]'
+        reasoning: 'The LLM correctly identifies most numeric thresholds based on
+          their equivalence class breakdowns: no_show boundaries at 2/3, days at 90,
+          dead zone slots 720/750 and daily 18/20, age at 65. However, they miss the
+          approval_score thresholds [2,3], which are central to the quorum-based approval
+          system per ImandraX, leading to incomplete clarity on decision boundaries.'
+        score: 0.8333333333333334
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides no specific numeric distributions for outcomes,
+          only stating that scenarios 'distribute across APPROVED, WAITLIST, and REJECTED'
+          without counts or percentages. In contrast, ImandraX gives precise breakdowns
+          (276 Approved, 401 WaitList, 192 Rejected). Thus, precision score is 0.0
+          as no quantitative outcome information is provided.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM's core conclusion overestimates the scenario count (3,072
+          vs. actual 869), indicating incorrect direction in scale, likely due to
+          treating parameters as independent without accounting for logic interactions,
+          overrides, and the quorum system. However, they correctly identify the three
+          outcome categories (APPROVED, WAITLIST, REJECTED) and note that many abstract
+          classes map to the same outcome, showing partial directional accuracy in
+          recognizing outcome variety and behavioral equivalence. The score reflects
+          this partial correctness but major quantitative error.
+      coverage_completeness:
+        score: 0.6
+        reasoning: Using the combinatorial coverage rubric, the LLM covers most input
+          parameters (InsuranceStatus, no_show_count, patient_age, pre_auth_provided,
+          Priority, days_in_advance, time_slot/daily_count dead zone, provider_premium,
+          slot_available, pre_auth_required), which align with ImandraX's thresholds
+          except for approval_score integration. However, their product-based estimation
+          (3,072) overcounts actual regions (869) by not capturing conditional dependencies,
+          overrides, and short-circuits that merge scenarios, achieving about 60%
+          effective coverage of distinct decision paths as inferred from parameter
+          inclusion.
+      overall_summary: '"The LLM answer shows good parameter identification and qualitative
+        insight into equivalence classes and outcomes but severely overestimates the
+        state space (3,072 vs. 869) due to missing the quorum-based approval_score
+        logic and interactions. Strengths include detecting most thresholds and edge
+        cases; weaknesses are in quantitative precision, control flow depth (especially
+        short-circuits and overrides), and coverage of integrated decision regions.
+        ImandraX provides verified, precise decomposition, highlighting the LLM''s
+        heuristic approach as useful for exploration but inaccurate for exact counts."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 100
+        reasoning: The LLM answer describes qualitative conditions for approval but
+          does not provide any explicit numerical estimate of the total number of
+          scenarios where Routine + Pending leads to Approved. In contrast, the ImandraX
+          answer explicitly states there are 100 such scenarios from decomposition.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          - Precedence of conditions: Correct, as the LLM accurately describes that
+          insurance_ok is evaluated via insurance_acceptable, which depends on provider_premium
+          and patient_age, and this feeds into the quorum score precedence over other
+          conditions.
+
+          - Branching structure: Correct, the LLM outlines the normal quorum path
+          for Routine (no emergency branch) and correctly branches on insurance_ok=True
+          vs False, requiring 3/5 total with slot_available=True for final approval.
+
+          - Short-circuit behavior: Correct, though not explicitly detailed, the LLM
+          implies no short-circuiting issues by following the full quorum evaluation
+          without assuming early exits; emergency override is correctly noted as not
+          applying.
+
+          - Override logic: Correct, explicitly states emergency_override not triggered
+          for Routine, and correctly handles the insurance exception as an override
+          via the multiplexer pattern equivalent.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Premium provider with senior patient (age >=65) allowing insurance_ok=True
+          despite Pending, needing only 2 more quorum conditions plus slot_available
+        - Non-premium/non-senior case where insurance_ok=False but at least 3 of the
+          other 4 conditions (including slot_available=True) are met to reach quorum
+          >=3
+        total_edge_cases: 2
+        reasoning: 'The LLM identifies two key edge cases: the exceptional insurance
+          acceptance for premium providers and seniors, and the compensatory case
+          where insurance fails but other conditions overcompensate to meet quorum.
+          The ImandraX highlights the multiplexer exception as the primary edge, with
+          100 scenarios likely encompassing variations of these; assuming decomposition
+          identifies these two main edge categories (exceptional insurance_ok and
+          full compensation without it), the LLM covers both.'
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - age >=65
+        - no_show_count <=2
+        - days_in_advance <=90
+        - quorum score >=3
+        - slot_available = True
+        - provider_premium = True
+        - pre_auth_ok (pre_auth_provided given pre_auth_required)
+        thresholds_from_decomp:
+        - age >=65
+        - no_show_count <=2
+        - days_in_advance <=90
+        - quorum score >=3 out of 5
+        - slot_available = True
+        - provider_premium = True
+        - pre_auth_ok (pre_auth_provided AND NOT pre_auth_required or similar logic)
+        reasoning: 'The LLM correctly identifies all major numeric and boolean thresholds:
+          age boundary at 65, no-show limit at 2, days limit at 90, the 3/5 quorum
+          threshold, slot_available requirement, provider_premium boolean, and mentions
+          pre_auth_ok without specifying sub-conditions. Decomposition (inferred from
+          ImandraX example) matches these, with possible nuance in pre_auth (e.g.,
+          provided when required), but LLM does not miss any core ones; no major misses.'
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides qualitative conditions but no precise numeric
+          distributions (e.g., no counts of scenarios or probabilities). It vaguely
+          implies variations (e.g., 'at least one more' condition) but lacks exact
+          quantification like ImandraX's 100 scenarios. Low score reflects absence
+          of numeric precision, though directionally accurate.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes 'Yes' with conditions, identifying
+          both the insurance exception path and the compensatory path without it,
+          aligning with ImandraX's affirmation of approval scenarios under the multiplexer
+          pattern for seniors/premium and implied broader quorum satisfaction. No
+          incorrect directions or contradictions.
+      coverage_completeness:
+        score: 0.8
+        reasoning: 'LLM covers the core decision scenarios: insurance_ok=True (via
+          premium+age>=65) needing slot_available +1 more, and insurance_ok=False
+          needing 3/4 others including slot_available. This captures the main branches
+          leading to the 100 approved scenarios in decomposition (variations in the
+          4 non-insurance conditions to meet quorum). Misses exhaustive enumeration
+          but proportionally covers ~80% of logical paths; rubric applied: proportion
+          of distinct condition combinations enabling approval.'
+      overall_summary: 'The LLM demonstrates strong qualitative understanding of control
+        flow and boundaries, correctly identifying approval paths for Routine+Pending
+        including the key exception, but falls short on quantitative precision and
+        scenario enumeration compared to ImandraX''s decomposed 100 scenarios. Strengths:
+        accurate direction and edge detection; weaknesses: no numeric estimates or
+        full coverage quantification.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 12
+        reasoning: The LLM answer does not provide any explicit estimation of the
+          total number of decision scenarios or regions in the state space. It qualitatively
+          discusses paths (e.g., override failure leading to quorum with 4 conditions)
+          but does not quantify the overall state space size, such as combinations
+          of insurance_status (multiple values), days_in_advance ranges, slot_available
+          (bool), etc. The ImandraX decomposition implies a more complex space with
+          at least 12 distinct regions based on thresholds like no_show_count thresholds,
+          days_in_advance bounds (including negative), priority types, quorum combinations,
+          and dead zone logic, but exact count is inferred from the counterexample
+          and bug exposure rather than stated.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct - LLM accurately describes the
+          emergency_override check happening first, before falling to quorum logic.
+          Branching structure: Correct - LLM captures the main branches: emergency_override
+          (if true, approve; else quorum with final slot_available check), and mentions
+          dead zone as a separate WAITLIST path but assumes not in dead zone for approval
+          scenarios. Short-circuit behavior: Partial - LLM does not explicitly discuss
+          any short-circuiting (e.g., if early conditions fail without evaluating
+          later ones), though the override acts as an early exit; it implies sequential
+          evaluation but doesn''t analyze potential optimizations or short-circuits
+          in quorum conditions. Override logic: Correct - LLM precisely explains that
+          emergency_override requires no_show_count < 3, failing for >=3, leading
+          to quorum.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Emergency priority with >=3 no-shows approved via quorum path despite override
+          failure
+        - Approval possible even if days_ok=False as long as 3/4 other conditions
+          met
+        - Dead zone (lunch hours) leading to WAITLIST instead of approval
+        total_edge_cases: 4
+        reasoning: 'LLM identifies key edge cases around the override failure and
+          quorum bypass for high no-show emergencies, including scenarios where one
+          condition (e.g., days_ok) fails but approval still occurs. It also notes
+          the dead zone as a limiting factor. However, it misses the critical edge
+          case of negative days_in_advance allowing past bookings (exposed by ImandraX
+          as a bug), and potentially other rare cases like extreme daily_count or
+          patient_age interactions if present in full decomp. Total edge cases inferred
+          as 4 from ImandraX: the quorum bypass, negative days, dead zone, and possibly
+          insurance/provider-specific edges.'
+        edge_case_count: 3
+        score: 0.75
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - no_show_count < 3 (for emergency_override)
+        - no_show_count <= 2 (for no_show_ok)
+        - quorum score >= 3 (out of 5)
+        - days_in_advance <= 90 (for days_ok)
+        thresholds_from_decomp:
+        - no_show_count < 3 (for emergency_override)
+        - no_show_count <= 2 (for no_show_ok)
+        - quorum score >= 3 (out of 5)
+        - days_in_advance <= 90 (for days_ok)
+        - days_in_advance >= 0 (lower bound for days_ok, missed as bug)
+        reasoning: LLM correctly identifies core thresholds related to no-shows, quorum,
+          and the upper bound for days_in_advance. It discusses how these enable approval
+          in the quorum path. However, it misses the implicit lower bound (days_in_advance
+          >= 0), which ImandraX exposes as a bug allowing negative values and past
+          appointments, a critical decision boundary in scheduling logic.
+        score: 0.8
+      outcome_precision:
+        score: 0.3
+        reasoning: LLM provides qualitative outcomes (e.g., APPROVED if 3/4 conditions
+          true) and a concrete example with score=4 or 3, but does not offer precise
+          numeric distributions (e.g., probability of approval across state space)
+          or enumerate all combinations. It implies possible approvals but lacks quantitative
+          precision like exact counts of approving scenarios out of total. ImandraX
+          gives a precise counterexample with exact parameter values and score=3/5,
+          highlighting the bug quantitatively.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'LLM correctly concludes that the safety property is violated:
+          Emergency appointments with >=3 no-shows CAN be approved via the quorum
+          path, matching ImandraX''s refutation and counterexample. Both identify
+          the override as insufficient to enforce the no-show guard across all paths,
+          exposing a potential design flaw.'
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'LLM covers the primary decision scenarios: override path failure
+          and quorum approval bypass, including examples where 3/4 conditions suffice.
+          This captures the core violation of the safety property. However, it incompletely
+          covers the full decomposition by missing the negative days_in_advance bug
+          (allowing past approvals) and potentially dead zone interactions in detail.
+          Rubric applied: proportion of key scenarios (override, quorum combos, bounds)
+          addressed vs. those verified in ImandraX counterexample and bug exposure;
+          LLM hits ~75% but overlooks the lower bound edge.'
+      overall_summary: The LLM demonstrates strong qualitative understanding of the
+        control flow and correctly identifies the safety property violation, reaching
+        the right directional conclusion without decomposition. It effectively reasons
+        through the override-quorum bypass, providing clear examples of approval scenarios.
+        However, it falls short in quantitative precision, state space estimation,
+        and detecting subtler edges like the negative days bug, leading to partial
+        coverage. Compared to ImandraX's verified decomposition, the LLM is insightful
+        but less exhaustive and rigorous, missing a real implementation flaw.

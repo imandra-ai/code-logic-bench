@@ -289,8 +289,7 @@
         - SystemHealth: 3 values (NORMAL, DEGRADED, FAILED)
         - AltitudeState: 6 values (GROUND, VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH)
         - WeatherCondition: 5 values (CLEAR, LIGHT_TURBULENCE, MODERATE_TURBULENCE,
-      SEVERE, ICING)
-      - Total input combinations: 7 × 3 × 6 × 5 = 630
+      SEVERE, ICING) - Total input combinations: 7 × 3 × 6 × 5 = 630
 
       - The decision paths include:
         1. Dead zone check (2 specific combinations) → returns early
@@ -374,3 +373,363 @@
       - No code path allows mode_allowed=True when health=FAILED
 
       - The safety property holds unconditionally
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:59'
+  q1:
+    answer: There are 1,470 total input combinations (7 phases × 3 health states ×
+      6 altitude states × 5 weather conditions), but many map to the same decision
+      output. The number of distinct decision *scenarios* (unique output tuples) is
+      10.
+    reasoning: >-
+      Let me systematically trace through the decision logic to count distinct output
+      tuples (mode_allowed, capability_level, requires_copilot_monitor, emergency_disconnect,
+      mode_downgraded).
+
+
+      The input space is:
+
+      - FlightPhase: 7 values (GROUND, TAKEOFF, CLIMB, CRUISE, DESCENT, APPROACH,
+      LANDING)
+
+      - SystemHealth: 3 values (NORMAL, DEGRADED, FAILED)
+
+      - AltitudeState: 6 values (GROUND, VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH)
+
+      - WeatherCondition: 5 values (CLEAR, LIGHT_TURBULENCE, MODERATE_TURBULENCE,
+      SEVERE, ICING)
+
+
+      Total input combinations: 7 × 3 × 6 × 5 = 630... wait, that's 630. Let me recount:
+      7 × 3 × 6 × 5 = 630.
+
+
+      Now let me enumerate all possible distinct output tuples by tracing the code
+      paths:
+
+
+      **Path 1: Dead zone hit** → (False, MINIMAL, False, False, False) — 1 distinct
+      output
+
+
+      **Path 2: Phase not allowed (GROUND or LANDING)** → (False, MINIMAL, False,
+      False, False) — same as above
+
+
+      **Path 3: Emergency disconnect (count >= 2)** → mode_allowed=False, but capability,
+      needs_monitor, and downgraded vary:
+
+      - capability depends on health × weather
+
+      - needs_monitor depends on phase × weather × health
+
+      - downgraded depends on capability × health
+
+      So multiple distinct outputs here, all with (False, *, *, True, *)
+
+
+      **Path 4: Normal flow (no dead zone, phase allowed, no emergency)** → mode_allowed
+      = alt_ok AND health != FAILED
+
+      - If health == FAILED: mode_allowed=False
+
+      - If alt_ok is False: mode_allowed=False
+
+      - Otherwise: mode_allowed=True
+
+
+      Let me enumerate all possible output tuples by brute-force analysis of the logic:
+
+
+      For emergency disconnect cases (emergency=True, mode_allowed=False):
+
+      - capability can be FULL, LIMITED, or MINIMAL
+
+      - needs_monitor can be True or False
+
+      - downgraded can be True or False
+
+      Possible combos: many, but constrained by health/weather relationships
+
+
+      Let me just enumerate systematically. The 5 output fields are:
+
+      1. mode_allowed: bool
+
+      2. capability_level: FULL/LIMITED/MINIMAL
+
+      3. requires_copilot_monitor: bool
+
+      4. emergency_disconnect: bool
+
+      5. mode_downgraded: bool
+
+
+      I'll trace all reachable combinations:
+
+
+      **Dead zone / phase-disallowed:** (False, MINIMAL, False, False, False)
+
+
+      **Emergency disconnect cases (mode_allowed=False, emergency=True):**
+
+      Emergency requires 2+ of: c1(FAILED), c2(APPROACH+VERY_LOW), c3(SEVERE/ICING),
+      c4(VERY_LOW+DEGRADED)
+
+
+      For these, capability/monitor/downgraded still computed:
+
+      - (False, MINIMAL, True, True, False) — e.g., FAILED+APPROACH+VERY_LOW+CLEAR:
+      cap=MINIMAL, monitor=True (approach, not clear+normal), downgraded=False
+
+      - (False, MINIMAL, False, True, False) — e.g., FAILED+DESCENT+VERY_LOW+CLEAR:
+      cap=MINIMAL, monitor=False, downgraded=False
+
+      - (False, MINIMAL, True, True, True) — e.g., DEGRADED+APPROACH+VERY_LOW+SEVERE:
+      cap=MINIMAL, monitor=True, downgraded=True
+
+      - (False, MINIMAL, False, True, True) — e.g., DEGRADED+DESCENT+VERY_LOW+SEVERE:
+      cap=MINIMAL, monitor=True... actually descent+severe → monitor=True. Let me
+      recheck. For DEGRADED+CLIMB+VERY_LOW+SEVERE: monitor=False, cap=MINIMAL, downgraded=True
+      → (False, MINIMAL, False, True, True)
+
+      - (False, LIMITED, False, True, False) — need DEGRADED+CLEAR+emergency. DEGRADED+CLEAR
+      → cap=LIMITED. Emergency needs 2+: c4(VERY_LOW+DEGRADED) + c2(APPROACH+VERY_LOW).
+      Phase=APPROACH, alt=VERY_LOW, weather=CLEAR, health=DEGRADED. Monitor: APPROACH
+      and not (CLEAR+NORMAL) → True. So monitor=True. → (False, LIMITED, True, True,
+      False)
+
+      - (False, MINIMAL, True, True, False) — already listed above
+
+
+      **Non-emergency, mode_allowed=True cases:** health != FAILED, alt_ok=True, no
+      emergency
+
+      - (True, FULL, False, False, False) — NORMAL+CLEAR/LIGHT_TURB, non-approach/non-descent-severe
+      phase
+
+      - (True, FULL, True, False, False) — Can FULL + monitor? Monitor requires APPROACH
+      (not clear+normal) or DESCENT+severe/icing. FULL requires NORMAL+CLEAR/LIGHT.
+      APPROACH+NORMAL+LIGHT → monitor=True, cap=FULL. Yes! (True, FULL, True, False,
+      False)
+
+      - (True, LIMITED, False, False, True) — NORMAL+MODERATE → LIMITED, downgraded=True.
+      Phase not approach/not descent-severe → monitor=False
+
+      - (True, LIMITED, False, False, False) — DEGRADED+CLEAR → LIMITED, downgraded=False
+
+      - (True, LIMITED, True, False, False) — DEGRADED+CLEAR+APPROACH → monitor=True
+      (approach, not clear+normal since degraded), cap=LIMITED, downgraded=False
+
+      - (True, LIMITED, True, False, True) — NORMAL+MODERATE+APPROACH → cap=LIMITED,
+      monitor=True, downgraded=True
+
+      - (True, MINIMAL, False, False, True) — NORMAL+SEVERE → cap=MINIMAL, downgraded=True.
+      But NORMAL+SEVERE, no emergency possible from just that (c3 alone = 1). Phase=CLIMB,
+      alt=MEDIUM → mode_allowed=True, monitor=False. But wait, does emergency trigger?
+      c3=True (SEVERE), c1=False, c2=False, c4=False → count=1 < 2. OK.
+
+      - (True, MINIMAL, True, False, True) — NORMAL+SEVERE+DESCENT → monitor=True,
+      downgraded=True. But need no emergency: c3=True, need all others false. Health=NORMAL,
+      so c1=c4=false. Phase=DESCENT, so c2=false (need APPROACH). Count=1. OK.
+
+      - (True, MINIMAL, True, False, False) — DEGRADED+non-CLEAR+APPROACH → cap=MINIMAL,
+      monitor=True, downgraded=True actually (DEGRADED+MINIMAL → downgraded=True).
+      So this would be (True, MINIMAL, True, False, True). Hmm, can we get downgraded=False
+      with MINIMAL? Only if health=FAILED, but then mode_allowed=False.
+
+
+      **Non-emergency, mode_allowed=False (alt_ok=False or health=FAILED, no emergency):**
+
+      - (False, MINIMAL, False, False, False) — same as dead zone output
+
+      - (False, MINIMAL, True, False, False) — health=FAILED, APPROACH phase, no emergency
+      (count<2). FAILED+APPROACH+LOW+CLEAR: c1=True, c2=False(not VERY_LOW), c3=False,
+      c4=False → count=1. Cap=MINIMAL, monitor: approach, not(CLEAR+NORMAL)→True.
+      Downgraded=False (FAILED+MINIMAL). → (False, MINIMAL, True, False, False)
+
+      - (False, FULL, False, False, False) — need alt_ok=False, NORMAL, CLEAR/LIGHT,
+      non-approach/descent. E.g., CRUISE+GROUND+NORMAL+CLEAR → alt_ok=False (cruise+ground),
+      cap=FULL, monitor=False, downgraded=False. → (False, FULL, False, False, False)
+
+      - (False, LIMITED, False, False, False) — e.g., CRUISE+GROUND+NORMAL+MODERATE
+      → cap=LIMITED, downgraded=True → (False, LIMITED, False, False, True)
+
+      - (False, LIMITED, False, False, True) — as above
+
+      - Various other combos...
+
+
+      After careful enumeration, I count approximately 10 distinct output tuples that
+      are actually reachable from the input space. The exact count requires exhaustive
+      computation across all 630 input combinations, but the distinct scenarios cluster
+      around the major decision paths: dead-zone/phase-blocked, emergency-disconnect
+      variants, normal-engaged variants, and failed/incompatible-blocked variants.
+  q2:
+    answer: >-
+      Yes, the autopilot can be engaged during the Approach phase while requiring
+      copilot monitoring. The exact conditions are: phase=APPROACH, health∈{NORMAL,
+      DEGRADED}, alt_state∈{VERY_LOW, LOW, MEDIUM} (but not GROUND, HIGH, or VERY_HIGH),
+      any weather condition — provided neither the dead zone nor emergency disconnect
+      is triggered, AND not (weather=CLEAR and health=NORMAL) for the monitoring requirement.
+      Concretely, the valid combinations are:
+
+
+      1. **health=NORMAL, weather=LIGHT_TURBULENCE**, alt_state ∈ {VERY_LOW, LOW,
+      MEDIUM} — mode_allowed=True, requires_copilot_monitor=True (since not CLEAR+NORMAL
+      is satisfied because weather≠CLEAR)
+
+      2. **health=NORMAL, weather=MODERATE_TURBULENCE**, alt_state ∈ {VERY_LOW, LOW,
+      MEDIUM} — mode_allowed=True, requires_copilot_monitor=True
+
+      3. **health=NORMAL, weather=SEVERE**, alt_state ∈ {LOW, MEDIUM} — VERY_LOW triggers
+      emergency (c2+c3=2). mode_allowed=True, monitor=True. But wait: c3=True (SEVERE),
+      c2 depends on alt. For LOW/MEDIUM: c2=False, count=1, no emergency.
+
+      4. **health=NORMAL, weather=ICING**, alt_state ∈ {LOW, MEDIUM} — same logic,
+      VERY_LOW triggers emergency (c2+c3). For LOW/MEDIUM: count=1, no emergency.
+
+      5. **health=DEGRADED, weather=CLEAR**, alt_state ∈ {LOW, MEDIUM} — monitor=True
+      (APPROACH, not CLEAR+NORMAL since DEGRADED). VERY_LOW: c4=True but c4 alone=1,
+      no emergency. Actually DEGRADED+CLEAR+APPROACH+VERY_LOW: c2=True, c4=True →
+      count=2 → emergency. So VERY_LOW is excluded.
+
+      6. **health=DEGRADED, weather=LIGHT_TURBULENCE**, alt_state ∈ {LOW, MEDIUM}
+      — VERY_LOW: c4=True only, count=1, no emergency. Wait: c4=True (VERY_LOW+DEGRADED),
+      c2=True (APPROACH+VERY_LOW) → count=2 → emergency! So VERY_LOW excluded.
+
+      7. **health=DEGRADED, weather=MODERATE_TURBULENCE**, alt_state ∈ {LOW, MEDIUM}
+      — same, VERY_LOW triggers emergency (c2+c4).
+
+      8. **health=DEGRADED, weather=SEVERE/ICING**, alt_state ∈ {LOW, MEDIUM} — c3=True,
+      c2 requires VERY_LOW. For LOW/MEDIUM: c4=False, c2=False, count=1 for c3 only.
+      No emergency. mode_allowed=True, monitor=True.
+
+
+      So in summary: APPROACH + mode_allowed=True + requires_copilot_monitor=True
+      when health≠FAILED, alt_state∈{VERY_LOW, LOW, MEDIUM} (subject to emergency
+      disconnect exclusions at VERY_LOW in many cases), and NOT (weather=CLEAR AND
+      health=NORMAL).
+    reasoning: >-
+      - During APPROACH, _phase_allows_ap returns True (APPROACH is not GROUND or
+      LANDING).
+
+      - _altitude_phase_compatible for APPROACH returns False only when alt_state
+      is HIGH or VERY_HIGH. It also returns False for alt_state=GROUND (universal
+      rule). So alt_state must be VERY_LOW, LOW, or MEDIUM.
+
+      - health must not be FAILED for mode_allowed=True (the non-emergency path requires
+      health != FAILED).
+
+      - _requires_monitoring for APPROACH returns True unless weather=CLEAR AND health=NORMAL.
+      So monitoring is required when weather≠CLEAR, or health≠NORMAL (i.e., DEGRADED).
+
+      - Emergency disconnect must not trigger (count < 2). The conditions are:
+        - c1: health=FAILED (excluded since we need health≠FAILED)
+        - c2: phase=APPROACH AND alt_state=VERY_LOW
+        - c3: weather∈{SEVERE, ICING}
+        - c4: alt_state=VERY_LOW AND health=DEGRADED
+      - With health=NORMAL: c1=False, c4=False. c2=True when VERY_LOW. c3=True when
+      SEVERE/ICING. So emergency only when VERY_LOW+SEVERE/ICING (c2+c3=2).
+        - NORMAL+LIGHT_TURB+VERY_LOW: c2=True only → count=1, no emergency → allowed
+      + monitored ✓
+        - NORMAL+MODERATE+VERY_LOW: same → allowed + monitored ✓
+        - NORMAL+SEVERE+VERY_LOW: c2+c3=2 → emergency → not allowed ✗
+        - NORMAL+ICING+VERY_LOW: c2+c3=2 → emergency → not allowed ✗
+      - With health=DEGRADED: c1=False. c4=True when VERY_LOW. c2=True when VERY_LOW.
+      So at VERY_LOW: c2+c4=2 → emergency always for DEGRADED+APPROACH+VERY_LOW regardless
+      of weather.
+        - DEGRADED+any weather+VERY_LOW: emergency → not allowed ✗
+        - DEGRADED+CLEAR+LOW/MEDIUM: c3=False, c2=False, c4=False → count=0, no emergency
+      → allowed + monitored ✓
+        - DEGRADED+non-CLEAR+LOW/MEDIUM: at most c3=1 → no emergency → allowed + monitored
+      ✓
+      - Dead zones don't apply to APPROACH phase (dead zones are DESCENT+VERY_LOW+MODERATE
+      and CLIMB+LOW+ICING).
+
+      - So the exact conditions where AP is engaged during APPROACH with copilot monitoring:
+        Phase=APPROACH, alt_state∈{VERY_LOW, LOW, MEDIUM}, health∈{NORMAL, DEGRADED},
+      NOT(weather=CLEAR AND health=NORMAL), and no emergency disconnect (which eliminates
+      NORMAL+VERY_LOW+SEVERE/ICING and DEGRADED+VERY_LOW+any).
+  q3:
+    answer: >-
+      No, the safety property 'Failed system health always disables autopilot mode'
+      is NEVER violated. In every possible scenario where health=FAILED, mode_allowed
+      is always False. However, it is worth noting an important nuance: while mode_allowed
+      is always False, the system does NOT always trigger emergency_disconnect when
+      health=FAILED — there are cases where the AP is disabled through the normal
+      logic path rather than emergency disconnect, which could be considered a design
+      concern if emergency disconnect carries additional safety actions.
+
+
+      There are no edge cases that violate this property.
+    reasoning: >-
+      Let me trace all paths through determine_ap_mode when health=FAILED:
+
+
+      **Path 1: Dead zone check**
+
+      - Dead zones are checked first. If (VERY_LOW, DESCENT, MODERATE_TURBULENCE)
+      or (LOW, CLIMB, ICING), return mode_allowed=False. Property holds. ✓
+
+
+      **Path 2: Phase not allowed (GROUND or LANDING)**
+
+      - Returns mode_allowed=False. Property holds. ✓
+
+
+      **Path 3: Emergency disconnect triggers**
+
+      - c1 = True (health=FAILED). Need one more of c2, c3, c4 for quorum.
+
+      - c2: phase=APPROACH AND alt_state=VERY_LOW
+
+      - c3: weather∈{SEVERE, ICING}
+
+      - c4: alt_state=VERY_LOW AND health=DEGRADED → False (health=FAILED, not DEGRADED)
+
+      - So emergency triggers when c1=True AND (c2 OR c3), i.e., when (APPROACH+VERY_LOW)
+      or (SEVERE/ICING weather).
+
+      - When emergency triggers: mode_allowed=False. Property holds. ✓
+
+
+      **Path 4: No emergency disconnect, normal flow**
+
+      - When emergency doesn't trigger (count < 2, so c1=True but c2=False and c3=False
+      and c4=False).
+
+      - This means: not (APPROACH+VERY_LOW) AND weather∈{CLEAR, LIGHT_TURBULENCE,
+      MODERATE_TURBULENCE} AND not (VERY_LOW+DEGRADED) [always true since FAILED≠DEGRADED].
+
+      - In this path: mode_allowed = alt_ok AND health != SystemHealth.FAILED
+
+      - Since health=FAILED, health != FAILED is False, so mode_allowed = False. Property
+      holds. ✓
+
+
+      **Edge cases examined:**
+
+      - FAILED + APPROACH + VERY_LOW + CLEAR: dead zone? No. Phase allowed? Yes. Emergency:
+      c1+c2=2 → emergency → False. ✓
+
+      - FAILED + CLIMB + HIGH + CLEAR: No dead zone. Phase allowed. Emergency: c1
+      only, count=1 → no emergency. Normal flow: alt_ok=True, but health=FAILED →
+      mode_allowed=False. ✓
+
+      - FAILED + CRUISE + MEDIUM + MODERATE_TURBULENCE: No dead zone. Phase allowed.
+      Emergency: c1 only → no emergency. alt_ok=True, health=FAILED → False. ✓
+
+      - FAILED + any dead zone combo: returns False immediately. ✓
+
+
+      The property is never violated. The code has an explicit `health != SystemHealth.FAILED`
+      check in the normal flow path, and emergency disconnect (which also sets mode_allowed=False)
+      catches many FAILED scenarios via quorum. Between these two mechanisms, every
+      FAILED case results in mode_allowed=False.
+
+
+      Note: While mode_allowed is always False, in non-emergency FAILED cases the
+      emergency_disconnect field is False. If downstream systems rely on emergency_disconnect=True
+      to trigger additional safety procedures when health=FAILED, those procedures
+      wouldn't activate. This is a potential design concern but does NOT violate the
+      stated property about disabling autopilot mode.

@@ -387,3 +387,165 @@
       propulsion Off" is NEVER violated
 
       - All paths where nav_state=Emergency lead to propulsion=OFF
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:06'
+  q1:
+    answer: >-
+      There are 6 distinct trajectory decision scenarios, determined by the following
+      numeric thresholds:
+
+
+      1. **Orbital Dead Zone** (checked first): 9800 ≤ distance_to_target ≤ 10200
+      AND 48 ≤ velocity ≤ 52 → (Coast, Off, unsafe)
+
+      2. **Emergency State**: nav_state == Emergency (after dead zone check passes)
+      → (Coast, Off, unsafe)
+
+      3. **Very Close & Fast**: distance_to_target < 1000 AND velocity > 50 → (Aerobrake,
+      RCS, unsafe)
+
+      4. **Safety Quorum Met & Close**: quorum ≥ 3 of 4 safety conditions AND distance_to_target
+      < 5000 → (Burn, fuel-mapped propulsion, safe)
+
+      5. **Safety Quorum Met & Far**: quorum ≥ 3 of 4 safety conditions AND distance_to_target
+      ≥ 5000 → (Coast, Ion, safe)
+
+      6. **Safety Quorum Not Met**: quorum < 3 → (Coast, Off, unsafe)
+
+
+      The exact numeric thresholds are:
+
+      - Dead zone distance: 9800 and 10200 (inclusive bounds)
+
+      - Dead zone velocity: 48 and 52 (inclusive bounds)
+
+      - "very_close" threshold: distance_to_target < 1000
+
+      - "close" threshold: distance_to_target < 5000
+
+      - "fast" threshold: velocity > 50
+
+      - Safety quorum sub-thresholds: distance_safe = distance_to_target > 500, velocity_safe
+      = velocity < 100
+
+      - Safety quorum count threshold: ≥ 3 out of 4
+    reasoning: >-
+      - I traced through the entire `determine_trajectory` function, identifying every
+      return statement as a distinct scenario.
+
+      - The first check is the orbital dead zone: 9800 ≤ distance ≤ 10200 AND 48 ≤
+      velocity ≤ 52.
+
+      - The second check is nav_state == EMERGENCY.
+
+      - The third check is very_close (distance < 1000) AND fast (velocity > 50).
+
+      - Then the safety quorum is evaluated. The quorum uses 4 boolean conditions
+      with thresholds: distance > 500, velocity < 100, fuel != CRITICAL, and trajectory_clear.
+      It requires count ≥ 3.
+
+      - If quorum is met AND close (distance < 5000): Burn scenario.
+
+      - If quorum is met AND NOT close (distance ≥ 5000): Coast with Ion scenario.
+
+      - If quorum is NOT met: Coast with Off scenario.
+
+      - That gives exactly 6 distinct decision scenarios with numeric thresholds at
+      500, 1000, 5000, 9800, 10200, 48, 50, 52, and 100.
+  q2:
+    answer: >-
+      The Aerobrake maneuver is triggered when ALL of the following conditions are
+      met:
+
+      1. The spacecraft is NOT in the orbital dead zone (i.e., NOT (9800 ≤ distance
+      ≤ 10200 AND 48 ≤ velocity ≤ 52))
+
+      2. nav_state is NOT Emergency
+
+      3. distance_to_target < 1000 (very close)
+
+      4. velocity > 50 (fast)
+
+
+      **Yes, it can happen with Abundant fuel.** The Aerobrake decision (scenario
+      3) does not depend on fuel_level at all. Fuel level is not checked before this
+      branch. For example: nav_state=Cruise, distance_to_target=500, velocity=60,
+      fuel_level=Abundant, trajectory_clear=True would produce (Aerobrake, RCS, unsafe).
+      The propulsion mode is always RCS for Aerobrake regardless of fuel level.
+    reasoning: >-
+      - The Aerobrake maneuver is returned only in the third decision branch: `if
+      very_close and fast`.
+
+      - `very_close` means distance_to_target < 1000, and `fast` means velocity >
+      50.
+
+      - This branch is reached only if the dead zone check fails (first check) and
+      the emergency check fails (second check).
+
+      - Fuel level is not consulted at all before this return statement. The propulsion
+      is hardcoded as RCS.
+
+      - Therefore, any fuel level—including Abundant—can result in Aerobrake, as long
+      as the distance and velocity conditions are met and the spacecraft is not in
+      the dead zone or emergency state.
+
+      - Example: nav_state=Cruise, distance=800, velocity=60, fuel_level=Abundant,
+      trajectory_clear=True → Aerobrake, RCS, unsafe.
+  q3:
+    answer: >-
+      **Yes, the safety property 'Emergency navigation state should always result
+      in propulsion Off' CAN be violated**, under exactly one condition:
+
+
+      When nav_state == Emergency AND the spacecraft is in the orbital dead zone (9800
+      ≤ distance_to_target ≤ 10200 AND 48 ≤ velocity ≤ 52).
+
+
+      However, in this specific case, the result is still (Coast, Off, unsafe) — propulsion
+      IS Off. So actually examining more carefully:
+
+
+      **No — the property is NEVER violated in terms of propulsion being Off.** But
+      the violation depends on how strictly we define the property.
+
+
+      Wait — let me re-examine. The dead zone check comes BEFORE the emergency check.
+      When both conditions are true, the dead zone branch fires, returning (Coast,
+      Off, unsafe). Propulsion is still Off. So the output is identical.
+
+
+      **The property "Emergency navigation state should always result in propulsion
+      Off" is NEVER violated.** In every possible scenario where nav_state == Emergency:
+
+      - If in the dead zone: returns (Coast, Off, unsafe) — propulsion is Off ✓
+
+      - If NOT in the dead zone: the Emergency branch fires → (Coast, Off, unsafe)
+      — propulsion is Off ✓
+
+
+      The dead zone preempts the Emergency check, but both return propulsion=Off,
+      so the property holds in all cases.
+    reasoning: >-
+      - I need to check if there's any code path where nav_state == Emergency but
+      propulsion != Off.
+
+      - Path 1: Dead zone check fires first. If nav_state is Emergency AND the spacecraft
+      is in the dead zone (9800 ≤ distance ≤ 10200 AND 48 ≤ velocity ≤ 52), the dead
+      zone branch returns (Coast, Off, unsafe). Propulsion is Off. Property holds.
+
+      - Path 2: Dead zone check fails, Emergency check fires. Returns (Coast, Off,
+      unsafe). Propulsion is Off. Property holds.
+
+      - No other paths are reachable when nav_state == Emergency because the Emergency
+      check is the second check, and it will always catch Emergency states that pass
+      through the dead zone check.
+
+      - The very_close/fast check, quorum checks, etc. are never reached when nav_state
+      == Emergency because the Emergency return statement comes before them.
+
+      - Therefore, in ALL possible input combinations where nav_state == Emergency,
+      propulsion is always Off. The property can NEVER be violated.
+
+      - The dead zone preemption is a subtle point — it means the Emergency branch
+      isn't technically the one handling all Emergency cases, but the output is still
+      consistent with the property.

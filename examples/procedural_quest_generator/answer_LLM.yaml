@@ -438,3 +438,197 @@
       if not in overflow zone
 
       - For PUZZLE_QUEST: need level≥8 AND not in overflow zone to get HIDDEN_QUESTLINE
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:22'
+  q1:
+    answer: >-
+      There are 7 distinct quest availability scenarios for RivalFaction quests, determined
+      by the following thresholds:
+
+
+      1. **PERMANENTLY_BLOCKED** (Reputation Overflow Dead Zone): player_reputation
+      in [85,95] AND player_level in [4,6] AND completed_faction_quests in [8,12].
+      This check happens FIRST and blocks everything regardless of other factors.
+
+
+      2. **TEMPORARILY_LOCKED** (Low reputation/quests): player_reputation < 80 OR
+      completed_faction_quests < 5 (and not in the overflow dead zone).
+
+
+      3. **PERMANENTLY_BLOCKED** (Warrior class block): player_reputation >= 80 AND
+      completed_faction_quests >= 5 AND player_class == WARRIOR (and not in overflow
+      dead zone).
+
+
+      4. **HIDDEN_QUESTLINE** (Rogue + specific quest types): player_reputation >=
+      80 AND completed_faction_quests >= 5 AND player_class == ROGUE AND quest_type
+      in {MAIN_STORY, SIDE_QUEST}.
+
+
+      5. **TEMPORARILY_LOCKED** (Rogue + other quest types): player_reputation >=
+      80 AND completed_faction_quests >= 5 AND player_class == ROGUE AND quest_type
+      NOT in {MAIN_STORY, SIDE_QUEST}. This falls through: for COMBAT_ENCOUNTER it
+      returns TEMPORARILY_LOCKED; for FETCH_QUEST/PUZZLE_QUEST Rogue is not WARRIOR,
+      the Rogue-specific condition fails, then it falls to the Mage/Cleric branch
+      which applies to all non-Warrior/non-Rogue classes — but wait, Rogue IS caught:
+      the elif checks player_class == ROGUE with quest_type condition. If that fails,
+      it falls to the next elif (quest_type != COMBAT_ENCOUNTER) which catches FETCH_QUEST
+      and PUZZLE_QUEST → CONDITIONAL_UNLOCK. For COMBAT_ENCOUNTER → TEMPORARILY_LOCKED.
+
+         Corrected scenarios for Rogue:
+         - 4a. Rogue + MAIN_STORY or SIDE_QUEST → HIDDEN_QUESTLINE
+         - 4b. Rogue + FETCH_QUEST or PUZZLE_QUEST → CONDITIONAL_UNLOCK (falls through
+      to the non-combat check)
+         - 4c. Rogue + COMBAT_ENCOUNTER → TEMPORARILY_LOCKED
+
+      6. **CONDITIONAL_UNLOCK** (Mage/Cleric + non-combat): player_reputation >= 80
+      AND completed_faction_quests >= 5 AND player_class in {MAGE, CLERIC} AND quest_type
+      != COMBAT_ENCOUNTER. This then requires player_gold >= quest_difficulty * 50
+      to remain CONDITIONAL_UNLOCK; otherwise downgrades to TEMPORARILY_LOCKED.
+
+
+      7. **TEMPORARILY_LOCKED** (Mage/Cleric + combat): player_reputation >= 80 AND
+      completed_faction_quests >= 5 AND player_class in {MAGE, CLERIC} AND quest_type
+      == COMBAT_ENCOUNTER.
+
+
+      Key numeric thresholds: reputation >= 80, completed_faction_quests >= 5, reputation
+      overflow zone [85-95] with level [4-6] and quests [8-12], and gold >= difficulty*50
+      for conditional unlock confirmation.
+    reasoning: >-
+      - First, the reputation overflow dead zone is checked: reputation in [85,95],
+      level in [4,6], completed_faction_quests in [8,12] → PERMANENTLY_BLOCKED.
+
+      - If not in the dead zone, _apply_faction_override is called for RIVAL_FACTION.
+
+      - The primary branch splits on: player_reputation >= 80 AND completed_faction_quests
+      >= 5.
+
+      - If that condition fails → TEMPORARILY_LOCKED (scenario 2).
+
+      - If that condition passes, sub-branches by player_class:
+        - WARRIOR → PERMANENTLY_BLOCKED (scenario 3).
+        - ROGUE with MAIN_STORY or SIDE_QUEST → HIDDEN_QUESTLINE (scenario 4a). This
+      short-circuits in the main function.
+        - ROGUE with other quest types: the Rogue-specific elif fails, falls through
+      to the next elif checking quest_type != COMBAT_ENCOUNTER. So ROGUE+FETCH_QUEST
+      or ROGUE+PUZZLE_QUEST → CONDITIONAL_UNLOCK (scenario 4b, subject to gold check).
+      ROGUE+COMBAT_ENCOUNTER → TEMPORARILY_LOCKED (scenario 4c).
+        - For MAGE/CLERIC (any non-Warrior, non-Rogue): quest_type != COMBAT_ENCOUNTER
+      → CONDITIONAL_UNLOCK (scenario 6, subject to gold check). COMBAT_ENCOUNTER →
+      TEMPORARILY_LOCKED (scenario 7).
+      - CONDITIONAL_UNLOCK results then go through the gold check: player_gold >=
+      quest_difficulty * 50 confirms CONDITIONAL_UNLOCK, otherwise degrades to TEMPORARILY_LOCKED.
+
+      - Counting distinct terminal outcomes: PERMANENTLY_BLOCKED (dead zone), TEMPORARILY_LOCKED
+      (low rep/quests), PERMANENTLY_BLOCKED (warrior), HIDDEN_QUESTLINE (rogue+story/side),
+      CONDITIONAL_UNLOCK (various non-combat, with sufficient gold), TEMPORARILY_LOCKED
+      (various combat or insufficient gold), giving approximately 7 distinguishable
+      scenario paths.
+  q2:
+    answer: >-
+      No, HostileEmpire can NEVER offer FetchQuests with a positive availability result
+      (FullyAvailable, ConditionalUnlock, or HiddenQuestline). FetchQuests from HostileEmpire
+      ALWAYS result in PERMANENTLY_BLOCKED.
+
+
+      There are exactly two paths, and both lead to PERMANENTLY_BLOCKED:
+
+
+      1. If completed_faction_quests >= 10 AND player_reputation >= 90: The code explicitly
+      checks `if quest_type == QuestType.FETCH_QUEST: return PERMANENTLY_BLOCKED`.
+      FetchQuests are "seen as beneath them."
+
+
+      2. If completed_faction_quests < 10 OR player_reputation < 90: The else branch
+      returns PERMANENTLY_BLOCKED for all quest types.
+
+
+      The only additional consideration is the reputation overflow dead zone (reputation
+      [85-95], level [4-6], quests [8-12]), which is checked even BEFORE the faction
+      override — but this also returns PERMANENTLY_BLOCKED, so it doesn't help.
+
+
+      Therefore, under NO conditions can a HostileEmpire FetchQuest result in anything
+      other than PERMANENTLY_BLOCKED.
+    reasoning: >-
+      - In _apply_faction_override for HOSTILE_EMPIRE: the first branch checks completed_faction_quests
+      >= 10 AND player_reputation >= 90. Within that branch, FetchQuest is explicitly
+      permanently blocked.
+
+      - The else branch (not meeting the 10 quests + 90 reputation threshold) permanently
+      blocks ALL quest types.
+
+      - Before faction override is even checked, the reputation overflow dead zone
+      check can trigger, but that also returns PERMANENTLY_BLOCKED.
+
+      - There is no code path in the entire function that can return FullyAvailable,
+      ConditionalUnlock, or HiddenQuestline for a HostileEmpire FetchQuest.
+
+      - The faction override result of PERMANENTLY_BLOCKED short-circuits in the main
+      function, so no subsequent quorum or difficulty checks matter.
+  q3:
+    answer: >-
+      No, it does NOT always result in HiddenQuestline. There are two factors that
+      can prevent it:
+
+
+      **Factor 1: Reputation Overflow Dead Zone (can prevent HiddenQuestline)**
+
+      If the player's reputation is in [85-95] AND player_level is in [4-6] AND completed_faction_quests
+      is in [8-12], the function returns PERMANENTLY_BLOCKED before the faction override
+      logic is ever reached. Since the question specifies reputation=90 and completed_faction_quests≥10,
+      this dead zone CAN trigger when:
+
+      - player_level is 4, 5, or 6, AND
+
+      - completed_faction_quests is 10, 11, or 12
+
+
+      For example: reputation=90, level=5, completed_faction_quests=10 → PERMANENTLY_BLOCKED
+      (not HiddenQuestline).
+
+
+      **Factor 2: PuzzleQuest with low player_level (can prevent HiddenQuestline)**
+
+      Even if the dead zone doesn't trigger, for quest_type == PUZZLE_QUEST specifically,
+      if player_level < 8, the faction override returns TEMPORARILY_LOCKED instead
+      of HiddenQuestline.
+
+
+      For example: reputation=90, level=7, completed_faction_quests=15, quest_type=PUZZLE_QUEST
+      → TEMPORARILY_LOCKED.
+
+
+      **Summary of when HiddenQuestline IS guaranteed (rep=90, quests≥10, non-FetchQuest):**
+
+      - Must NOT be in the overflow dead zone (i.e., if quests are in [10-12], level
+      must NOT be in [4-6]; if quests are ≥13, any level is fine since quest count
+      is outside [8-12])
+
+      - If quest_type is PUZZLE_QUEST, player_level must be ≥ 8
+
+      - For MAIN_STORY, SIDE_QUEST, and COMBAT_ENCOUNTER (non-Fetch, non-Puzzle),
+      only the dead zone check can block it
+    reasoning: >-
+      - The main function checks _in_reputation_overflow_zone BEFORE _apply_faction_override.
+
+      - _in_reputation_overflow_zone returns True when: 85 <= player_reputation <=
+      95 AND 4 <= player_level <= 6 AND 8 <= completed_faction_quests <= 12.
+
+      - With reputation=90 (which is in [85,95]) and completed_faction_quests=10 (which
+      is in [8,12]), if player_level is 4, 5, or 6, the dead zone triggers and returns
+      PERMANENTLY_BLOCKED.
+
+      - Even if the dead zone doesn't trigger, _apply_faction_override for HOSTILE_EMPIRE
+      with completed_faction_quests >= 10 and reputation >= 90 has a special case:
+      PUZZLE_QUEST with player_level < 8 returns TEMPORARILY_LOCKED.
+
+      - For FetchQuest, it returns PERMANENTLY_BLOCKED (but the question says non-FetchQuest
+      types).
+
+      - For all other quest types (MAIN_STORY, SIDE_QUEST, COMBAT_ENCOUNTER) that
+      pass the dead zone check, HiddenQuestline is returned.
+
+      - So the answer is: No, HiddenQuestline is NOT guaranteed. The reputation overflow
+      dead zone and the PuzzleQuest level check can both prevent it.

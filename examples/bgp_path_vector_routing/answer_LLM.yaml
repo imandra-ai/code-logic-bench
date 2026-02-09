@@ -302,3 +302,171 @@
 
       - The dead zone check happens before any other comparison (emergency, local_pref,
       AS path, origin, MED), so no other attribute can override it
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:03'
+  q1:
+    answer: >-
+      There are 7 distinct route selection scenarios in the BGP decision process,
+      and 1 of these involves MED comparison.
+
+
+      The 7 scenarios are:
+
+      1. Both routes invalid → TIE
+
+      2. Only Route 1 invalid → ROUTE2
+
+      3. Only Route 2 invalid → ROUTE1
+
+      4. Emergency override differentiates (one route has emergency with MED < 100,
+      the other doesn't) → winner selected
+
+      5. Local preference comparison (higher wins) → winner selected
+
+      6. AS path length comparison (shorter wins) → winner selected
+
+      7. Origin type comparison (IGP > EGP > INCOMPLETE) → winner selected
+
+      After all of the above tie, there is a conditional step:
+
+      8. MED comparison (if compare_med is true based on mode/same_as) → winner selected
+      or TIE
+
+      9. Final fallback → TIE
+
+
+      Counting the decision *stages* that can produce a result: validity check (3
+      outcomes), emergency override (1 stage), local_pref (1 stage), AS path (1 stage),
+      origin (1 stage), MED (1 stage), and final TIE — totaling 7 distinct decision
+      points. Of these, exactly 1 involves MED comparison.
+    reasoning: >-
+      - The function has a sequential decision process with multiple stages, each
+      of which can produce a final result.
+
+      - Stage 0 (Validity): Checks dead zones, local_pref >= 50, as_path <= 255. Three
+      outcomes: both invalid (TIE), only r1 invalid (ROUTE2), only r2 invalid (ROUTE1).
+      This is 1 decision point with 3 branches.
+
+      - Stage 1 (Emergency Override): If one route has emergency=True and MED < 100
+      while the other doesn't, that route wins. This is 1 decision point.
+
+      - Stage 2 (Local Preference): Higher local_pref wins. 1 decision point.
+
+      - Stage 3 (AS Path Length): Shorter AS path wins. 1 decision point.
+
+      - Stage 4 (Origin Type): Lower origin integer wins (IGP=0 < EGP=1 < INCOMPLETE=2).
+      1 decision point.
+
+      - Stage 5 (MED Comparison): Conditional on med_mode and same_as. If comparison
+      happens, lower MED wins. 1 decision point.
+
+      - Stage 6 (Final Fallback): TIE. 1 decision point.
+
+      - Counting distinct decision stages/scenarios: 7 decision points total.
+
+      - Only Stage 5 (MED comparison) involves MED comparison in the traditional BGP
+      sense. (Note: MED is also used in the emergency override condition and dead
+      zone check, but those are not "MED comparison" in the BGP best-path selection
+      sense.)
+
+      - So 1 out of 7 involves MED comparison.
+  q2:
+    answer: >-
+      Yes, a route with lower local_pref can beat a route with higher local_pref under
+      two conditions:
+
+
+      **Condition 1: The higher local_pref route is invalid.**
+
+      - The higher local_pref route falls in the dead zone (AS path 250–254 AND MED
+      95–105), OR
+
+      - The higher local_pref route has local_pref < 50, OR
+
+      - The higher local_pref route has as_path > 255.
+
+      In any of these cases, the lower local_pref route wins by default (assuming
+      it is itself valid).
+
+
+      **Condition 2: Emergency override.**
+
+      If the lower local_pref route has emergency=True AND its MED < 100, while the
+      higher local_pref route either has emergency=False OR has MED >= 100, then the
+      lower local_pref route wins via the emergency override, which is checked BEFORE
+      local preference comparison. Both routes must be valid for this path to apply.
+
+
+      Example: Route 1 has local_pref=100, emergency=True, MED=50. Route 2 has local_pref=200,
+      emergency=False, MED=50. Route 1 wins despite lower local_pref.
+    reasoning: >-
+      - The code checks validity first, then emergency override, and ONLY THEN compares
+      local_pref.
+
+      - A route with higher local_pref can be invalidated if: (a) its local_pref is
+      actually < 50 (but then it wouldn't truly be "higher" in a meaningful range...
+      though technically local_pref=49 > local_pref=48 but both invalid), (b) its
+      as_path > 255, or (c) it falls in the dead zone (as_path 250-254 and med 95-105).
+
+      - More interestingly, the emergency override is checked before local_pref. If
+      Route 1 has emergency=True and MED < 100, it gets the emergency flag. If Route
+      2 has higher local_pref but does NOT have the emergency flag (either emergency=False
+      or MED >= 100), Route 1 wins despite lower local_pref.
+
+      - This is a deliberate design pattern: emergency override trumps normal BGP
+      selection order.
+
+      - Both routes must be valid (local_pref >= 50, as_path <= 255, not in dead zone)
+      for this path to be reached.
+  q3:
+    answer: >-
+      No, routes in the dead zone (AS path 250–254 with MED 95–105) can NEVER be selected
+      as the best route.
+
+
+      Dead zone routes are marked as invalid (`r1_dead` or `r2_dead` becomes True),
+      which causes `r1_valid` or `r2_valid` to be False. The validity check happens
+      at the very beginning of the function, before any selection logic. An invalid
+      route can never win:
+
+
+      - If both routes are in the dead zone (both invalid), the result is TIE (neither
+      is selected as best).
+
+      - If only the dead-zone route is invalid while the other is valid, the valid
+      route wins.
+
+      - If both are invalid for any combination of reasons, TIE is returned.
+
+
+      There is no code path that allows an invalid route to be returned as ROUTE1
+      or ROUTE2 as the winning route. The dead zone check is absolute and cannot be
+      overridden by emergency flags, high local preference, short AS paths, or any
+      other attribute.
+    reasoning: >-
+      - The `_in_dead_zone` function returns True when 250 <= as_path <= 254 AND 95
+      <= med <= 105.
+
+      - In `select_best_route`, dead zone status is computed first: `r1_dead = _in_dead_zone(r1_as_path,
+      r1_med)`.
+
+      - Validity is then: `r1_valid = r1_local_pref >= 50 and r1_as_path <= 255 and
+      not r1_dead`.
+
+      - If r1_dead is True, r1_valid is False regardless of other attributes.
+
+      - The validity check is the FIRST decision point. If a route is not valid, it
+      cannot proceed to any subsequent selection stage.
+
+      - If both routes are invalid → TIE (neither selected as best).
+
+      - If one route is invalid and the other is valid → the valid route wins.
+
+      - A dead zone route is always invalid, so it can never be the selected best
+      route.
+
+      - Emergency override, local_pref, AS path, origin, and MED comparisons are all
+      only reached after both routes pass validity. A dead zone route never passes
+      validity.
+
+      - Therefore, dead zone routes can never be selected as the best route.

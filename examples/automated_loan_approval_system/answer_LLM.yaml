@@ -515,3 +515,184 @@
 
       • No external state or callbacks that could alter the decision flow exist in
       this implementation
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:21'
+  q1:
+    answer: >-
+      There are 5 distinct approval scenarios (decision classifications), determined
+      by the following exact numeric thresholds:
+
+
+      1. **INVALID_APPLICATION**: Triggered when any of these hold:
+         - credit_score < 300 or credit_score > 850
+         - debt_to_income < 0 or debt_to_income > 100
+         - age < 18 or age > 120
+         - "Dead zone": 580 <= credit_score <= 620 AND 43 <= debt_to_income <= 47
+      AND 72 <= age <= 74
+
+      2. **MANUAL_REVIEW_REQUIRED**: Triggered when:
+         - risk_level >= 3 (i.e., risk_score > 70), OR
+         - loan_amount > 500,000, OR
+         - has_bankruptcy (hardcoded False, so never triggered), OR
+         - debt_to_income > 45
+
+         Risk score thresholds: risk_score = (max(0, 800 - credit_score) // 10) +
+      (max(0, debt_to_income - 30) // 2) + employment_component (UNEMPLOYED=50, SELF_EMPLOYED=20,
+      EMPLOYED=0). Risk levels: 0-20=Low, 21-40=Medium, 41-70=High, >70=Extreme.
+
+      3. **AUTO_REJECTED**: Triggered when (after passing validity and manual review
+      checks):
+         - age < 18 or age > 75
+         - credit_score < 500
+         - monthly_income < 2000 (hardcoded to 5000, so never triggered)
+         - debt_to_income > 50 (but >45 already caught by manual review)
+         - loan_amount <= 0
+         - loan_amount exceeds type limit: PERSONAL > 100,000; AUTO > 150,000; MORTGAGE
+      > 2,000,000; BUSINESS > 1,000,000
+
+      4. **CONDITIONAL_APPROVAL**: Triggered when (after passing all prior checks):
+         - debt_to_income > 40, OR
+         - employment_status == SELF_EMPLOYED
+
+      5. **AUTO_APPROVED**: Triggered when all prior checks pass and no conditions
+      are needed (debt_to_income <= 40 AND employment_status != SELF_EMPLOYED).
+    reasoning: >-
+      - The function has 5 distinct return points, each corresponding to a DecisionClassification
+      enum value.
+
+      - INVALID_APPLICATION is checked first via _is_valid_application, with thresholds
+      on credit_score (300-850), debt_to_income (0-100), age (18-120), and the dead
+      zone (credit 580-620, DTI 43-47, age 72-74).
+
+      - MANUAL_REVIEW_REQUIRED is checked next via _requires_manual_review, with thresholds:
+      risk_level >= 3 (risk_score > 70), loan_amount > 500,000, has_bankruptcy (always
+      False), debt_to_income > 45.
+
+      - Risk score is computed as: max(0, 800 - credit_score) // 10 + max(0, debt_to_income
+      - 30) // 2 + employment_component. Risk levels: <=20 Low, <=40 Medium, <=70
+      High, >70 Extreme.
+
+      - AUTO_REJECTED checks: age 18-75, credit_score >= 500, monthly_income >= 2000
+      (always true), debt_to_income <= 50, loan_amount > 0, loan_amount <= type-specific
+      limits.
+
+      - CONDITIONAL_APPROVAL: debt_to_income > 40 OR self_employed.
+
+      - AUTO_APPROVED: everything else that passes all checks.
+  q2:
+    answer: >-
+      Yes, an applicant with Excellent credit (score >= 750) can receive MANUAL_REVIEW_REQUIRED.
+      This happens under the following exact conditions (any one suffices, assuming
+      the application is valid):
+
+
+      1. **loan_amount > 500,000**: Regardless of credit score, any loan amount exceeding
+      500,000 triggers manual review. For example: credit_score=800, loan_amount=600,000,
+      any valid DTI/age/employment.
+
+
+      2. **debt_to_income > 45**: Even with excellent credit, a DTI ratio above 45
+      triggers manual review. For example: credit_score=800, debt_to_income=46.
+
+
+      3. **risk_level >= 3 (Extreme risk, risk_score > 70)**: With credit_score >=
+      750, the credit component is at most (800-750)//10 = 5. To reach risk_score
+      > 70, the remaining components must exceed 65. This requires UNEMPLOYED (employment_component=50),
+      plus dti_component > 15, meaning debt_to_income > 60 (i.e., max(0, DTI-30)//2
+      > 15 → DTI >= 61). However, DTI > 45 already triggers manual review independently,
+      so while this path is technically reachable, it is always redundant with condition
+      #2.
+
+
+      Note: has_bankruptcy is hardcoded to False, so it never triggers manual review.
+    reasoning: >-
+      - With credit_score >= 750, the credit_component of risk_score = max(0, 800
+      - credit_score) // 10. For score=750, this is 50//10 = 5. For score=800, it's
+      0. For score=850, it's 0.
+
+      - _requires_manual_review checks: risk_level >= 3 OR loan_amount > 500,000 OR
+      has_bankruptcy OR debt_to_income > 45.
+
+      - has_bankruptcy is hardcoded False, so that path is closed.
+
+      - loan_amount > 500,000: This is independent of credit score, so excellent credit
+      applicants requesting large loans get manual review.
+
+      - debt_to_income > 45: Also independent of credit score.
+
+      - risk_level >= 3 means risk_score > 70. With credit_component at most 5 (for
+      score=750), we need dti_component + employment_component > 65. Max employment_component
+      is 50 (UNEMPLOYED). So dti_component must be > 15, meaning (DTI-30)//2 > 15,
+      so DTI >= 62. But DTI > 45 already triggers manual review via the separate condition,
+      so the risk_level path is always a subset of the DTI > 45 condition for excellent
+      credit applicants.
+
+      - All three triggering conditions are reachable for excellent credit applicants.
+  q3:
+    answer: >-
+      No, the safety property 'applications with ManualReviewRequired are never auto-approved'
+      cannot be violated, including all edge cases. The property holds absolutely
+      for the following reasons:
+
+
+      1. **Mutually exclusive code paths**: The function follows a strict sequential
+      decision structure. MANUAL_REVIEW_REQUIRED is returned at line/check #2 (after
+      validity check), and AUTO_APPROVED is returned at the final else branch. These
+      are in a strict if-elif-else chain — once MANUAL_REVIEW_REQUIRED is returned,
+      the function exits immediately and never reaches the AUTO_APPROVED branch.
+
+
+      2. **Single decision per invocation**: The function returns exactly one ApprovalDecision
+      per call. There is no mechanism to change or override a decision after it is
+      returned.
+
+
+      3. **No state mutation or side effects**: The function is purely functional
+      with no global state, no callbacks, no async operations, and no mutable shared
+      state that could cause a decision to be altered after the fact.
+
+
+      4. **Edge cases analyzed**:
+         - **Dead zone (credit 580-620, DTI 43-47, age 72-74)**: These are caught
+      as INVALID_APPLICATION before manual review is even checked, so they never reach
+      either MANUAL_REVIEW_REQUIRED or AUTO_APPROVED.
+         - **Boundary values (e.g., DTI=45, loan_amount=500,000)**: DTI=45 does NOT
+      trigger manual review (requires >45, i.e., >=46). loan_amount=500,000 does NOT
+      trigger manual review (requires >500,000). These boundary cases proceed to later
+      checks and may be auto-approved, but they were correctly not flagged for manual
+      review.
+         - **DTI=46**: Triggers MANUAL_REVIEW_REQUIRED and the function returns —
+      never reaches AUTO_APPROVED.
+         - **Concurrent/re-entrant calls**: Not applicable; each function call is
+      independent.
+
+      5. **The approved field is always False for MANUAL_REVIEW_REQUIRED**: The return
+      value explicitly sets approved=False with decision_type=MANUAL_REVIEW_REQUIRED,
+      making the semantics unambiguous.
+
+
+      The safety property is structurally guaranteed by the control flow of the function.
+    reasoning: >-
+      - The function has a strict linear decision flow: validate → manual review check
+      → requirements check → conditional/auto-approve.
+
+      - MANUAL_REVIEW_REQUIRED is checked and returned before any approval logic is
+      reached.
+
+      - Once a return statement is hit, the function exits. There is no way to "fall
+      through" from MANUAL_REVIEW_REQUIRED to AUTO_APPROVED.
+
+      - There is no global state, no mutation, no callbacks that could alter the decision.
+
+      - Edge case: Dead zone applicants are caught as INVALID_APPLICATION before manual
+      review, so no conflict.
+
+      - Edge case: Boundary values like DTI=45 use strict inequality (>45), so DTI=45
+      does not trigger manual review. Such an applicant could potentially be auto-approved,
+      but this is correct behavior — they were never flagged for manual review.
+
+      - Edge case: loan_amount=500,000 uses strict inequality (>500,000), so exactly
+      500,000 does not trigger manual review. Again, correct behavior.
+
+      - The property is structurally enforced by the code's control flow and cannot
+      be violated under any input combination.

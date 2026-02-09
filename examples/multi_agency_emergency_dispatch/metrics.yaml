@@ -4853,3 +4853,739 @@
         purely on describing current behavior without critique. Overall, both answers
         achieve near-perfect alignment on all metrics, with comprehensive understanding
         of control flow, exact numeric boundaries, and correct conclusions."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:14'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 7104
+        reasoning: The LLM identifies that the scenario space is 'theoretically infinite
+          due to continuous integer parameters', but provides '960 distinct parameter
+          combinations' for the categorical parameters. ImandraX identifies 7104 distinct
+          scenarios after considering continuous parameters, indicating the LLM's
+          assessment is inaccurate due to its categorical-only focus for a specific
+          number. The LLM's '960' is not comparable to the ImandraX's '7104' as it
+          refers to a different dimension of the problem space.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: 'The LLM correctly identifies that ''The system has multiple decision
+          paths: dead zone path, critical override path, normal quorum path'' but
+          does not fully elaborate on the precedence or interactions between these
+          paths. For example, it misses that ''life-threatening incident overrides
+          that bypass fuel constraints'' means the override logic takes precedence
+          over fuel-related conditions, and similar details for short-circuiting and
+          branching. The ''partial'' assessment across all aspects of control flow
+          understanding reflects this incomplete but not entirely incorrect understanding.'
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - distance_to_incident and fuel_level are integers with no explicit bounds
+        - life-threatening incident overrides
+        total_edge_cases: 7
+        reasoning: The LLM identifies the continuous nature of 'distance_to_incident
+          and fuel_level' as a factor impacting scenarios, which is a form of edge
+          case related to parameter bounds. It also implicitly identifies 'life-threatening
+          incident overrides' as a special condition. However, it misses other explicit
+          edge cases like 'fuel-distance dead zones for marginal situations' and 'quorum-based
+          dispatch approval requiring multiple operational criteria' where specific
+          thresholds act as edge cases, as well as specific combinations mentioned
+          as 'key_thresholds' from ImandraX.
+        edge_case_count: 2
+        score: 0.2857142857142857
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - category_priority
+        - minimum_fuel
+        - fuel_dead_zone
+        - distance_dead_zone
+        - response_time_limit
+        - dispatch_score
+        reasoning: The LLM does not explicitly identify any of the numeric thresholds
+          or decision boundaries. The ImandraX answer clearly lists several key numeric
+          thresholds such as 'category_priority', 'minimum_fuel', 'fuel_dead_zone',
+          'distance_dead_zone', 'response_time_limit', and 'dispatch_score'. The LLM
+          mentions that 'Each of these 960 categorical combos can produce different
+          outcomes depending on the integer values of distance and fuel_level (which
+          affect dead zone checks, critical override checks, response time calculations,
+          fuel threshold comparisons)', but doesn't extract the specific thresholds.
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM stated 'theoretically infinite number of scenarios due
+          to continuous integer parameters' and '960 distinct parameter combinations
+          per (distance, fuel_level) pair', which are imprecise and do not provide
+          a concrete numeric distribution or estimate that can be directly compared
+          to the exact number provided by ImandraX. ImandraX provides an exact number
+          (7104) and explains how to get to it including continuous parameters which
+          the LLM fails to provide.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly identifies the existence of multiple decision
+          paths, the influence of continuous parameters, and the categorical combinations.
+          However, it fails to provide a concrete, accurate number of scenarios that
+          includes the impact of continuous parameters in a bounded way, only mentioning
+          that the total scenario count is 'unbounded'. ImandraX provides a concrete
+          number of 7104 scenarios which considers the continuous parameters, suggesting
+          the LLM's direction is partially correct but ultimately incomplete and misleading
+          for directly answering 'How many distinct emergency dispatch decision scenarios
+          exist'.
+      coverage_completeness:
+        score: 0.2
+        reasoning: The LLM correctly identified the categorical parameters and their
+          combinations (960). However, it failed to extend this to a complete scenario
+          count by properly accounting for the continuous parameters in a bounded
+          manner. ImandraX indicates a much larger number (7104 scenarios) by incorporating
+          the continuous parameters, suggesting the LLM covered only a small portion
+          of the actual state space by focusing only on categorical combinations.
+      overall_summary: The LLM partially understood the problem by identifying categorical
+        combinations and the influence of continuous parameters. However, it failed
+        to provide a precise or accurate numerical estimation of the total distinct
+        scenarios, leading to significant imprecision and incompleteness. It also
+        showed partial understanding of control flow and edge cases, but missed specific
+        numeric thresholds. The main weakness is its inability to bound the continuous
+        parameters effectively to arrive at a concrete scenario count, which ImandraX
+        successfully achieved.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 42
+        reasoning: LLM states 'There are three paths' but doesn't quantify the number
+          of scenarios for each, and misses the critical safety bug identified by
+          ImandraX, which specifies 42 scenarios. Thus, the LLM's scenario count is
+          unknown.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM correctly identifies that 'dead zone logic triggers first'
+          and that 'The critical override explicitly requires weather != STORM', showing
+          some understanding of precedence. However, it fails to fully understand
+          how the dead zone short-circuits *all* safety checks. It incorrectly claims
+          that in normal quorum logic, a score of 4 out of 5 (with weather_safe=False)
+          can lead to dispatch, suggesting a misunderstanding of how 'weather_safe'
+          might be a hard constraint or part of a more complex branching. It understands
+          the critical override's conditions to an extent but misses the override
+          aspect of the dead zone completely.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: 'The LLM completely misses the most critical edge case/safety bug:
+          that the ''dead zone'' bypasses all weather safety checks, leading to helicopters
+          being dispatched in storms. ImandraX explicitly identifies this as a safety
+          issue. The LLM''s ''path 1'' for the dead zone is not framed as an edge
+          case or a bug, but rather as a normal operational path, incorrectly assuming
+          intentional functionality where a flaw exists.'
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level is 25-35%
+        - distance is 15-25 units
+        - quorum only requires 4 out of 5 factors
+        - response_time <= 30 min
+        - distance <= 3 units
+        thresholds_from_decomp:
+        - fuel_level between 25 and 35
+        - distance between 15 and 25
+        - quorum threshold of 4
+        - time_ok max response time of 30
+        - distance for time_ok max distance of 3
+        reasoning: The LLM correctly identifies several numeric thresholds related
+          to fuel level, distance for the dead zone, quorum factors, and response
+          time/distance. All significant numeric thresholds from the decomposition
+          are covered in the LLM's answer.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM incorrectly states that helicopters can be dispatched in
+          storm conditions via the quorum logic even when weather_safe is false, and
+          it misunderstands the implications of the dead zone. Its example scenario
+          for quorum dispatch during a storm is flawed because it does not acknowledge
+          that 'weather_safe' failing should prevent dispatch in the normal path,
+          even if 4 other factors are true. ImandraX correctly identifies this as
+          a safety bug where the dead zone path causes dispatch, contradicting the
+          LLM's 'normal quorum logic' explanation. Therefore, the precision of its
+          outcomes is very low, as its main conclusions about dispatch conditions
+          under storms are inaccurate according to the decomposition.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM correctly identifies that helicopters *can* be dispatched
+          in storm conditions, which aligns with ImandraX's finding of 42 such scenarios.
+          However, the LLM attributes this primarily to a misinterpretation of the
+          quorum logic, where it incorrectly assumes a weather_safe=False condition
+          for helicopters in storms can still lead to dispatch via having 4 other
+          true factors. ImandraX attributes these dispatches solely to a safety bug
+          in the dead zone logic. The LLM's understanding of _why_ dispatch occurs
+          is largely incorrect, though its initial direction ('Yes, Helicopters can
+          be dispatched...') is correct by chance due to the safety bug. The LLM correctly
+          identifies that the critical override cannot apply. Given the fundamental
+          misunderstanding of the primary mechanism (safety bug vs. quorum logic),
+          the score is low but not zero because the ultimate answer to 'Can Helicopters
+          ever be dispatched during Storm weather conditions? If yes...' is 'Yes'.
+      coverage_completeness:
+        score: 0.2
+        reasoning: The LLM provides three 'paths' for dispatch, but only one of these
+          (the 'dead zone' path) corresponds to the actual scenarios identified by
+          ImandraX where helicopters are dispatched in storms. The LLM's paths 2 and
+          3 (normal quorum logic with score 4 or 3) are incorrect interpretations
+          according to the decomposition, as they miss the explicit blocking by `weather_safe`
+          in the normal path. The LLM therefore only covers a very small portion of
+          the correct underlying logic and misinterprets the reasons for dispatch
+          in the majority of its explanation.
+      overall_summary: The LLM correctly identifies that helicopters can indeed be
+        dispatched during storm conditions, which is surprising and aligns with ImandraX's
+        finding of a safety bug. However, the LLM fundamentally misinterprets the
+        reason for this. It incorrectly believes that normal quorum logic can override
+        the weather safety check, whereas ImandraX correctly identifies a critical
+        safety bug in the 'dead zone' logic that bypasses all safety measures, including
+        weather. The LLM misses this crucial safety vulnerability and instead presents
+        dispatch during storms as a feature of the system's intended quorum behavior.
+        While it identifies several numeric thresholds accurately, its understanding
+        of control flow, especially regarding the 'dead zone' override and the implications
+        of 'weather_safe' in the normal path, is flawed. The LLM's answer highlights
+        a 'yes' to the main question but provides incorrect and misleading explanations
+        for why this is the case, failing to identify the actual safety defect.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM does not explicitly mention the number of scenarios it
+          considered. The ImandraX answer implies a single scenario where the dead
+          zone conditions are met.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the dead zone check is the first
+          decision point and that it unconditionally returns a DispatchDecision. It
+          understands that this short-circuits other checks like 'compatibility, fuel
+          minimum, weather safety, resource readiness, quorum score' which is reinforced
+          by the ImandraX response. The LLM accurately describes the override logic
+          of the dead zone.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - dead zone bypasses weather safety
+        total_edge_cases: 1
+        reasoning: Both the LLM and ImandraX identify the key insight that the dead
+          zone bypasses weather safety, which is an important edge case.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 'fuel level: 25-35%'
+        - 'distance: 15-25 units'
+        thresholds_from_decomp:
+        - fuel ∈ [25,35]
+        - distance ∈ [15,25]
+        reasoning: The LLM correctly identifies the numeric thresholds for fuel level
+          and distance that define the dead zone, matching the decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM correctly identifies all outcomes: requires_backup=True,
+          escalation_needed=True, dispatch_approved=True, and response_time_minutes
+          varies. This is fully consistent with the ImandraX answer and decomposition.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concludes that backup resources are ALWAYS required
+          when in the dead zone, aligning with the PROVEN assertion from ImandraX.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM fully covers the stated scenario and its implications,
+          accurately describing the behavior of the system within the 'dead zone'
+          as confirmed by the ImandraX answer. It correctly identifies the constant
+          outcomes and the varying one (response_time_minutes).
+      overall_summary: The LLM provides an excellent and comprehensive answer, demonstrating
+        a strong understanding of the system's control flow, decision boundaries,
+        and edge cases. It accurately identifies the conditions for the 'dead zone'
+        and the resulting dispatch decisions, including the 'always requires backup'
+        conclusion. It also successfully identifies the critical edge case where the
+        dead zone bypasses weather safety. The explanation is detailed and fully aligns
+        with the verified insights from ImandraX.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:16'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 960
+        n_decomposition_exact_scenarios: 7104
+        reasoning: LLM calculated categorical combinations only, not considering continuous
+          extensions and specific parameter constraints found in ImandraX. ImandraX
+          provided a more thorough decomposition considering how continuous parameters
+          multiplied the base scenarios.
+        score: -11.584962500721156
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: LLM showed some understanding of branches based on defined parameters
+          but lacked detail in describing how continuous parameters would affect logical
+          branches. It did not fully address how overrides and quorum logic interact
+          with categorical conditions.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - injuries in high traffic without resources
+        - resource unavailability during crisis
+        total_edge_cases: 4
+        reasoning: LLM identified some edge cases related to resource readiness and
+          incident severity but missed edge cases presented in the complete scenario
+          overview from ImandraX.
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - distance_dead_zone
+        - minimum_fuel
+        thresholds_from_decomp:
+        - category_priority
+        - minimum_fuel
+        - fuel_dead_zone
+        - distance_dead_zone
+        - response_time_limit
+        - dispatch_score
+        reasoning: LLM captured a few thresholds relevant to decisions but missed
+          others critical for identifying all dispatch decision scenarios available
+          in ImandraX.
+        score: 0.3333333333333333
+      outcome_precision:
+        score: 0.6
+        reasoning: LLM provided a total of 960 distinct categorical combinations but
+          did not fully integrate the influence of continuous parameters, leading
+          to a precision score that reflects some accuracy but lacks completeness.
+      direction_accuracy:
+        score: 0.5
+        reasoning: While LLM reached a directionally correct understanding of scenarios
+          being discrete and influenced by parameters, it significantly underestimated
+          the complexity and volume of the scenarios available.
+      coverage_completeness:
+        score: 0.13
+        reasoning: LLM barely grasped the total scenario space, focusing only on categorical
+          interactions. With a stark difference in scenario estimation (960 vs. 7104),
+          it only covered a small proportion of the whole decision scenarios.
+      overall_summary: LLM's response was partially correct but fundamentally flawed
+        in estimating scenario counts and coverage. It lacked depth in understanding
+        the interplay of continuous and discrete parameters, resulting in insufficient
+        edge case identification and decision boundary clarity.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 42
+        reasoning: 'The LLM estimated 3 paths under which a helicopter could be dispatched
+          during a storm: (1) dead zone path, (2) normal quorum logic with 4 factors
+          being true, and (3) borderline dispatch with 3 factors met. However, the
+          correct decomposition reveals there are 42 actual scenarios that allow for
+          successful helicopter dispatch in the context of storm weather due to the
+          dead zone logic.'
+        score: -4.285402218862249
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: incorrect
+        reasoning: The LLM has a partial understanding of the overall control flow.
+          It recognizes that the dead zone bypasses weather checks; however, it incorrectly
+          conveys some details, especially regarding the override logic which it states
+          cannot dispatch the helicopter in storm conditions, when in fact the dead
+          zone path does allow this dispatch.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone path allows dispatch in storm despite safety checks
+        - Dispatch should never occur in storm due to helicopter response time being
+          severely impacted
+        total_edge_cases: 2
+        reasoning: The LLM identified that helicopters could be dispatched during
+          storm conditions through the dead zone logic but did not highlight the safety
+          issue that exists by bypassing normal checks. It missed a critical edge
+          case about response time impact.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level is 25-35%
+        - distance is 15-25 units
+        thresholds_from_decomp:
+        - fuel_level is 25%
+        - distance is 15 units
+        reasoning: The LLM identified some numeric thresholds related to the conditions
+          under which the helicopter could be dispatched (fuel levels and distances).
+          However, it missed the additional nuance about operational thresholds from
+          the decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 0.7
+        reasoning: The LLM provides a reasonably clear account of situations under
+          which dispatch can occur but lacks precision in detailing all numerical
+          requirements regarding thresholds for both the dead zone logic and decision-making
+          surrounding those scenarios.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly indicates that helicopters can be dispatched
+          in storms but fails to reach the correct conclusion about whether this should
+          be considered safe or acceptable behavior, thus demonstrating a mixed performance
+          on correctness.
+      coverage_completeness:
+        score: 0.1
+        reasoning: The LLM only covers a small fraction of the decision scenarios,
+          with only 3 paths described compared to the actual 42 distinct scenarios
+          allowing for helicopter dispatch in storm conditions.
+      overall_summary: The LLM provided an initially plausible yet fundamentally flawed
+        understanding of helicopter dispatch logic during storm conditions. It grasped
+        some key pathways but misunderstood critical safety implications and lost
+        substantial accuracy in assessing the decision logic, especially regarding
+        overrides.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM indicates that the system always requires backup resources
+          when in the specified fuel dead zone and moderate distance, aligning with
+          the actual behavior as defined in the decomposed logic.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM captures the precedence of conditions and the branching
+          structure accurately. However, its understanding of override logic is partial
+          because it does not mention that other conditions are bypassed due to the
+          immediate return for dead zone.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: The LLM did not identify any specific edge cases beyond the standard
+          behavior in the dead zone, while the decomposition does not highlight edge
+          cases, indicating potential for missed nuanced scenarios.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - fuel ∈ [25,35]
+        - distance ∈ [15,25]
+        reasoning: The LLM did not identify specific numeric thresholds that define
+          the dead zone, which are clearly stated in the decomposition.
+        score: 0.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM’s outcome regarding the requirement for backup resources
+          is precise and clearly articulated, matching the decomposed model's specification.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that backup resources are required is correct and
+          aligns with the operational logic defined in the decomposition.
+      coverage_completeness:
+        score: 0.86
+        reasoning: The LLM correctly identifies significant scenarios but misses some
+          nuances involved in the decision-making process surrounding weather safety
+          and other bypassed checks.
+      overall_summary: The LLM answers correctly about the requirement for backup
+        resources in the dead zone scenario with strong precision. However, it lacks
+        in detailing nuance around override logic and specific threshold identification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:35'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 960
+        n_decomposition_exact_scenarios: 7104
+        reasoning: The LLM estimates 960 distinct scenarios based on categorical parameters
+          (6 incident categories × 5 resources × 4 weather × 4 traffic × 2 resource_ready),
+          treating distance and fuel_level as unbounded integers leading to infinite
+          scenarios overall. However, it does not decompose the continuous parameters
+          into discrete regions defined by thresholds. The ImandraX decomposition
+          yields exactly 7104 scenarios by dividing the space into ~15 regions per
+          categorical combination, accounting for fuel, distance, and other thresholds
+          that create finite behavioral regions.
+        score: -11.584962500721156
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: The LLM partially understands precedence by mentioning critical
+          override paths that bypass fuel constraints and priority-dependent minimum
+          fuel requirements. It identifies branching structure partially through references
+          to dead zone paths, critical override paths, and normal quorum paths (score
+          ≥ 4, score 3, score < 3). However, it does not address short-circuit behavior,
+          marking it as incorrect. Override logic is partially captured via life-threatening
+          incident overrides, but lacks depth on quorum-based approvals requiring
+          multiple criteria.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 8
+        reasoning: The LLM does not explicitly identify any specific edge cases, such
+          as fuel-distance dead zones, marginal situations, or quorum edge cases at
+          score thresholds like 3 or 4. The decomposition highlights at least 8 key
+          edge cases implied by thresholds (e.g., minimum_fuel boundaries, dead zones,
+          response_time limits, dispatch scores), which the LLM misses entirely.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - 'category_priority: [4, 6, 8, 12, 16, 24]'
+        - 'minimum_fuel: [25, 35, 50]'
+        - 'fuel_dead_zone: [25, 35]'
+        - 'distance_dead_zone: [15, 20, 25]'
+        - 'response_time_limit: [30]'
+        - 'dispatch_score: [3, 4]'
+        reasoning: The LLM identifies no exact numeric thresholds, focusing only on
+          categorical combinations without breaking down continuous parameters. The
+          decomposition reveals multiple precise thresholds across category priorities,
+          fuel minima, dead zones, distances, response times, and dispatch scores,
+          all of which the LLM overlooks, leading to an incomplete view of decision
+          boundaries.
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides no precise numeric distributions for outcomes,
+          instead offering a categorical count of 960 and claiming infinity due to
+          unbounded integers, which ignores the finite regions created by thresholds.
+          This results in zero precision against the verified 7104 scenarios from
+          decomposition.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM correctly identifies a large state space driven by categorical
+          parameters and recognizes interactions with distance and fuel_level, pointing
+          in the direction of a massive (potentially infinite) scenario count. However,
+          it fundamentally errs by not discretizing continuous parameters into finite
+          regions via thresholds, leading to an incorrect infinite conclusion instead
+          of the finite 7104, reducing accuracy.
+      coverage_completeness:
+        score: 0.135
+        reasoning: Using the proportion metric from ImandraX's breakdown (480 base
+          categorical × ~15 regions = 7104), the LLM covers only the 960 categorical
+          combinations (including the boolean, but effectively 480 × 2 = 960), missing
+          the ~15 regions per combination from thresholds. Thus, coverage is approximately
+          960 / 7104 ≈ 0.135, as the LLM does not explore the decomposed regions.
+      overall_summary: The LLM answer demonstrates a basic grasp of categorical parameter
+        combinations but fails to decompose continuous variables (distance, fuel)
+        into finite behavioral regions defined by thresholds, resulting in an underestimated
+        bounded count (960) and an overstated infinite total. It partially captures
+        high-level control flows like overrides and paths but misses numeric boundaries,
+        edge cases, and precise outcomes. Strengths include enumerating categories
+        accurately; weaknesses are in ignoring threshold-driven discretization, leading
+        to incomplete coverage and low precision compared to ImandraX's verified 7104
+        scenarios.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 42
+        reasoning: The LLM answer does not provide any numerical estimate of the number
+          of scenarios where Helicopters can be dispatched in Storm conditions. It
+          describes conditions qualitatively (e.g., dead zone with fuel 25-35% and
+          distance 15-25, quorum with score=4 or 3) but does not count or enumerate
+          scenarios. The ImandraX answer specifies exactly 42 scenarios via the dead
+          zone path.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: >-
+          - precedence_of_conditions: correct - LLM accurately states that the dead
+          zone check happens first in the function, before any weather safety checks,
+          aligning with ImandraX's description of the three paths (dead zone first,
+          then override, then normal).
+
+          - branching_structure: correct - LLM identifies three relevant paths: dead
+          zone, critical override (which blocks Storm), and normal quorum logic, matching
+          ImandraX's structure of dead zone (lines 154-160), override (165-171), and
+          normal (176-218).
+
+          - short_circuit_behavior: correct - LLM notes that dead zone triggers dispatch
+          regardless of weather, compatibility, etc., correctly capturing that it
+          bypasses other checks, as per ImandraX's insight that dead zone has no weather
+          check and always dispatches if in_dead_zone.
+
+          - override_logic: correct - LLM correctly states that critical override
+          requires weather != STORM (weather_ok=False blocks it), matching ImandraX's
+          note that override path blocks Storm due to weather_ok = (weather != Storm)
+          = false.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone path (fuel 25-35%, distance 15-25) bypassing weather for Helicopter
+          in Storm
+        - Quorum path with 4/5 factors despite weather_safe=False (incorrectly identified)
+        - Borderline quorum with 3/5 factors and escalation (incorrectly identified)
+        total_edge_cases: 42
+        reasoning: The LLM identifies the dead zone as a key edge case where Helicopters
+          are dispatched in Storm without weather checks, which is a policy-violating
+          safety issue covering the 42 scenarios from ImandraX. However, it incorrectly
+          identifies additional edge cases in the normal quorum path (score=4 or 3
+          despite weather_safe=False), which ImandraX states is blocked. Thus, LLM
+          found 1 correct edge case type (dead zone) but added 2 false ones; it misses
+          the full scope of the 42 dead zone variations (e.g., across incident categories
+          like RoutineFire). Total edge cases are the 42 decomposed scenarios exposing
+          the safety bug.
+        edge_case_count: 3
+        score: 0.07142857142857142
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level 25-35% (dead zone)
+        - distance 15-25 units (dead zone)
+        - response_time ≤30 min implying distance ≤3 units in Storm for time_ok
+        - fuel_level ≥25% for fuel_ok
+        - quorum score ≥4 for approval
+        - quorum score ≥3 for borderline with escalation
+        thresholds_from_decomp:
+        - fuel_level 25-35% and distance 15-25 for in_fuel_dead_zone (dead zone path)
+        - weather != Storm for weather_ok (override path)
+        - weather_safe=False for Helicopter+Storm (normal path block)
+        - quorum factors including compatible, fuel_ok, time_ok, resource_ready, weather_safe
+          (but blocked)
+        reasoning: The LLM identifies key numeric thresholds for the dead zone (fuel
+          25-35%, distance 15-25) and derives distance ≤3 for time_ok in Storm based
+          on multipliers (distance ×100×10 /100 = distance×10 ≤30). It also notes
+          fuel ≥25% and quorum scores ≥4/≥3. However, the quorum thresholds are irrelevant/misapplied
+          since normal path blocks Storm per decomposition. Decomposition thresholds
+          focus on dead zone conditions and the blocking conditions (weather_ok, weather_safe),
+          which LLM partially captures but misses explicitly stating weather_safe
+          as a hard block in normal path.
+        score: 1.0
+      outcome_precision:
+        score: 0.3
+        reasoning: The LLM provides qualitative descriptions and a single numeric
+          example (e.g., distance=1, fuel=50%, response_time=10≤30, score=4) but no
+          distributions or counts of outcomes (e.g., no mention of 42 scenarios).
+          It incorrectly includes outcomes from quorum paths that do not occur in
+          Storm for Helicopters. ImandraX precisely quantifies 42 approved scenarios
+          via dead zone, exposing the bug. Score reflects partial precision in dead
+          zone conditions but lack of quantification and inclusion of invalid outcomes.
+      direction_accuracy:
+        score: 0.6
+        reasoning: The LLM correctly concludes 'yes' and identifies the dead zone
+          path as allowing dispatch in Storm (bypassing weather), matching ImandraX's
+          key insight and the 42 scenarios. It accurately rules out the critical override
+          for Storm. However, it incorrectly claims the normal quorum path can approve
+          dispatch with weather_safe=False (e.g., score=4/5 or 3/5), whereas ImandraX
+          states the normal path blocks Helicopter+Storm entirely via weather_safe=False.
+          This overstates the conditions, leading to partially incorrect directions
+          on feasible paths.
+      coverage_completeness:
+        score: 0.7
+        reasoning: Using the scenario coverage rubric, the actual decision scenarios
+          are the 42 decomposed cases where Helicopter+Storm leads to approval via
+          dead zone (policy-violating). The LLM covers the dead zone path completely
+          in concept (fuel 25-35%, distance 15-25, regardless of other factors like
+          incident_category), which encompasses all 42 scenarios, but does not enumerate
+          or quantify them. It adds non-existent coverage in quorum paths (incorrectly),
+          but the core enabling path is fully described. Score penalizes lack of explicit
+          scenario count and false positives, but credits identification of the sole
+          actual path.
+      overall_summary: The LLM answer demonstrates strong understanding of control
+        flow precedence and correctly identifies the critical dead zone path as enabling
+        Helicopter dispatch in Storm, aligning with ImandraX's safety bug exposure.
+        It provides useful numeric examples and boundaries for this path. However,
+        it errs by positing additional approval paths via normal quorum (despite weather_safe
+        block), leading to overstated conditions and reduced precision. Coverage is
+        good for the key bug but incomplete in quantification; overall, solid directional
+        insight but misses the exclusivity of the dead zone bypass.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM answer does not explicitly estimate or count the number
+          of scenarios in the state space; it treats the dead zone condition as a
+          single uniform behavioral region where requires_backup is always true. The
+          ImandraX decomposition identifies this dead zone as one specific decision
+          path or region (lines 154-160) that hard-codes the outcome, so the exact
+          number of regions for this property is 1.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence_of_conditions: Correct - LLM accurately states the
+          dead zone check is the first decision point, evaluated before critical overrides
+          or normal quorum logic, matching ImandraX''s description of the path triggering
+          early. Branching_structure: Correct - LLM describes the if in_dead_zone
+          then immediate return structure, aligning with ImandraX''s reference to
+          lines 154-160. Short_circuit_behavior: Correct - LLM notes that the dead
+          zone return bypasses all other checks (compatibility, fuel minimum, weather
+          safety, etc.), consistent with ImandraX noting it bypasses weather safety
+          and other criteria. Override_logic: Correct - LLM explains this as an unconditional
+          override for marginal situations regardless of other parameters, which matches
+          ImandraX''s hard-coded true for requires_backup and escalation_needed in
+          the dead zone path.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Fuel-distance dead zone triggering backup despite bypassing weather safety
+          checks
+        total_edge_cases: 1
+        reasoning: The LLM implicitly identifies the dead zone itself as a marginal
+          edge case where backup is required regardless of other factors, including
+          the bypass of weather safety, resource readiness, and quorum checks. ImandraX
+          explicitly highlights the dead zone as the key edge/marginal situation and
+          notes the policy-violating bypass of weather safety as an insight. Thus,
+          the LLM finds 1 relevant edge case (the dead zone bypass behavior), matching
+          the total from the decomposition's focus on this property.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - fuel_level >= 25 and <= 35
+        - distance >= 15 and <= 25
+        thresholds_from_decomp:
+        - fuel ∈ [25,35]
+        - distance ∈ [15,25]
+        reasoning: 'The LLM correctly identifies the exact numeric thresholds for
+          the dead zone: fuel level between 25-35% and distance between 15-25 units,
+          matching the decomposition precisely. No thresholds are missed; both sources
+          describe the same boundaries for triggering the dead zone logic.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides exact boolean outcomes (requires_backup=True always
+          in dead zone) with no probabilistic or distributional estimates, which is
+          precise and matches the deterministic hard-coded behavior in the ImandraX
+          decomposition. There are no numeric distributions involved in the answer,
+          but the certainty of 'ALWAYS' aligns perfectly with the proven property,
+          warranting full precision.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM concludes correctly that the system always requires backup
+          resources (requires_backup=True) in the specified dead zone, directly matching
+          the ImandraX proven property. Both affirm the outcome holds unconditionally
+          for the given conditions, with no directional errors in the reasoning or
+          conclusion.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The question focuses on a single decision scenario (dead zone triggering
+          requires_backup). The LLM fully covers this by analyzing the specific condition,
+          control flow, and unconditional outcomes, equivalent to the ImandraX decomposition's
+          property verification for that path. No sub-scenarios within the dead zone
+          vary the requires_backup outcome, so coverage is complete.
+      overall_summary: 'The LLM answer demonstrates strong understanding of the control
+        flow and decision logic for the dead zone, accurately concluding that backup
+        is always required and explaining the early short-circuit bypass correctly.
+        It identifies key thresholds and outcomes precisely, matching ImandraX''s
+        verification. Minor gap: LLM does not explicitly call out the policy implication
+        of bypassing weather safety, but it mentions the bypass of checks, so coverage
+        is comprehensive. Overall, the LLM performs excellently on this specific property,
+        with no factual errors.'

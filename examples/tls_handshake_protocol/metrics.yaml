@@ -5248,8 +5248,7 @@
         secrecy. (4) Recognition that SECP256R1 is a vulnerability that high-security
         policies block. The LLM's answer is approximately 75% complete and accurate,
         with the main gap being the discovery and enumeration of the full set of distinct
-        scenarios."
-        }
+        scenarios." }
     q3:
       state_space_estimation_accuracy:
         n_llm_estimated_scenarios: unknown
@@ -5438,3 +5437,773 @@
         IMPACT: The LLM's answer would mislead users into believing the system has
         a critical safety vulnerability, when the property is actually proven to always
         hold. This represents a significant failure in safety analysis.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:45'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 40
+        reasoning: The LLM identified 7 scenarios based on the return statements in
+          the code, whereas ImandraX identified 40 distinct scenarios. The LLM's approach
+          of counting return statements does not accurately reflect the true number
+          of distinct decision paths or states.
+        score: -4.044394119358453
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM correctly identifies the sequence of some conditions (e.g.,
+          replay_detected first), but misses many subtle interactions. For example,
+          it notes that `SECURITY_DOWNGRADE` is reachable via two different conditions,
+          hinting at some branching understanding. However, its overall estimation
+          of scenarios is significantly off, indicating a partial understanding of
+          how different conditions and their precedences lead to a multitude of distinct
+          control flow paths. The LLM mentions `security_policy_level` overriding
+          normal behavior in its summary, showing some grasp of override logic but
+          failing to fully enumerate the implications on control flow.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - replay_detected is True
+        - error_count >= 3
+        - client_cipher != server_cipher
+        - client_group != server_group
+        - actual_strength < min_strength
+        - cert_status == INVALID
+        - security_policy_level >= 4 AND client_group != X25519
+        - has_session_ticket=True AND ticket_is_valid=True AND resumption_policy_ok=True
+        total_edge_cases: 40
+        reasoning: The LLM identified 8 specific conditions or combinations as distinct
+          scenarios which can be seen as edge cases (e.g., replay attack, invalid
+          state, certificate failure). However, these are high-level outcomes and
+          not the granular edge cases that contribute to the 40 distinct scenarios
+          identified by ImandraX. The LLM missed many more nuanced edge cases related
+          to the interplay of different policy levels, session age, and various flag
+          combinations that ImandraX's decomposition would uncover.
+        edge_case_count: 8
+        score: 0.2
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - error_count >= 3
+        - security_policy_level >= 2
+        - security_policy_level >= 3
+        - security_policy_level >= 4
+        - 'session_age: 86400'
+        - 'session_age: 86410'
+        - 'cipher strength: 128'
+        - 'cipher strength: 256'
+        thresholds_from_decomp:
+        - 'security_policy_level: 2'
+        - 'security_policy_level: 3'
+        - 'security_policy_level: 4'
+        - 'error_count: 3'
+        - 'cipher_strength: 128'
+        - 'cipher_strength: 192'
+        - 'cipher_strength: 256'
+        reasoning: The LLM identified numeric thresholds for `error_count`, `security_policy_level`,
+          `cipher strengths`, and `session_age`. The ImandraX answer confirmed `security_policy_level`,
+          `error_count`, and `cipher_strength` thresholds, partially aligning with
+          the LLM's findings. The LLM correctly identified the key values for `security_policy_level`
+          (2, 3, 4) and `error_count` (3) and `cipher strengths` (128, 256), although
+          it did not explicitly mention `192` as a distinct threshold for cipher strength
+          but rather as a derived `min_strength`. The `session_age` thresholds identified
+          by the LLM are relevant to the problem but are not explicitly listed in
+          the ImandraX output; thus, they are considered missed in terms of what ImandraX
+          highlighted as key thresholds for this particular query. Overall, the LLM
+          showed good clarity in identifying numeric thresholds relevant to the problem.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provided an estimate of 7 distinct scenarios, while the
+          actual number is 40. This represents a significant deviation, indicating
+          very low precision in its quantitative outcome.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM correctly identified some of the conditions that lead to
+          different handshake outcomes and described the general direction of the
+          decision logic. For example, it correctly identified that `replay_detected`
+          or `error_count` can lead to failures, and that `session_resumption` has
+          specific conditions. However, its overall count of scenarios is significantly
+          inaccurate, and it missed the complex interactions that create a much larger
+          state space. While it correctly identified many of the raw thresholds, its
+          interpretation of how these thresholds combine to form distinct scenarios
+          is flawed.
+      coverage_completeness:
+        score: 0.175
+        reasoning: The LLM identified 7 scenarios, while the ImandraX decomposition
+          revealed 40. The coverage score is calculated as 7/40 = 0.175. This indicates
+          a very low completeness in covering all possible decision scenarios.
+      overall_summary: The LLM demonstrated a partial understanding of the system's
+        logic, accurately identifying several key numeric thresholds and the general
+        conditions for different handshake outcomes. However, it significantly underestimated
+        the total number of distinct scenarios, suggesting a lack of depth in its
+        control flow analysis and an inability to fully grasp the combinatorial explosion
+        of conditions. While it provided good clarity on specific decision boundaries,
+        its overall scenario coverage and precision are very low when compared to
+        the exhaustive decomposition by ImandraX.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 4
+        reasoning: 'The LLM identified two scenarios where handshake succeeds but
+          fails to provide forward secrecy: ''SESSION_RESUMPTION_SUCCESS'' and ''FULL_HANDSHAKE_SUCCESS
+          with client_group=SECP256R1 and security_policy_level < 4''. The ImandraX
+          answer, however, states there are 4 such scenarios. The LLM missed the finer
+          distinctions within session resumption and full handshake related to different
+          security policy levels.'
+        score: 0.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: 'The LLM correctly identified the precedence of conditions and
+          short-circuit behavior, noting ''a sequential chain of guards: conditions
+          1-5 are negative checks that must NOT trigger''. It partially understood
+          the branching structure, identifying two main successful pathways. However,
+          its understanding of override logic is partial because it missed how `resumption_policy_ok`
+          and `security_policy_level` interact in the session resumption path to create
+          multiple scenarios. Specifically, the LLM missed that session resumption
+          is blocked if the security_policy_level is too high (>= 4).'
+        score: 0.75
+      edge_case_detection:
+        edge_cases_found:
+        - client_group = SECP256R1 AND security_policy_level < 4 (Full Handshake without
+          FS)
+        total_edge_cases: 4
+        reasoning: The LLM identified one edge case, the 'FULL_HANDSHAKE_SUCCESS with
+          client_group=SECP256R1 and security_policy_level < 4'. However, it missed
+          additional edge cases related to the interplay of session resumption and
+          security policy levels, where session resumption can be blocked by higher
+          security policies. For example, a scenario with 'has_session_ticket = true',
+          'ticket_is_valid = true', but 'resumption_policy_ok = false' due to 'security_policy_level
+          >= 4' would lead to a full handshake instead of a session resumption, and
+          if that full handshake also doesn't provide forward secrecy (e.g., due to
+          'client_group = SECP256R1'), it would be another distinct scenario where
+          can_proceed=True and forward_secrecy=False.
+        edge_case_count: 1
+        score: 0.25
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - error_count < 3
+        - security_policy_level < 4
+        - security_policy_level >= 4
+        thresholds_from_decomp:
+        - error_count < 3
+        - security_policy_level <= 3
+        - security_policy_level >= 4
+        reasoning: The LLM correctly identified error_count < 3 and security_policy_level
+          < 4 and >= 4 as thresholds. The decomposition uses security_policy_level
+          <= 3, which is equivalent to < 4.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's initial answer was imprecise, stating 'exactly ONE scenario',
+          then self-correcting to two. The decomposition identified 4 specific scenarios,
+          each with distinct conditions and outcomes, indicating a higher level of
+          precision. The LLM combined scenarios that ImandraX breaks out, for instance,
+          not fully distinguishing how `security_policy_level` affects `resumption_policy_ok`
+          and thus the resumption path itself.
+      direction_accuracy:
+        score: 0.75
+        reasoning: The LLM correctly identified that session resumption never provides
+          forward secrecy (forward_secrecy=false) and that a full handshake can also
+          result in forward_secrecy=false if specific conditions (client_group=SECP256R1
+          and security_policy_level < 4) are met. However, it missed the key insight
+          from ImandraX that 'high security policy (level >= 4) blocks resumption
+          to force full handshake with forward secrecy'. This omission impacts the
+          full accuracy of its understanding of the system's behavior.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM identified 2 of the 4 scenarios found by ImandraX, resulting
+          in 50% coverage. It missed the nuanced ways in which the security policy
+          level interacts with session resumption, leading to additional scenarios
+          where a handshake succeeds without forward secrecy.
+      overall_summary: The LLM demonstrated a partial understanding of the system's
+        behavior regarding successful handshakes without forward secrecy. While it
+        correctly identified that session resumption inherently lacks forward secrecy
+        and a specific full handshake scenario, it missed the full interplay of security
+        policy levels, particularly how they can block session resumption, leading
+        to a lower overall scenario count compared to the decomposition. Its control
+        flow understanding was good for short-circuiting and precedence but weaker
+        on branching and override logic in complex interactions.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 10
+        reasoning: 'The LLM did not estimate the number of scenarios. The ImandraX
+          answer implies 10 scenarios based on the ''why_holds'' explanation about
+          high security policy blocking session resumption and requiring X25519, and
+          the three listed edge cases. '
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies that the `resumption_policy_ok` parameter,
+          when *incorrectly* passed as True, can override the intended security policy
+          level. It accurately traces the control flow through the session resumption
+          path and correctly observes that no check for `security_policy_level` exists
+          on that specific path. This demonstrates a correct understanding of how
+          conditions are evaluated, how different branches are taken, and how an external
+          parameter can effectively override internal policy logic due to the separation
+          of concerns.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - security_policy_level = 4
+        - security_policy_level = 3
+        - resumption_policy_ok = True when security_policy_level >= 4
+        total_edge_cases: 3
+        reasoning: The LLM correctly identifies 'security_policy_level = 4' as a boundary
+          condition, which aligns with one edge case from the decomposition. It also
+          identifies 'security_policy_level = 3' as not requiring forward secrecy,
+          which is implicitly an edge case related to the policy. The LLM's core finding
+          about `resumption_policy_ok` being an independent parameter creating a violation
+          condition is a critical edge case it discovered on its own not directly
+          from the ImandraX response but from analyzing the code, which is a key insight.
+          The ImandraX answer listed 'error_count = 2 (just below threshold)' and
+          'SECP256R1 group rejected by high security policy (only X25519 accepted)'
+          which the LLM missed. However, given the LLM's deep dive into the `resumption_policy_ok`
+          edge case, it effectively covers the spirit of edge case detection.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - security_policy_level >= 4
+        - cipher_strength >= 256
+        - error_count < 3
+        thresholds_from_decomp:
+        - security_policy_level >= 4
+        - security_policy_level = 3
+        reasoning: The LLM identifies 'security_policy_level >= 4' and 'security_policy_level
+          = 3' (the precise boundary for where the property should hold), aligning
+          with the ImandraX answer. It also identifies 'cipher_strength >= 256' and
+          'error_count < 3' as relevant thresholds, demonstrating a good understanding
+          of the numerical conditions governing the system, even though they weren't
+          explicitly listed in the ImandraX answer for *this specific property*.
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's outcome is diametrically opposed to the ImandraX answer.
+          The LLM states that the property 'CAN be violated' and provides exact conditions
+          for this violation, whereas ImandraX states 'PROVEN - Property always holds,
+          no counterexamples'. This represents a complete lack of precision in the
+          final conclusion regarding the property's validity.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's conclusion is entirely incorrect ('CAN be violated')
+          according to the ImandraX answer ('PROVEN - Property always holds, no counterexamples').
+          The LLM identifies what it considers a 'decoupling bug' or 'architectural
+          flaw' where an independent parameter (`resumption_policy_ok`) could lead
+          to a violation. However, the ImandraX verification proves that, despite
+          this potential design nuance, the property itself *always holds* in the
+          context of the complete system logic, implying that such a 'decoupling bug'
+          doesn't *actually* lead to a violation of this specific property.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM's reasoning and stated violation conditions are completely
+          at odds with the ImandraX verification which states that the property *always
+          holds*. While the LLM provides a comprehensive analysis of a potential vulnerability
+          related to the `resumption_policy_ok` parameter, this ultimately leads it
+          to an incorrect conclusion about the property itself. The ImandraX answer
+          indicates that 'High security policy (>= 4) blocks session resumption AND
+          requires X25519 for forward secrecy', which means the LLM's proposed violation
+          path (SESSION_RESUMPTION_SUCCESS for security_policy_level >= 4) is not
+          reachable under correct system behavior, regardless of the `resumption_policy_ok`
+          parameter's independence. Therefore, the LLM fails to cover the actual conditions
+          under which the property *does* hold true.
+      overall_summary: The LLM demonstrated a strong ability to understand complex
+        control flow and identify a nuanced interaction between parameters that could
+        be perceived as a vulnerability. It meticulously analyzed the code paths and
+        pinpointed a scenario where, hypothetically, a misconfigured input could lead
+        to a violation. However, its ultimate conclusion about the safety property's
+        violation was incorrect, as the ImandraX verification proved the property
+        always holds. This suggests that while the LLM is adept at identifying potential
+        flaws or areas of concern, it may lack the broader systemic understanding
+        to determine if these potential flaws actually lead to a property violation
+        within the complete problem context, especially when implicit system behaviors
+        or interactions (like how a specific policy level *blocks* certain paths)
+        are at play. Its strength lies in detailed code path analysis and edge case
+        identification *within the confines of its perceived logic*, but it falls
+        short in absolute correctness when compared to formal verification.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:48'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 40
+        reasoning: The LLM estimates 7 distinct outcomes based on return statements,
+          but upon decomposition, the actual scenarios that arise due to various combinations
+          of conditional checks lead to a total of 40 distinct scenarios.
+        score: -4.044394119358453
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: The LLM recognizes some branches and thresholds but fails to fully
+          capture the conditional checks leading to all possible outcomes. The relationships
+          between branches and how they override each other are not thoroughly explained.
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - Invalid certificate due to session ticket ambiguity
+        - Replay attack handling
+        - Security downgrade potential
+        - Compatibility failure due to cipher mismatches
+        - Session ticket policy violations
+        total_edge_cases: 10
+        reasoning: The LLM identifies some edge cases related to security downgrades,
+          replay attacks, and compatibility failures but misses out on a number of
+          nuanced edge cases, leaving it short of capturing the total edge cases.
+        edge_case_count: 5
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - error_count >= 3
+        - security_policy_level >= 2
+        - security_policy_level >= 3
+        - security_policy_level >= 4
+        thresholds_from_decomp:
+        - error_count >= 3
+        - security_policy_level >= 2
+        - security_policy_level >= 3
+        - security_policy_level >= 4
+        - 'cipher_strength: 128 (AES_128_GCM), 192, 256'
+        - 'session_age: 86400'
+        reasoning: The LLM recognizes several important thresholds but it misses the
+          detailed clarity on session age and specific cipher strengths associated
+          with each policy level.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.4
+        reasoning: The LLM's precision in outlining distinct outcomes is limited due
+          to incomplete identification of scenarios and edge cases, resulting in a
+          lower score.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM presents a direction of reasoning that aligns partially
+          with the correct outcomes, but it ultimately lacks comprehensive coverage
+          of the actual scenarios.
+      coverage_completeness:
+        score: 0.175
+        reasoning: The LLM captures only a fraction of the actual decision scenarios,
+          missing many possible combinations and outcomes defined in the decomposed
+          model.
+      overall_summary: The LLM identifies a limited number of handshake outcomes and
+        provides some relevant thresholds but lacks depth in the overall understanding
+        of edge cases, decision-making scenarios, and thorough coverage of the handshake
+        logic.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 4
+        reasoning: The LLM initially identified only 2 scenarios for success, while
+          the decomposition shows that there are actually 4 scenarios. The reasoning
+          behind the estimation was discussed, but it missed two additional scenarios
+          described in ImandraX's answer.
+        score: 0.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM demonstrated a correct understanding of the logical precedence
+          and short-circuit behavior. The branching structure was partially accurate
+          as it correctly identified session resumption and the conditions under which
+          it occurs. However, it missed additional scenarios that ImandraX presented,
+          affecting the completeness of the branching structure.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 4
+        reasoning: The LLM did not identify any edge cases, while the decomposition
+          revealed 4 specific edge cases. These include various scenarios under session
+          resumption where the handshake can succeed without providing forward secrecy.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - security_policy_level < 4
+        - client_group = SECP256R1
+        reasoning: The LLM did not identify any explicit numeric thresholds. However,
+          in the decomposition, key thresholds were identified that influence the
+          handshake outcomes.
+        score: 0.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's answer contained both correct and incomplete information.
+          While it correctly pointed out key conditions, it failed to account for
+          the additional scenarios and specific conditions that would affect the outcome,
+          resulting in a precision score of 0.5.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM reached some correct conclusions about handshake scenarios,
+          but it also missed critical conditions and alternative scenarios identified
+          by ImandraX, making the conclusions only partially accurate.
+      coverage_completeness:
+        score: 0.5
+        reasoning: The LLM's coverage of decision scenarios was limited to the two
+          it identified while the decomposition revealed more scenarios. Though some
+          analyzed scenarios were correct, overall coverage was incomplete.
+      overall_summary: The LLM correctly identified some aspects of the TLS handshake
+        and the importance of conditions for session resumption and full handshakes.
+        However, it faltered in recognizing the total number of success scenarios
+        and specific conditions leading to successes without forward secrecy, revealing
+        gaps in edge case detection and overall coverage.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 8
+        n_decomposition_exact_scenarios: 3
+        reasoning: LLM estimated 8 scenarios by listing conditions; exact decomposition
+          scenarios were 3 main paths.
+        score: -1.3219280948873622
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: LLM inaccurately described the interaction of resumption_policy_ok
+          and security_policy_level; it misrepresents decision pathways and ignores
+          overrides present in the policy checks.
+        score: 0.125
+      edge_case_detection:
+        edge_cases_found:
+        - replay attacks
+        - certificate failures
+        - security downgrades
+        - incorrect assumptions on resumption_policy_ok
+        total_edge_cases: 4
+        reasoning: LLM identified major edge cases typical in security considerations
+          but missed nuance in how resumption policy interacts, calling out significant
+          conditions as potential edge cases.
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - security_policy_level >= 4
+        - error_count < 3
+        thresholds_from_decomp:
+        - security_policy_level < 4
+        - session age
+        - ticket validity
+        reasoning: Identified thresholds focus on high-level conditions rather than
+          all relevant contexts and did not cover all boundary conditions set in the
+          decomposition.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.5
+        reasoning: LLM provided outcomes which lacked depth and precision, veering
+          into general situations without specificity in numerical context.
+      direction_accuracy:
+        score: 0.2
+        reasoning: The LLM concluded the property can be violated, while ImandraX
+          accurately proved it holds, indicating a major divergence in understanding.
+      coverage_completeness:
+        score: 0.4
+        reasoning: Coverage of decision scenarios was limited, focusing predominantly
+          on session resumption while discounting other significant modes evaluated
+          in the decomposition.
+      overall_summary: The LLM's response contains critical misunderstandings of the
+        protocol; its flawed interpretation leads to misidentifying the safety property
+        status, misconfiguration of conditions leading to confusion in implied relationships
+        and dependencies.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:53:21'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 7
+        n_decomposition_exact_scenarios: 40
+        reasoning: The LLM explicitly states there are 7 distinct handshake outcome
+          scenarios based on tracing return statements. The ImandraX decomposition
+          indicates 40 exact scenarios, showing a significant underestimation by the
+          LLM.
+        score: -4.044394119358453
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: partial
+        reasoning: 'Precedence of conditions: partial - The LLM correctly identifies
+          early returns for replay_detected and error_count >= 3, and notes policy
+          levels affecting later checks, but does not fully account for how all conditions
+          interact in sequence leading to combinatorial scenarios. Branching structure:
+          partial - It recognizes main branches like has_session_ticket paths and
+          full handshake fallthrough, including duplicates in code, but misses deeper
+          nested combinations across policy levels, cipher compatibilities, and certificate
+          statuses that result in 40 regions. Short-circuit behavior: partial - Acknowledges
+          first-checked booleans like replay and error_count short-circuiting, but
+          underplays how resumption_policy_ok and cert_status short-circuit in ticket
+          vs no-ticket paths. Override logic: partial - Captures security_policy_level
+          overriding min_strength and blocking resumption at level >=4, and forward
+          secrecy requirements, but does not detail how these overrides interact with
+          session age or other variables in a complete manner.'
+        score: 0.5
+      edge_case_detection:
+        edge_cases_found:
+        - replay_detected True
+        - error_count >= 3
+        - cipher or group incompatibility
+        - actual_strength < min_strength (e.g., 128 < 192 or 256)
+        - cert_status == INVALID
+        - security_policy_level >=4 and no forward secrecy
+        - session_age in 86400-86410 ambiguous zone
+        total_edge_cases: 12
+        reasoning: The LLM identifies 7 specific edge cases related to failure modes
+          and boundary conditions like replay attacks, high error counts, mismatches,
+          downgrades, invalid certs, policy-enforced no forward secrecy, and the ambiguous
+          session age boundary. The decomposition likely includes these plus additional
+          rare combinations (e.g., specific policy-cipher interactions, ticket validity
+          edges), estimated at 12 total edge cases out of the 40 scenarios, with the
+          LLM missing some like precise session age thresholds or combined policy
+          violations.
+        edge_case_count: 7
+        score: 0.5833333333333334
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - error_count >= 3
+        - security_policy_level >= 2 (min_strength=192)
+        - security_policy_level >= 3 (min_strength=256)
+        - security_policy_level >= 4 (no resumption, require FS)
+        - cipher_strength 128 (AES_128_GCM)
+        - cipher_strength 256 (AES_256_GCM)
+        - session_age < 86400 allowed, 86400-86410 blocked
+        thresholds_from_decomp:
+        - security_policy_level 2
+        - security_policy_level 3
+        - security_policy_level 4
+        - error_count 3
+        - cipher_strength 128
+        - cipher_strength 192
+        - cipher_strength 256
+        reasoning: The LLM identifies all key thresholds from the decomposition (policy
+          levels 2,3,4; error_count 3; cipher_strength 128,256) and additionally notes
+          the derived 192 min_strength and session_age boundaries (86400), which are
+          implicit in policy/resumption logic. It misses explicitly listing 192 as
+          a direct threshold but uses it in explanations. Overall, strong match with
+          minor additions and no major misses.
+        score: 1.0
+      outcome_precision:
+        score: 0.2
+        reasoning: The LLM provides a precise count of 7 scenarios but this is inaccurate
+          compared to the 40 from decomposition, with no probabilistic distributions
+          or detailed counts per outcome. It lists outcomes qualitatively but without
+          numeric breakdowns of scenario frequencies or exact region sizes, leading
+          to low precision in quantifying the decision space.
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM correctly identifies several core failure modes and thresholds
+          in the right direction (e.g., higher policy requires stronger ciphers and
+          FS, error_count threshold at 3), and all listed outcomes align with actual
+          behaviors. However, it fundamentally errs by undercounting scenarios (7
+          vs 40), missing combinatorial interactions, and incorrectly claiming only
+          6-7 unique types, which misdirects on the complexity and coverage of the
+          function's logic.
+      coverage_completeness:
+        score: 0.175
+        reasoning: Using the scenario count as the rubric for decision coverage, the
+          LLM identifies 7 out of 40 distinct regions from the decomposition, yielding
+          a coverage proportion of 7/40 = 0.175. This assesses the proportion of atomic
+          decision paths or behavioral regions found, where the LLM captures main
+          branches but misses fine-grained combinations across variables like policy
+          levels, cipher compatibilities, ticket validities, and group choices.
+      overall_summary: '"The LLM provides a solid qualitative overview of the main
+        handshake outcomes and correctly pinpoints key thresholds and early failure
+        modes, demonstrating good intuition for the protocol''s high-level logic.
+        However, it significantly underestimates the state space complexity by focusing
+        on return statements rather than decomposed regions, missing the combinatorial
+        explosion from interacting variables (e.g., 3 policy levels x multiple cipher/group
+        options x ticket states x cert statuses). Strengths include accurate direction
+        on policy overrides and boundaries; weaknesses are in exhaustive coverage,
+        precise counting, and edge case depth, making it useful for overview but insufficient
+        for formal verification."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2
+        n_decomposition_exact_scenarios: 4
+        reasoning: 'The LLM explicitly estimates and describes exactly 2 scenarios
+          where can_proceed=true and forward_secrecy=false: (1) Session Resumption
+          Success and (2) Full Handshake Success with SECP256R1 and security_policy_level
+          < 4. The ImandraX answer states there are 4 such scenarios, though it only
+          details one example; we take the stated count of 4 from decomposition as
+          ground truth.'
+        score: 0.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: LLM correctly identifies early guards (replay, error_count,
+          compatibility, strength) that must pass before reaching success paths. Branching:
+          Partial, as LLM captures the main cascade to resumption or full handshake
+          but misses nuances leading to 4 total scenarios per ImandraX. Short-circuit:
+          Correctly describes negative checks short-circuiting to failure. Override:
+          Correctly notes security_policy_level overriding to block resumption or
+          downgrade for high levels (>=4).'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Security policy allowing full handshake downgrade with SECP256R1 (policy
+          <4)
+        - Session resumption despite no forward secrecy (policy allows resumption)
+        total_edge_cases: 4
+        reasoning: 'The LLM identifies two edge cases: session resumption (sacrificing
+          FS for performance under low policy) and full handshake with non-FS group
+          (SECP256R1) allowed only under low security policy (<4), which are policy-violating
+          in terms of FS. ImandraX implies 4 total edge cases in its 4 scenarios,
+          likely including finer policy level interactions or additional rare combinations
+          like specific policy levels (0-3) enabling these without FS; LLM misses
+          at least 2.'
+        edge_case_count: 2
+        score: 0.5
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - error_count < 3
+        - security_policy_level < 4
+        - actual_strength >= min_strength
+        thresholds_from_decomp:
+        - error_count < 3
+        - security_policy_level < 4 (or <=3 for resumption)
+        - actual_strength >= min_strength
+        - possibly finer policy thresholds for resumption_ok
+        reasoning: 'LLM correctly identifies key thresholds: error_count <3 for early
+          failure avoidance, security_policy_level <4 to allow non-FS outcomes, and
+          actual_strength >= min_strength for policy compliance. Decomposition (ImandraX)
+          matches these but may include equivalent <=3 for policy and additional resumption-specific
+          boundaries; LLM misses no major ones but doesn''t detail all policy granularities
+          if decomp has more.'
+        score: 0.75
+      outcome_precision:
+        score: 0.5
+        reasoning: No explicit numeric distributions (e.g., probabilities or counts
+          beyond scenarios) are provided by the LLM; it focuses on boolean conditions
+          and scenario counts. ImandraX also lacks distributions but verifies scenarios;
+          partial credit for precise condition listings without quantitative outcomes.
+      direction_accuracy:
+        score: 0.5
+        reasoning: LLM correctly identifies that success without FS occurs via resumption
+          (always no FS) and full handshake downgrades (under low policy with non-FS
+          group), aligning with ImandraX's key insight on policy blocking resumption/FS.
+          However, LLM undercounts scenarios (2 vs 4), missing some directional combinations,
+          leading to partial correctness in conclusions.
+      coverage_completeness:
+        score: 0.5
+        reasoning: Using scenario count as proxy for decision scenarios, LLM covers
+          2 out of 4 identified by ImandraX decomposition (50% coverage). It captures
+          core paths (resumption and full non-FS) but misses additional scenarios,
+          possibly policy-level variants (e.g., levels 0-3 separately) or other interactions
+          like cert edges in non-FS success.
+      overall_summary: '"The LLM provides a strong, detailed analysis of the two main
+        scenarios for successful handshakes without forward secrecy, accurately capturing
+        the sequential guard structure, policy overrides, and key conditions. It excels
+        in control flow and boundary clarity but underestimates the total scenarios
+        (2 vs 4 per decomposition), leading to incomplete coverage and partial edge
+        case detection. Conclusions are directionally correct but lack full precision
+        due to missed cases, suitable for high-level understanding but not exhaustive
+        verification."'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 6
+        reasoning: The LLM does not provide an explicit count of total scenarios or
+          regions; it focuses on qualitative description of two main successful paths
+          (SESSION_RESUMPTION_SUCCESS and FULL_HANDSHAKE_SUCCESS) where can_proceed=True,
+          suggesting a high-level estimation of around 2-3 decision regions. The decomposition
+          likely breaks down into more fine-grained regions considering variables
+          like cipher compatibility, group selection (e.g., X25519 vs SECP256R1),
+          error counts, and policy interactions, estimated at 6 based on the complexity
+          described in the ImandraX answer (multiple guards, branches for resumption
+          block, FS requirement via group).
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: 'Precedence of conditions: Correct - LLM accurately describes the
+          sequence: first replay_detected and error_count checks, then session resumption
+          if conditions met, falling through to full handshake compatibility checks.
+          Branching structure: Correct - Clearly outlines the if-then-else structure
+          for resumption vs. full handshake, including sub-checks in full path like
+          security downgrade if level >=4 and not fs. Short-circuit behavior: Correct
+          - Notes how resumption path short-circuits the full handshake, bypassing
+          FS enforcement. Override logic: Partial - Understands that security policy
+          level overrides in the full handshake path (enforcing FS), but incorrectly
+          assumes no linkage between security_policy_level and resumption_policy_ok
+          within the function, missing that verification likely models the correct
+          computation of resumption_policy_ok externally to enforce the block for
+          level >=4.'
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - resumption_policy_ok=True with security_policy_level >=4 (potential caller
+          misuse)
+        - security_policy_level = 4 (exact boundary for FS requirement)
+        - security_policy_level = 3 (no FS requirement, only cipher strength)
+        total_edge_cases: 3
+        reasoning: 'LLM identified 3 edge cases, two of which align with boundaries
+          (level=4 and level=3 contrast). The first is a spurious ''bug'' from assuming
+          independent parameters leading to violation, not present in verified model.
+          Missed ImandraX edges: ''error_count = 2 (just below failure threshold,
+          allowing proceed)'' and ''SECP256R1 group rejected by high security policy
+          (only X25519 accepted for FS)''. Thus, found 2 relevant out of 3 total.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 4 (security_policy_level)
+        - 3 (error_count)
+        - 256 (cipher_strength)
+        thresholds_from_decomp:
+        - 4 (security_policy_level)
+        - 3 (error_count, implied by edge=2)
+        - 256 (cipher_strength, implied for policy)
+        reasoning: 'LLM correctly identified key numeric thresholds: level >=4 for
+          FS policy start, error_count <3 for proceeding, and cipher_strength >=256
+          for compatibility under policy >=3 (relevant as level=4 subsumes this).
+          Decomposition thresholds match these, with no additional numerics explicit
+          in ImandraX summary; the group rejection (SECP256R1) is categorical, not
+          numeric. All major thresholds identified, none missed.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: No probabilistic numeric distributions are involved; the LLM provides
+          precise, exact boolean and conditional outcomes (e.g., forward_secrecy=False
+          in resumption, True in full with X25519). Full precision in deterministic
+          outcomes, scoring 1.0 despite lack of distributions as the metric adapts
+          to context.
+      direction_accuracy:
+        score: 0.0
+        reasoning: LLM concludes the property CAN be violated under specific conditions
+          (caller passing resumption_policy_ok=True despite level >=4), leading to
+          SESSION_RESUMPTION_SUCCESS without FS. However, ImandraX proves it always
+          holds, as high security blocks resumption (via correct policy_ok computation)
+          and enforces FS via group (X25519). The conclusion is entirely opposite;
+          the 'decoupling bug' is not a violation in the verified model, assuming
+          proper external enforcement. No partial credit, as direction is wrong.
+      coverage_completeness:
+        score: 0.75
+        reasoning: 'Using path coverage rubric: LLM covers main branches (resumption
+          vs. full handshake, downgrade for !fs at high level), ~75% of decision scenarios,
+          including compatibility and policy checks. Misses finer decomp details like
+          specific group rejections (SECP256R1 blocked for FS) and error_count boundary
+          interactions in high-security context. Covers core successful paths but
+          not all edge combinations verified in decomp.'
+      overall_summary: The LLM shows strong control flow tracing and boundary identification,
+        correctly dissecting the function's branches and parameters, which highlights
+        potential design issues insightfully. However, it errs in conclusion by treating
+        resumption_policy_ok as independently violable, missing the verified model's
+        enforcement of policy linkage externally, leading to a false positive on violations.
+        Edge case detection is good but includes non-issues and misses verification-specific
+        ones like group policies. Overall, solid qualitative analysis undermined by
+        incorrect final direction on safety.

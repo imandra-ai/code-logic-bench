@@ -4446,3 +4446,1178 @@
         that for well-structured, focused questions about deterministic logic, LLMs
         can provide high-quality analysis comparable to formal decomposition when
         the underlying logic is clear and the constraints are explicit."}'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:11'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2000
+        n_decomposition_exact_scenarios: 1254
+        reasoning: 'LLM estimated 2000 scenarios by multiplying all possible input
+          enum values. ImandraX identified 1254 distinct scenarios after accounting
+          for internal compatibility constraints. The LLM''s estimation does not account
+          for these internal constraints, leading to a higher estimate. The question
+          asks for ''distinct fulfillment strategy scenarios'' which ImandraX clarifies
+          as ''Actual regions: 1254 (62% feasible due to compatibility constraints)''.
+          The LLM reasoning for 2000 total combinations is sound, but does not identify
+          the internal domain constraints and their implications.'
+        score: -8.543031820255237
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: The LLM's reasoning attempts to determine the number of distinct
+          scenarios based on input parameters. It shows partial understanding of branching
+          structure by multiplying enum values, but misses the impact of internal
+          conditional logic and compatibility constraints. The LLM's calculation of
+          distinct scenarios assumes all input combinations lead to distinct outputs,
+          which is not true due to internal logic and constraints. The special case
+          of 'premium seller express overrides for remote inventory' and 'zone-method-carrier
+          multiplexing with extensive compatibility matrices' were missed.
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 1
+        reasoning: The LLM did not explicitly identify any edge cases. ImandraX identified
+          '48 premium Express from non-Urban zones' as a specific scenario subset,
+          which represents an edge case related to the 'premium seller express overrides
+          for remote inventory' described in the problem context. The LLM did not
+          comment on 'premium seller express overrides'.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - seller_sla
+        - category_multiplier
+        - zone_processing
+        - method_delivery
+        reasoning: 'The LLM did not identify any numeric thresholds. ImandraX provided
+          four key thresholds: ''seller_sla'', ''category_multiplier'', ''zone_processing'',
+          and ''method_delivery.'' The LLM solely focused on enum-based input combinations.'
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM's numeric estimate of 2000 scenarios is significantly different
+          from ImandraX's precise count of 1254. The LLM's reasoning for 2000 is based
+          on a simple multiplication of input enum values, ignoring internal logical
+          constraints and thus leading to a lack of precision.
+      direction_accuracy:
+        score: 0.0
+        reasoning: The LLM's answer regarding the number of distinct scenarios is
+          incorrect because it did not account for internal constraints and conditional
+          logic described in the problem. ImandraX provides the correct number of
+          distinct scenarios after accounting for such constraints. The LLM is pointed
+          in the wrong direction.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM's approach of multiplying enum values to find the number
+          of regions is fundamentally flawed for this problem, resulting in a low
+          coverage score. It implies that every combination of enum is a distinct
+          region, which we know is not true due to internal constraints. Therefore,
+          it does not fully cover the actual decision space.
+      overall_summary: The LLM's answer provides a higher estimate for scenarios by
+        assuming all input enum combinations are distinct, overlooking internal logic,
+        compatibility constraints, and special overrides that reduce the actual number
+        of unique scenarios to 1254. It fails to identify edge cases, numeric thresholds,
+        or the impact of control flow on the final scenario count. Its approach is
+        simplistic, assuming direct multiplication of input parameters fully captures
+        the scenario space without considering the underlying logic. The LLM is pointed
+        in the wrong direction and missed important constraints.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM states 'Yes, but ONLY for Platinum or Enterprise sellers
+          with non-Food products and non-Critical inventory, via the premium express
+          override.' and 'Express shipping can NEVER be selected from Rural warehouses
+          for Food products.'. This indicates an understanding of a zero-scenario
+          outcome for Food products, matching the decomposition. However, the LLM
+          also describes conditions under which the override would work for non-Food
+          products, implying it sees scenarios there, but doesn't provide a precise
+          count for those. Therefore, I cannot extract a single 'n_llm_estimated_scenarios'
+          value for the direct question 'Can Express shipping ever be selected from
+          Rural warehouses for Food products?'. Thus the LLM provided an 'unknown'
+          number of scenarios, as it didn't quantify for the specific question.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of conditions, noting
+          that the `zone-method compatibility matrix` is the primary check, followed
+          by the `premium_express_override` as an exception, and then the `inventory
+          dead zone check` before the override. It accurately describes the branching
+          structure, explaining how the `premium_express_override` provides an alternative
+          path for Rural zones and how `zone_supports_method` returns `False` for
+          the normal path. The LLM also correctly implies an understanding of short-circuiting
+          by listing all conditions that must be met simultaneously for the override
+          to activate, and explaining how if `not_food` is `False` the override is
+          blocked. The override logic is very well understood, detailing the specific
+          conditions (`is_premium`, `is_rural`, `not_food`, `stock_ok`) required for
+          the `premium_express_override` to function and how it creates an exception
+          path.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Rural warehouses and Express shipping normally incompatible
+        - Premium seller override
+        - Food product exclusion from override
+        - Inventory dead zone check impact on override
+        total_edge_cases: 4
+        reasoning: 'The LLM identified four key edge cases: 1) the baseline incompatibility
+          of Rural zones with Express shipping, 2) the `premium_express_override`
+          as a mechanism to bypass this, 3) the explicit exclusion of Food products
+          from this override, and 4) the impact of inventory dead zones on the eligibility
+          for express shipping. These perfectly match the edge cases identified in
+          the decomposition.'
+        edge_case_count: 4
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Platinum
+        - Enterprise
+        - Food
+        - Electronics
+        - Apparel
+        - Furniture
+        - Books
+        - Critical
+        - Limited
+        - Abundant
+        - Adequate
+        - Rural
+        - Express
+        thresholds_from_decomp:
+        - Platinum
+        - Enterprise
+        - Food
+        - Rural
+        - Express
+        - Critical
+        - Limited
+        - Abundant
+        - Adequate
+        reasoning: The LLM identified several categorical thresholds related to `Seller
+          tier` (Platinum, Enterprise), `Product category` (Food, Electronics, Apparel,
+          Furniture, Books), `Inventory status` (Critical, Limited, Abundant, Adequate),
+          `Warehouse zone` (Rural), and `Shipping method` (Express). The decomposition
+          explicitly mentions 'Platinum/Enterprise', 'Food', 'Rural', 'Express', and
+          implicitly inventory statuses 'Abundant/Adequate' (to avoid 'Limited' due
+          to dead zone and 'Critical' due to override condition). The decomposition
+          primarily focuses on the values directly relevant to the question itself.
+          The LLM has identified a super-set of relevant thresholds and explicitly
+          mentioned all the ones found in the decomposition. The extra product categories
+          (Electronics, Apparel, Furniture, Books) are valid thresholds from the broader
+          model context, even if not strictly needed for *this* very specific question.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's conclusion, 'Express shipping can NEVER be selected from
+          Rural warehouses for Food products,' is absolutely precise and matches the
+          ImandraX answer of 'NO - 0 scenarios'. It correctly identified the exact
+          condition (`not_food = category != ProductCategory.FOOD`) which blocks the
+          override for Food products.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly concluded that Express shipping can never be
+          selected from Rural warehouses for Food products. This aligns perfectly
+          with the ImandraX answer, which also states 'NO'. The LLM accurately traces
+          the logic through the default incompatibility, the override and then the
+          specific exception for Food products within the override.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covered all relevant aspects of the problem in its reasoning,
+          including the initial compatibility check, the override logic, the specific
+          exception for Food products, and the impact of the inventory dead zone.
+          It explored all paths for Express shipping from Rural warehouses for Food
+          products, concluding that none are possible. This complete exploration of
+          the decision space, leading to an accurate zero-scenario count, indicates
+          full coverage.
+      overall_summary: The LLM demonstrated an excellent understanding of the complex
+        control flow, correctly identifying overrides, exceptions, and the precedence
+        of conditions. It precisely identified all relevant edge cases and decision
+        boundaries. The final conclusion was accurate and well-supported by a comprehensive
+        and precise reasoning process. The LLM's analysis of the scenario for non-Food
+        products also shows a good grasp of the broader model behavior.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM does not explicitly state the number of scenarios it considered,
+          so it's unknown. ImandraX implies 2 scenarios for 'in_inventory_dead_zone'
+          (true/false) in relation to the main question and decision outcome.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of the 'dead zone'
+          check as the very first and highest precedence check. It correctly understands
+          that if this condition is met, the function immediately returns, short-circuiting
+          any subsequent logic including the premium express override. It also correctly
+          infers the branching structure (if dead zone then set to standard, else
+          proceed) and that the override logic is bypassed when the dead zone condition
+          is met.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - premium express override being bypassed
+        total_edge_cases: 1
+        reasoning: The LLM correctly identifies the edge case where the 'premium express
+          override' is bypassed due to the higher precedence of the dead zone check.
+          No other specific edge cases were described in the decomposition, so the
+          LLM found all relevant ones.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - inventory_status == LIMITED
+        - requested_method in (EXPRESS, SAME_DAY)
+        thresholds_from_decomp:
+        - inventory_status = Limited
+        - requested_method = Express
+        - requested_method = SameDay
+        reasoning: 'The LLM accurately identifies the conditions for the dead zone:
+          ''inventory_status == LIMITED'' and ''requested_method in (EXPRESS, SAME_DAY)''.
+          The decomposition specifies the same conditions: ''inventory_status = Limited''
+          AND (''requested_method = Express'' OR ''SameDay''). The LLM''s identified
+          thresholds are equivalent and accurately cover the decomposition''s thresholds.'
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM precisely states that Express and SameDay are ''always
+          downgraded to Standard'' and provides the exact output fields: ''method_selected
+          = FulfillmentMethod.STANDARD'', ''can_use_air_carrier = False'', ''forced_downgrade
+          = True''. This is consistent with the ImandraX output which states ''ALWAYS
+          downgrades to Standard'' and ''method_selected = Standard; forced_downgrade
+          = true''.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion that ''No. Express and SameDay shipping
+          methods cannot be selected when inventory is in the dead zone. They are
+          always downgraded to Standard'' is 100% correct and aligns perfectly with
+          the ImandraX answer: ''PROVEN - Limited inventory with Express/SameDay ALWAYS
+          downgrades to Standard''.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM thoroughly covers all aspects described in the ImandraX
+          answer regarding the dead zone logic. It correctly identifies the dead zone
+          conditions, its high precedence, and the impact on shipping method selection,
+          including the bypassing of override logic. The explanation of the `in_inventory_dead_zone`
+          function and the immediate return of specific FulfillmentDecision fields
+          demonstrates complete understanding of the relevant decision scenarios.
+      overall_summary: The LLM provides an excellent and highly accurate answer. It
+        demonstrates a deep understanding of control flow, precedence, and override
+        logic, providing precise details that align perfectly with the formal verification
+        results from ImandraX. Its reasoning is clear, comprehensive, and accurately
+        identifies key decision boundaries and the critical edge case of the premium
+        express override being bypassed. The numeric outputs and directional conclusions
+        are entirely correct, showcasing a complete and precise understanding of the
+        system's behavior concerning the inventory dead zone.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:16'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2000
+        n_decomposition_exact_scenarios: 1254
+        reasoning: LLM estimated 2,000 scenarios based on its calculation of input
+          parameter combinations without accounting for compatibility constraints.
+          ImandraX provided a detailed breakdown leading to a final count of 1254
+          feasible scenarios.
+        score: -8.543031820255237
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identified parameters and their multiplicative
+          combinations reflecting the structure of the `determine_fulfillment_strategy`
+          function's input. It understood the overriding patterns due to the seller
+          tier and product category, and how different scenarios would lead to different
+          outcomes.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Premium Express from Remote Zones
+        total_edge_cases: 1
+        reasoning: LLM identified one specific edge case related to premium express
+          overrides in remote areas. However, it did not explore other potential edge
+          conditions or constraints that contribute to feasibility.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - seller_sla
+        - category_multiplier
+        - zone_processing
+        - method_delivery
+        thresholds_from_decomp:
+        - seller_sla
+        - category_multiplier
+        - zone_processing
+        - method_delivery
+        reasoning: Both LLM and ImandraX identified key thresholds essential for decision-making
+          in fulfillment strategies, recognizing the thresholds that guide fulfillment
+          outcomes.
+        score: 1.0
+      outcome_precision:
+        score: 0.6
+        reasoning: LLM's precision on outcomes was moderate. It arrived at total possible
+          scenarios but did not clearly delve into feasible outcomes or operational
+          constraints leading to the ultimate 1254 scenarios.
+      direction_accuracy:
+        score: 0.4
+        reasoning: LLM reached a conclusion (2000) which was incorrect relative to
+          ImandraX's verification (1254). The reasoning process showed awareness of
+          parameters, but miscalculations led to an inflated number.
+      coverage_completeness:
+        score: 0.4
+        reasoning: The LLM captured the procedural aspects and potential combinations
+          but failed to provide a comprehensive overview regarding feasibility and
+          actual scenario counts due to compatibility arguments that ImandraX highlighted.
+      overall_summary: The LLM provided a strong structural breakdown of input parameters
+        but misestimated the feasible outcomes leading to higher total scenarios than
+        practicable scenarios found by ImandraX. While it understood the control flow
+        well, it lacked in practical feasibility analysis and real-world edge case
+        identification.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM does not provide an exact count of scenarios, only concludes
+          for Food products, whereas ImandraX identifies the definitive blocking of
+          scenarios with the explanation that there are zero valid scenarios for Food
+          under the given conditions.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of conditions, accurate
+          branching structure in its decision-making logic, correctly explains the
+          short-circuit behavior where if inventory is Limited, it defaults to Standard,
+          and accurately articulates the override logic that allows for exceptional
+          paths for non-Food products with premium seller tiers.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - override clause for premium sellers
+        - food product exclusion
+        total_edge_cases: 2
+        reasoning: Both answers touched on edge cases concerning the override for
+          premium sellers and food product exclusion. The LLM correctly identified
+          these aspects but did not systematically list them as edge cases, while
+          ImandraX detailed them as critical exceptions.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Platinum or Enterprise seller
+        - Inventory must be Abundant or Adequate
+        thresholds_from_decomp:
+        - Seller tier (not Food)
+        - Inventory status
+        - Zone compatibility
+        reasoning: The LLM identified some thresholds involved in decision-making
+          but did not fully lay out all thresholds present in the decomposition which
+          included critical factors like food exclusion.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.85
+        reasoning: The LLM's conclusion is precise regarding non-Food products but
+          fails with Food products since it incorrectly states Express can be selected
+          in certain circumstances for non-Food products when it’s blocked for Food.
+      direction_accuracy:
+        score: 0.5
+        reasoning: The LLM reaches a conclusion for Food products that is ultimately
+          incorrect (stating Express can be selected under some conditions), but accurately
+          captures that Express is possible for other categories under specific conditions.
+      coverage_completeness:
+        score: 0.6
+        reasoning: The LLM covers some scenarios related to non-Food products but
+          misses the overall ruling out of Express for Food comprehensively. ImandraX
+          captures the entire logic pathway leading to the conclusion of zero valid
+          scenarios for Food.
+      overall_summary: The LLM demonstrates a good understanding of the control flow
+        and conditions leading to delivery method selection, accurately captures some
+        high-level scenarios, but ultimately fails in decisively ruling out Express
+        shipping for Food products. It misses comprehensive edge case identification,
+        lacks full decision boundary clarity, and gives incomplete directional accuracy
+        in its conclusions.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 1
+        n_decomposition_exact_scenarios: 1
+        reasoning: LLM and ImandraX both correctly assessed that no scenarios permit
+          Express or SameDay during dead zones, with LLM considering the single feasible
+          path where inventory is limited and methods are downgraded to Standard.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: LLM accurately identified that the dead zone check comes first
+          in control flow, followed by the override logic and return values, capturing
+          the hierarchical structure of conditions.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - None
+        total_edge_cases: 0
+        reasoning: Both answers identified no exceptional or unusual situations where
+          Express or SameDay could be selected during the identified constraints of
+          inventory levels and order velocity.
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Limited inventory means Standard shipping
+        thresholds_from_decomp:
+        - Limited inventory -> Standard, Critical inventory -> Block Express/SameDay
+          entirely
+        reasoning: LLM translated inventory levels to shipping method outcomes without
+          disambiguation of explicit threshold definitions, while ImandraX clarified
+          the specified inventory boundaries.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: Both answers reach a definitive conclusion. LLM's understanding
+          aligns with the strict downgrade requirements based on inventory conditions.
+      direction_accuracy:
+        score: 1.0
+        reasoning: Both answers conclusively and correctly state that Express and
+          SameDay cannot be chosen when the inventory is in the dead zone and thus
+          reach the right outcome.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Both answers cover all scenarios concerning the dead zone conditions,
+          providing clear reasoning as to why expedited shipping options are not available.
+      overall_summary: Both the LLM and ImandraX have demonstrated high accuracy in
+        reasoning and understanding of the fulfillment strategy's decision-making
+        process regarding dead zones in inventory. They have effectively identified
+        that Express and SameDay shipping methods are unconditionally downgraded,
+        with LLM's reasoning being accurate but slightly less detailed in articulating
+        the specific thresholds and control flow relationships.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:26'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2000
+        n_decomposition_exact_scenarios: 1254
+        reasoning: The LLM's final answer states '2,000 distinct fulfillment strategy
+          scenarios', explicitly calculated as 5 (seller tiers) × 5 (product categories)
+          × 4 (inventory statuses) × 5 (requested methods) × 4 (warehouse zones) =
+          2,000, assuming all input combinations are valid scenarios. The ImandraX
+          answer provides the exact number from decomposition as 1,254 actual regions,
+          noting that out of 2,000 potential ADT combinations, only 62% are feasible
+          due to compatibility constraints.
+        score: -8.543031820255237
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: The LLM does not analyze or mention any control flow elements such
+          as condition precedence, branching based on guards, short-circuiting, or
+          override logic (e.g., premium seller express overrides). It treats the problem
+          as a simple Cartesian product of input enums without considering the described
+          core logic features like zone-method-carrier multiplexing, compatibility
+          matrices, inventory dead zones, or quorum-based selection. Branching structure
+          is partially understood only in the sense of recognizing multiple input
+          parameters, but no deeper structure is captured.
+        score: 0.125
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 48
+        reasoning: The LLM identifies no specific edge cases, focusing solely on total
+          input combinations without discussing rare or policy-violating scenarios
+          like premium Express overrides from non-Urban zones or inventory dead zones
+          during high velocity. The ImandraX answer highlights 48 such premium Express
+          from remote (non-Urban) scenarios as a focus subset for the override pattern,
+          which we take as the total number of key edge cases in the decomposition
+          for evaluation purposes; the LLM misses all of them.
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - '6'
+        - '12'
+        - '24'
+        - '48'
+        - '72'
+        - '1'
+        - '2'
+        - '3'
+        - '4'
+        - '2'
+        - '4'
+        - '8'
+        - '24'
+        - '2'
+        - '6'
+        - '24'
+        - '72'
+        - '96'
+        reasoning: 'The LLM does not identify or discuss any numeric thresholds, cost
+          constraints, SLAs, multipliers, or processing times that define decision
+          boundaries. The decomposition reveals several: seller_sla thresholds [6,12,24,48,72]
+          (hours?), category_multiplier [1,2,3,4], zone_processing [2,4,8,24], and
+          method_delivery [2,6,24,72,96]. All are missed by the LLM, which ignores
+          these boundaries entirely.'
+        score: 0.0
+      outcome_precision:
+        score: 0.0
+        reasoning: The LLM provides a single numeric estimate of 2,000 for the total
+          scenarios, which is incorrect and does not account for any constraints or
+          distributions (e.g., no breakdown like ImandraX's 1,254 total with 48 premium
+          subsets). There are no precise numeric distributions or probabilities given;
+          the estimate is a rough overcount based on unchecked enum multiplication,
+          warranting a score of 0.0 for precision.
+      direction_accuracy:
+        score: 0.4
+        reasoning: The LLM's conclusion overestimates the scenario count (2,000 vs.
+          actual 1,254), but it correctly identifies the scale in the thousands and
+          the base structure of inputs (seller, product, inventory, warehouse, plus
+          method). However, it fails to recognize feasibility constraints reducing
+          the space by ~38%, leading to an inaccurate final number. Directionally,
+          it points toward a large combinatorial space but misses key reductions,
+          justifying a moderate-low score of 0.4.
+      coverage_completeness:
+        score: 0.0
+        reasoning: The LLM does not enumerate or describe any specific decision scenarios,
+          only estimating a total count based on input enums without decomposition.
+          The actual coverage from ImandraX is 1,254 distinct regions, but the LLM
+          covers none explicitly, treating all 2,000 potentials as valid without identifying
+          feasible subsets or constraints. Using a rubric of proportion of actual
+          scenarios acknowledged or listed, the score is 0.0 as no scenarios are distinctly
+          found or verified.
+      overall_summary: 'The LLM answer is superficial, relying on naive enumeration
+        of input parameter cardinalities (5×5×4×5×4=2,000) without engaging with the
+        problem''s complex logic, such as compatibility matrices, overrides, or thresholds,
+        resulting in a significant overestimate (2,000 vs. 1,254 actual). It shows
+        basic parameter recognition but no understanding of control flow, edge cases,
+        or decision boundaries. Strengths: Correctly lists enum sizes and total potential
+        space. Weaknesses: Ignores all constraints and core features, leading to poor
+        accuracy across metrics. ImandraX provides precise, verified decomposition
+        with breakdowns, highlighting the LLM''s limitations in handling real-world
+        policy complexity.'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM concludes 'NEVER' for Food products from Rural warehouses
+          with Express shipping, implying 0 possible scenarios. This matches the ImandraX
+          decomposition of 0 scenarios. No explicit count is given by LLM, but the
+          conclusion aligns exactly.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence: LLM correctly notes inventory dead zone check happens
+          BEFORE override, preventing Limited inventory from reaching override for
+          Express. Branching: LLM accurately describes normal path (zone_supports_method
+          false for Rural-Express) leading to fallback, and override branch for premium
+          sellers. Short-circuit: Correctly identifies dead zone short-circuit downgrading
+          Express to Standard for Limited inventory before override. Override: Precisely
+          captures premium_express_override conditions, including explicit Food exclusion
+          (not_food), which blocks for Food products.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Food product exclusion in premium override due to perishable risk
+        total_edge_cases: 1
+        reasoning: 'LLM identifies the key edge case: Food products are explicitly
+          excluded from the premium_express_override despite other conditions (premium
+          seller, Rural zone) being met, due to perishable risk. This matches the
+          single edge case in ImandraX (exception clause for Food). No other edge
+          cases like inventory dead zones are missed in context, but the Food block
+          is fully covered.'
+        edge_case_count: 1
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp: []
+        reasoning: 'No numeric thresholds are involved in this decision (e.g., no
+          quantities for velocity or capacity mentioned). Decisions are categorical:
+          seller tier (Platinum/Enterprise), zone (Rural), category (Food vs. non-Food),
+          inventory (not Critical). LLM identifies these categorical boundaries clearly,
+          including the ''not_food'' condition in override. No misses, but since not
+          numeric, lists are empty.'
+        score: 1.0
+      outcome_precision:
+        score: 0.0
+        reasoning: No numeric distributions or probabilities are provided by LLM (e.g.,
+          no percentages or counts of scenarios). The answer is binary (NEVER/NO for
+          Food), so precision score is 0.0 as no quantitative outcomes are detailed
+          beyond the conclusion.
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'LLM reaches the correct conclusion: Express shipping from Rural
+          warehouses is NEVER possible for Food products, aligning perfectly with
+          ImandraX''s ''NO - 0 scenarios''. The reasoning traces both normal path
+          denial and override block due to Food exclusion, with no incorrect directions.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: The question focuses on a specific combination (Express from Rural
+          for Food). ImandraX decomposes to 0 scenarios, blocked by exception. LLM
+          fully covers this by explaining normal path failure and override exclusion
+          for Food, identifying all relevant conditions (premium tier, rural, not_food,
+          stock_ok). No scenarios missed; complete coverage of the decision space
+          for this query.
+      overall_summary: 'The LLM answer demonstrates strong qualitative understanding
+        of the control flow and exceptions, correctly concluding impossibility for
+        Food products while detailing conditions for non-Food cases. It misses quantitative
+        precision and scenario counting but excels in direction, coverage, and edge
+        detection for this categorical decision. Strengths: accurate override logic
+        and Food exclusion insight. Weaknesses: no numeric estimation or distributions,
+        but not critical here as the logic is rule-based without quantities.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 1
+        reasoning: The LLM answer focuses on a specific yes/no question about the
+          dead zone condition without estimating or enumerating the total number of
+          scenarios in the state space. It implies a single blocking scenario (dead
+          zone triggers downgrade) but does not quantify broader regions or combinations.
+          The ImandraX decomposition verifies a single property (in_dead_zone ==>
+          method_selected = Standard), representing one exact scenario/region for
+          this logic path, so actual count is 1.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence_of_conditions: correct - LLM correctly identifies the
+          dead zone check as the very first condition with highest precedence, overriding
+          all subsequent logic including premium express overrides. Branching_structure:
+          correct - LLM accurately describes the immediate return/branch to Standard
+          method when dead zone is true, before any other branching. Short_circuit_behavior:
+          correct - LLM notes the function ''immediately returns'' a downgrade, capturing
+          the short-circuiting nature of the early check. Override_logic: correct
+          - LLM explicitly states that premium express override is checked after the
+          dead zone check and thus ''never gets a chance to execute'' in dead zone
+          conditions, aligning with ImandraX''s safety_precedence where dead zone
+          is level_1_critical above level_2_override.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone forces downgrade regardless of seller tier
+        - Premium express override does not apply in dead zone
+        - No bypass for any product category, warehouse zone, or other parameters
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies key edge cases implicitly through its reasoning:
+          (1) the dead zone condition itself as an edge case where fast methods are
+          blocked irrespective of seller tier (matching ImandraX''s ''regardless of
+          seller tier or other factors''); (2) the override not applying as an edge
+          case where premium benefits are nullified; and (3) no code paths bypassing
+          the check, covering variations in other parameters like category or zone.
+          ImandraX highlights the dead zone as a core edge case with risky combinations
+          (limited stock + fast shipping), and its decomposition implies variations
+          in inventory levels and methods as edges (e.g., Limited vs Critical). Total
+          edge cases in decomposition: 3 (dead zone trigger, override inapplicability,
+          parameter independence), all of which the LLM effectively detects through
+          explanation.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - inventory_status == LIMITED
+        - requested_method in (EXPRESS, SAME_DAY)
+        thresholds_from_decomp:
+        - inventory_status = Limited (stock 18-22 with velocity ≥8)
+        - requested_method = Express OR SameDay
+        reasoning: 'The LLM identifies the core decision boundaries as ''inventory_status
+          == LIMITED'' and ''requested_method in (EXPRESS, SAME_DAY)'', directly tying
+          to the dead zone definition, though it does not explicitly reference the
+          numeric stock 18-22 or velocity ≥8 from the question (instead referencing
+          the code function). The decomposition from ImandraX specifies these with
+          numerics: Limited inventory (explicitly linked to stock 18-22/velocity ≥8)
+          and the method conditions. LLM misses the exact numeric tying but correctly
+          captures the logical boundaries; no major misses, but slightly less precise
+          on numerics.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides a precise, definitive outcome: ''neither Express
+          nor SameDay can ever be selected'' and ''unconditionally downgraded to Standard'',
+          matching the binary yes/no nature of the question and ImandraX''s ''ALWAYS
+          downgrades''. No probabilistic or approximate distributions are involved;
+          the conclusion is exact and aligns with the verified property, warranting
+          full precision score.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion ('No, cannot be selected') is fully correct
+          and in the same direction as ImandraX's proven property ('ALWAYS downgrades
+          to Standard'). Both emphasize the blocking nature of the dead zone with
+          no exceptions, accurately reflecting the logic's intent to prevent over-promising
+          on risky inventory. No inaccuracies in direction or scope.
+      coverage_completeness:
+        score: 1.0
+        reasoning: Using the property-based rubric from ImandraX (in_dead_zone ==>
+          method_selected = Standard), the LLM fully covers this decision scenario
+          by explaining the trigger conditions, precedence, and outcome, including
+          why overrides and other factors do not apply. It addresses the question's
+          specific dead zone definition (stock 18-22, velocity ≥8) implicitly via
+          the LIMITED status. No parts of the relevant logic path are missed; coverage
+          is complete for the queried scenario.
+      overall_summary: ' "The LLM answer demonstrates strong understanding of the
+        core logic, particularly control flow and precedence, accurately concluding
+        the blocking behavior in dead zone conditions without needing formal decomposition.
+        It matches ImandraX''s verified insights on downgrade enforcement and override
+        inapplicability, with high scores across metrics except state space estimation
+        (lacking quantification) and minor numeric boundary precision. Strengths:
+        precise directional accuracy, complete coverage of the scenario, and clear
+        edge case implications. Weaknesses: No explicit scenario counting or numeric
+        thresholds from the question, but this does not detract from the yes/no resolution.
+        Overall, the LLM performs comparably to ImandraX for this targeted question,
+        validating informal reasoning against formal verification."'
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: anthropic/claude-haiku-4.5
+  timestamp: '2026-02-09 17:53:11'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 2000
+        n_decomposition_exact_scenarios: 1254
+        reasoning: The LLM estimated 2,000 distinct scenarios by calculating the raw
+          combinatorial product of all input parameters (5 × 5 × 4 × 5 × 4 = 2,000).
+          However, ImandraX's actual decomposition discovered only 1,254 feasible
+          scenarios after accounting for compatibility constraints. The LLM's reasoning
+          showed uncertainty and multiple re-readings of the question, ultimately
+          settling on the naive combinatorial count without considering that not all
+          input combinations are valid or result in distinct decision paths. The LLM's
+          estimate is 59.5% of the actual count (2000/1254 = 1.594x), revealing a
+          significant overestimation due to failure to account for constraint-based
+          feasibility filtering.
+        score: -8.543031820255237
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: incorrect
+        override_logic: incorrect
+        reasoning: 'The LLM failed to recognize that the system implements multiple
+          complex control flow patterns: (1) Premium seller express overrides for
+          remote inventory—the LLM did not account for conditional branching that
+          eliminates certain combinations based on seller tier and zone interaction.
+          (2) Zone-method-carrier multiplexing with compatibility matrices—the LLM
+          treated all 5 methods as valid across all zones, but the actual system has
+          constraints that reduce feasible paths. (3) Inventory dead zones during
+          high velocity—the LLM did not recognize logic that deactivates certain pathways
+          under specific inventory conditions. (4) Quorum-based method selection requiring
+          multiple operational criteria—the LLM ignored that methods must satisfy
+          multiple conditions simultaneously, creating short-circuit behavior. The
+          LLM''s combinatorial approach assumes all input combinations are independent
+          and lead to distinct outcomes, missing the override patterns and guard conditions
+          that prune the decision tree.'
+        score: 0.25
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 2
+        reasoning: 'The ImandraX decomposition identified at least 2 notable edge
+          cases: (1) Premium Express from non-Urban zones (48 scenarios / 4% focus
+          subset) representing a rare policy-violating or highly specialized scenario
+          where premium sellers trigger express overrides in remote inventory contexts,
+          and (2) The 38% reduction in feasible scenarios (from 2000 to 1254) due
+          to compatibility constraints indicates multiple edge cases where combinations
+          are structurally invalid. The LLM identified neither of these patterns,
+          providing no edge case analysis whatsoever. The LLM''s combinatorial reasoning
+          inherently missed the bounded regions and constraint violations that characterize
+          edge cases in this complex system.'
+        edge_case_count: 0
+        score: 0.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm: []
+        thresholds_from_decomp:
+        - 'seller_sla: 6, 12, 24, 48, 72'
+        - 'category_multiplier: 1, 2, 3, 4'
+        - 'zone_processing: 2, 4, 8, 24'
+        - 'method_delivery: 2, 6, 24, 72, 96'
+        reasoning: 'The LLM provided no numeric thresholds whatsoever, offering only
+          a categorical enumeration of parameter values (5 seller tiers, 5 product
+          categories, etc.). The ImandraX decomposition revealed critical numeric
+          decision boundaries across four dimensions: SLA thresholds at 6/12/24/48/72
+          hours for seller-based prioritization, category multipliers (1-4x) for processing
+          time adjustments, zone processing times (2-24 hours) for warehouse-specific
+          logistics, and method delivery windows (2-96 hours) for carrier selection.
+          The LLM''s failure to identify any thresholds suggests it did not understand
+          the underlying quantitative constraints that drive the fulfillment strategy
+          decisions. This represents a complete gap in decision boundary clarity.'
+        score: 0.0
+      outcome_precision:
+        score: 0.2
+        reasoning: 'The LLM provided only a single point estimate (2,000 scenarios)
+          without any numeric distributions, probability weightings, or breakdown
+          of scenario prevalence. The ImandraX answer provides richer precision: 1,254
+          total scenarios with explicit subset identification (48 premium Express
+          scenarios = 4% focus subset, implying 1,206 non-premium scenarios = 96%).
+          This is a 2-3% precision level from ImandraX compared to the LLM''s 0% precision
+          regarding distributions. The LLM''s answer lacks any quantification of scenario
+          distribution patterns, constraint impact magnitudes, or relative proportions
+          of distinct pathway outcomes. The score of 0.2 reflects that the LLM at
+          least provided a numeric total count (necessary but not sufficient for outcome
+          precision), but completely failed to characterize the distribution of scenarios
+          across meaningful partitions or provide likelihood weightings.'
+      direction_accuracy:
+        score: 0.3
+        reasoning: The LLM's final answer of 2,000 is directionally incorrect—it overestimates
+          the actual count by 59.5% (2000 vs 1254). However, the LLM did correctly
+          identify that the answer should be a positive integer derived from the function's
+          parameter space, and the reasoning process showed some structural understanding
+          of parameter enumeration. The LLM also oscillated between different interpretations
+          (1,500 → 2,000 → debate about including requested_method), ultimately selecting
+          a defensible but incorrect estimate. The primary failure is not understanding
+          that many input combinations are infeasible due to compatibility constraints.
+          The LLM's conclusion about 'all possible input combinations' being distinct
+          scenarios is fundamentally flawed; the correct answer requires recognizing
+          that compatibility matrices and constraint logic reduce the actual state
+          space. A score of 0.3 reflects that the approach was partially sound but
+          the core assumption about feasibility was wrong.
+      coverage_completeness:
+        score: 0.38
+        reasoning: 'The LLM achieved 1,254 actual scenarios out of 2,000 potential
+          combinations, but the LLM itself claimed all 2,000 were valid. Using the
+          ImandraX decomposition as ground truth, the LLM covered 62.7% of feasible
+          scenarios (1254/2000), but this is misleading because the LLM thought all
+          2,000 were achievable. In reality, the LLM covered ~100% of the actual scenario
+          space (by claiming 2,000 when there are 1,254), but this is false coverage—it
+          includes 746 infeasible or non-distinct scenarios. True coverage assessment:
+          the LLM identified the correct problem space but failed to recognize constraint-driven
+          pruning. Its coverage of the *actual* decision scenarios is therefore 100%
+          in count but 0% in accuracy/validity. Using a hybrid rubric: (scenarios_estimated_correctly
+          / scenarios_in_true_space) = accuracy ≈ 0.38, acknowledging the LLM bounded
+          the right region but massively inflated the count.'
+      overall_summary: '{"summary": "The LLM''s answer significantly overestimates
+        the fulfillment strategy scenario count, claiming 2,000 distinct scenarios
+        when the actual number is 1,254. This represents a critical failure to account
+        for the complex constraint logic embedded in the system—namely compatibility
+        matrices between zones, methods, and carriers; premium seller overrides; inventory
+        dead zones; and quorum-based method selection. The LLM''s reasoning relied
+        on naive combinatorial multiplication (5×5×4×5×4), treating all input combinations
+        as valid and distinct, without recognizing that the system''s control flow
+        logic prunes ~38% of the theoretical space. The answer lacks precision in
+        outcome distribution, identifies zero numeric decision thresholds, misses
+        edge cases (such as the 48-scenario premium Express subset), and fundamentally
+        misunderstands the branching structure, override logic, and short-circuit
+        behavior that govern scenario feasibility. Strengths: the LLM correctly identified
+        the parameter categories and their cardinalities, and showed some self-correction
+        in reasoning. Weaknesses: no recognition of constraints, no threshold identification,
+        no edge case detection, no distribution analysis, and directional overestimation
+        by 59.5%."}'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM does not provide an explicit count of total scenarios in
+          the marketplace. The LLM's answer focuses on the logical conditions for
+          the Food+Rural+Express combination rather than estimating total state space.
+          The decomposition shows this specific combination yields 0 scenarios (blocked
+          by exception clause). The LLM correctly identifies the outcome but does
+          not estimate overall scenario count, so we cannot calculate a ratio.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM demonstrates strong control flow understanding: (1) Precedence
+          is correct - the LLM identifies that zone-method compatibility is checked
+          first, then the inventory dead zone check occurs BEFORE the premium override,
+          establishing clear evaluation order. (2) Branching structure is correct
+          - the LLM maps the conditional paths: normal path via zone_supports_method
+          returns False, then override path via premium_express_override is checked.
+          (3) Short-circuit behavior is correct - the LLM notes that inventory dead
+          zones (Limited inventory with Express method) get downgraded to Standard
+          BEFORE reaching the override check, effectively short-circuiting the override
+          logic. (4) Override logic is correct - the LLM correctly identifies the
+          premium_express_override requires ALL conditions (is_premium AND is_rural
+          AND not_food AND stock_ok) and explicitly states Food is excluded. The only
+          minor point is that the LLM could have been more explicit about the exact
+          line references, but the logical flow is accurate.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Food products with premium seller (Platinum/Enterprise) and Rural warehouse
+          - blocked by exception clause
+        - Limited inventory with Express method - downgraded before override check
+        - Critical inventory status - blocks override even for premium sellers
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies 3 key edge cases: (1) The nested exception
+          for Food products despite premium seller status, which is the core edge
+          case in this problem, (2) The inventory dead zone behavior where Limited+Express
+          gets downgraded before override evaluation, creating a subtle control flow
+          issue, (3) Critical inventory blocking the override. The decomposition shows
+          the exception clause for Food products is the primary safety-critical pattern.
+          The LLM correctly identifies all three edge cases without missing any. The
+          analysis demonstrates understanding of why these are exceptions (perishable
+          risk for Food, inventory constraints for Limited status).'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - Seller tier must be Platinum or Enterprise (not Basic/Professional)
+        - Inventory status must be Abundant or Adequate (not Limited or Critical)
+        - Product category must NOT be Food
+        thresholds_from_decomp:
+        - 'Seller tier: Platinum/Enterprise required for is_premium = true'
+        - 'Inventory status: Abundant/Adequate required (Limited blocked by dead zone,
+          Critical blocked by override condition)'
+        - 'Product category: Food category must return not_food = FALSE, blocking
+          override'
+        - 'Warehouse zone: Must be Rural'
+        reasoning: 'The LLM identifies the key decision boundaries clearly: seller
+          tier classification (Platinum/Enterprise), inventory levels (Abundant/Adequate
+          vs Limited vs Critical), and product category (Food excluded). The decomposition
+          confirms these thresholds. The LLM captures 3 of 4 explicit thresholds,
+          missing the explicit statement that warehouse zone must be Rural (though
+          this is implicit in the question and the LLM does mention it). The LLM effectively
+          explains why certain inventory levels are excluded (dead zone logic for
+          Limited, stock_ok condition for Critical) and why Food is excluded. The
+          numeric/categorical boundaries are well-defined.'
+        score: 0.75
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides precise, definitive conclusions: ''Express shipping
+          can NEVER be selected from Rural warehouses for Food products'' - a clear
+          binary outcome. The reasoning traces through exact conditions: not_food
+          = category != ProductCategory.FOOD returns FALSE for Food products, causing
+          the override to return false. The LLM then confirms the normal path also
+          cannot select Express (zone_supports_method returns False). The answer is
+          definitive with zero ambiguity - no scenarios exist where Food+Rural+Express
+          is valid. The decomposition confirms this with ''0 scenarios (Exception
+          clause blocks this combination)''. Both answers align perfectly on the outcome
+          precision: Food products cannot use Express from Rural warehouses under
+          any circumstances. The LLM provides the correct direction (NO) with full
+          confidence and supporting detail.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is definitively correct: ''Express shipping
+          can NEVER be selected from Rural warehouses for Food products.'' This conclusion
+          is supported by two independent blocking mechanisms: (1) The zone-method
+          compatibility matrix shows (Rural, Express) → False for the normal path,
+          and (2) The premium_express_override function explicitly excludes Food products
+          via the ''not_food'' condition. The ImandraX decomposition confirms this
+          with ''answer: NO - 0 scenarios'', establishing that the combination is
+          impossible. The LLM correctly identifies that while the premium_express_override
+          could theoretically bypass the zone limitation for premium sellers, Food
+          products are explicitly blocked by the exception clause. The reasoning is
+          sound, the conclusion is accurate, and the direction (NO, cannot happen)
+          is precisely correct.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'The LLM provides complete coverage of the decision scenario. The
+          question asks: ''Can Express shipping ever be selected from Rural warehouses
+          for Food products? If yes, under what exact conditions?'' The LLM comprehensively
+          addresses both parts: (1) Direct answer: NO, it can never be selected, (2)
+          Complete path analysis: examines both the normal zone-method path and the
+          premium override path, (3) Exception clause identification: explicitly identifies
+          the ''not_food'' exception in the premium_express_override, (4) Condition
+          enumeration: lists all conditions for the override (is_premium, is_rural,
+          not_food, stock_ok) and explains why Food fails the not_food check. The
+          LLM also covers related scenarios (works for non-Food products when conditions
+          are met) to provide context. No aspect of the decision logic is left unexplored.
+          The coverage is complete and aligned with the ImandraX finding of 0 scenarios.'
+      overall_summary: 'Both the LLM and ImandraX arrive at the same correct conclusion:
+        Express shipping can NEVER be selected from Rural warehouses for Food products.
+        The LLM demonstrates exceptional understanding of the control flow logic,
+        including the precedence of conditions, branching structure, short-circuit
+        behavior via inventory dead zones, and the nested exception pattern (base
+        rule denied → override allows → exception re-denies). The LLM correctly identifies
+        the exception clause (''not_food'' condition blocks Food products) and explains
+        the safety rationale (perishable risk from long Rural processing). All key
+        decision boundaries are identified (seller tier, inventory levels, product
+        category, warehouse zone), and the outcome is stated with precision and confidence.
+        Edge cases are identified correctly. The main strengths are: (1) Clear explanation
+        of the nested override-exception logic, (2) Correct direction with full confidence,
+        (3) Comprehensive path analysis covering both normal and override routes.
+        The only minor weakness is lack of explicit code line references (which the
+        decomposition provides). Overall, the LLM answer is highly accurate, well-reasoned,
+        and complete—matching the ImandraX verification perfectly.'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 0
+        reasoning: Neither answer explicitly estimates a total scenario count or provides
+          a complete decomposition of state space regions. Both focus on the dead
+          zone rule rather than enumerating distinct decision scenarios across all
+          parameter combinations (seller tier, category, zone, velocity ranges, etc.).
+          Without detailed scenario enumeration from either answer or the decomposition
+          provided, we cannot precisely measure state space estimation accuracy. The
+          decomposition information provided does not include an exact scenario region
+          count.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'LLM and ImandraX both correctly identify that the dead zone check
+          (lines 145-153) has the HIGHEST precedence in the control flow. Both correctly
+          explain that when in_inventory_dead_zone returns True, the function immediately
+          returns with forced downgrade to Standard BEFORE any other logic executes.
+          LLM explicitly states ''The dead zone check is the VERY FIRST check in determine_fulfillment_strategy,
+          before any other logic (including the premium express override)'' and ''The
+          premium express override... is checked AFTER the dead zone check, so it
+          never gets a chance to execute.'' Both answers correctly understand the
+          branching structure: if dead_zone then immediate return, else continue to
+          other logic. Short-circuit behavior is correctly captured: the early return
+          prevents further evaluation. Override logic is correctly understood: the
+          premium express override is checked after the dead zone, so it cannot override
+          dead zone decisions.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Dead zone applies specifically when inventory_status = LIMITED AND (requested_method
+          = EXPRESS OR SAME_DAY)
+        - Premium express override cannot rescue Express method during dead zone even
+          for Enterprise sellers
+        - The dead zone prevents 'over-promising on uncertain inventory' regardless
+          of seller tier
+        total_edge_cases: 3
+        reasoning: 'Both answers identify the critical edge case: that Express/SameDay
+          are blocked in the dead zone even though a premium express override mechanism
+          exists elsewhere in the code. LLM correctly notes ''There is no code path
+          that bypasses the dead zone check for any seller tier, product category,
+          warehouse zone, or other parameter.'' ImandraX explicitly documents the
+          safety precedence hierarchy showing the dead zone at level_1_critical above
+          overrides. The key insight that the dead zone prevents ''over-promising
+          on uncertain inventory before any override can apply'' is correctly captured.
+          Both answers find all the important edge cases: the dead zone''s absolute
+          blocking of Express/SameDay, the fact that it applies only to LIMITED inventory
+          (not Critical or Adequate), and that seller tier/other factors cannot override
+          it.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - inventory_status = LIMITED (triggered by dead zone)
+        - requested_method in (EXPRESS, SAME_DAY)
+        thresholds_from_decomp:
+        - inventory_status = LIMITED (for dead zone trigger)
+        - requested_method in (EXPRESS, SAME_DAY)
+        - stock range 18-22 (referenced in question but clarified as context, not
+          the actual definition)
+        - order velocity ≥8 (referenced in question but appears to be separate from
+          dead zone logic)
+        reasoning: 'The LLM correctly identifies that the dead zone is triggered by
+          inventory_status = LIMITED AND requested_method in (EXPRESS, SAME_DAY).
+          However, the LLM makes an important clarification: the question references
+          ''stock 18-22 with order velocity ≥8'' as the dead zone definition, but
+          the code actually defines the dead zone through inventory_status enum (LIMITED)
+          rather than specific numeric stock ranges. ImandraX''s decomposition documents
+          that ''Limited: Dead zone for Express/SameDay (line 128-130)'' but both
+          answers recognize the question''s numeric references may not directly map
+          to the code''s enum-based approach. The LLM explicitly notes this discrepancy:
+          ''The question references "stock 18-22 with order velocity ≥8" as the dead
+          zone, but in the code model, the dead zone is defined by the `in_inventory_dead_zone`
+          function.'' This is accurate and demonstrates good boundary clarity despite
+          the mismatch between question framing and code implementation.'
+        score: 0.5
+      outcome_precision:
+        score: 1.0
+        reasoning: 'Both answers provide identical and precise outcomes: Express and
+          SameDay shipping methods CANNOT be selected when inventory is in the dead
+          zone. The outcome is definitively stated as ''No'' (downgraded to Standard)
+          with forced_downgrade = true. Both answers specify exact method selection
+          logic: method_selected = FulfillmentMethod.STANDARD, forced_downgrade =
+          True, can_use_air_carrier = False. The LLM states ''immediately returns
+          a FulfillmentDecision with: method_selected = FulfillmentMethod.STANDARD''
+          and ImandraX states ''result.method_selected = Standard''. Both provide
+          exact code references (lines 145-153) and identical reasoning about the
+          unconditional nature of the downgrade. There is no ambiguity or imprecision
+          in either answer regarding the specific outcome.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'Both answers reach the correct directional conclusion: NO, Express
+          and SameDay cannot be selected in the dead zone. LLM answer: ''Answer: No.
+          Express and SameDay shipping methods cannot be selected when inventory is
+          in the dead zone.'' ImandraX answer: ''answer: PROVEN - Limited inventory
+          with Express/SameDay ALWAYS downgrades to Standard.'' Both correctly identify
+          this is an absolute, unconditional blocking rule with no exceptions. The
+          reasoning is sound: the dead zone check executes before any override logic,
+          preventing any code path that would allow Express/SameDay selection. The
+          conclusion aligns with the code logic documented in both answers (lines
+          145-153 showing the immediate forced return). The directional accuracy is
+          perfect with no ambiguity or error.'
+      coverage_completeness:
+        score: 0.95
+        reasoning: 'Both answers comprehensively cover the decision scenarios relevant
+          to the specific question about dead zone blocking. They address: (1) the
+          dead zone definition and trigger condition, (2) the immediate forced return
+          behavior, (3) the precedence over premium express override, (4) confirmation
+          that no seller tier/category/zone can bypass it. The LLM explicitly states
+          ''There is no code path that bypasses the dead zone check for any seller
+          tier, product category, warehouse zone, or other parameter'' - demonstrating
+          thorough coverage of possible exception scenarios. ImandraX documents the
+          complete safety precedence hierarchy (level_1 through level_3). The minor
+          reason for not full 1.0 is that neither answer explicitly enumerates all
+          the different inventory level categories (Abundant, Adequate, Limited, Critical)
+          to fully contextualize why Limited is special, though both mention Limited
+          has the dead zone. The coverage is very comprehensive for the specific question
+          asked.'
+      overall_summary: >-
+        Both the LLM and ImandraX answers are high-quality and essentially equivalent
+        in their conclusions and reasoning. Both correctly identify that Express and
+        SameDay shipping methods CANNOT be selected when inventory enters the dead
+        zone due to the highest-precedence dead zone check that executes before any
+        override logic.
+
+
+        STRENGTHS:
+
+        - Both answers achieve perfect outcome precision and direction accuracy
+
+        - Both correctly understand the control flow precedence: dead zone check (line
+        145-153) → forced downgrade → early return → premium override never executes
+
+        - Both identify the critical safety property: the dead zone prevents "over-promising"
+        on limited inventory regardless of seller tier
+
+        - Both correctly note the discrepancy between the question's numeric framing
+        (stock 18-22, velocity ≥8) and the code's enum-based inventory_status definition
+
+        - Coverage is comprehensive for the specific question, with good edge case
+        detection
+
+
+        WEAKNESSES (minor, affecting overall assessment minimally):
+
+        - Neither provides a complete enumeration of all inventory status categories
+        (Abundant, Adequate, Limited, Critical) to fully contextualize the decision
+        space
+
+        - Neither explicitly counts total decision scenarios, limiting state space
+        estimation accuracy assessment
+
+        - Both focus narrowly on the dead zone rule rather than mapping how all parameter
+        combinations affect outcomes
+
+
+        DIFFERENTIATION:
+
+        - LLM is slightly more explicit in stating "There is no code path that bypasses
+        the dead zone check" with detailed parameter coverage
+
+        - ImandraX provides a cleaner hierarchical safety precedence model and explicit
+        line number documentation
+
+        - Both are essentially equivalent in quality for answering this specific question
+
+
+        Overall assessment: Excellent answers with near-perfect accuracy on the specific
+        question. The only meaningful limitation is the lack of broader state space
+        enumeration, which is acceptable given the focused nature of the question.

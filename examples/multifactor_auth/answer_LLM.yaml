@@ -292,3 +292,128 @@
       - Therefore, lock_account does not "always" trigger when failed_attempts ==
       max_failed_attempts; it depends on whether the current authentication attempt
       fails with incorrect password
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:00'
+  q1:
+    answer: 7 distinct authentication outcome scenarios exist across all user states
+      and authentication factors.
+    reasoning: >-
+      Tracing through all paths in determine_auth_result:
+
+
+      1. **LOCKED user**: Returns (granted=False, requires_additional_factor=False,
+      lock_account=True, step_up_auth_needed=False)
+
+
+      2. **SUSPENDED user**: Returns (granted=False, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=False)
+
+
+      3. **ACTIVE user, password incorrect, failed_attempts+1 >= max_failed_attempts**:
+      Returns (granted=False, requires_additional_factor=False, lock_account=True,
+      step_up_auth_needed=False) — Note: this has the same field values as scenario
+      1, but is a distinct code path. However, counting distinct *outcome tuples*,
+      it matches scenario 1.
+
+
+      4. **ACTIVE user, password incorrect, failed_attempts+1 < max_failed_attempts**:
+      Returns (granted=False, requires_additional_factor=False, lock_account=False,
+      step_up_auth_needed=False) — Same tuple as scenario 2.
+
+
+      5. **ACTIVE user, password correct, requires_mfa=True, totp_correct=False**:
+      Returns (granted=False, requires_additional_factor=True, lock_account=False,
+      step_up_auth_needed=False)
+
+
+      6. **ACTIVE user, password correct, requires_mfa=True, totp_correct=True**:
+      needs_step_up(high_value_operation, 2) is always False (since 2 < 2 is False).
+      Returns (granted=True, requires_additional_factor=False, lock_account=False,
+      step_up_auth_needed=False)
+
+
+      7. **ACTIVE user, password correct, requires_mfa=False, device trusted**: needs_step_up(high_value_operation,
+      1) depends on high_value_operation.
+         - 7a. high_value_operation=False: Returns (granted=True, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=False) — Same tuple as scenario 6.
+         - 7b. high_value_operation=True: Returns (granted=True, requires_additional_factor=False,
+      lock_account=False, step_up_auth_needed=True)
+
+      8. **ACTIVE user, password correct, requires_mfa=False, device not trusted**:
+      Returns (granted=False, requires_additional_factor=True, lock_account=False,
+      step_up_auth_needed=False) — Same tuple as scenario 5.
+
+
+      Counting distinct code-path scenarios (logical branches): there are 7 distinct
+      logical paths that produce outcomes (paths 1, 2, 3, 4, 5, 6, 7a, 7b = 8 paths,
+      but the `can_auth` check for ACTIVE is always true so that dead-code path doesn't
+      count as reachable).
+
+
+      Actually re-examining: paths are 1, 2, 3, 4, 5, 6, 7a, 7b = 8 reachable code
+      paths. But if we count distinct *scenario types* by their unique combination
+      of input conditions: LOCKED(1), SUSPENDED(1), password_wrong+lock(1), password_wrong+no_lock(1),
+      mfa_required+totp_wrong(1), mfa_required+totp_correct(1), no_mfa+trusted+high_value(1),
+      no_mfa+trusted+not_high_value(1), no_mfa+untrusted(1) = 9 input scenarios but
+      the dead-code path is unreachable, so 8 reachable paths producing 7 unique output
+      scenarios.
+
+
+      Counting by distinct outcome tuples: (F,F,T,F), (F,F,F,F), (F,T,F,F), (T,F,F,F),
+      (T,F,F,T) = 5 distinct tuples.
+
+
+      Interpreting "distinct authentication outcome scenarios" as distinct reachable
+      code paths (logical branches through the function): **7** — Locked, Suspended,
+      Wrong password + lockout, Wrong password + no lockout, MFA required + TOTP wrong,
+      MFA required + TOTP correct, No MFA + trusted device (with step-up sub-variant
+      counted as one scenario since it's the same branch with a parameter variation),
+      No MFA + untrusted device. More precisely, counting each unique branch endpoint:
+      **8 reachable scenarios** if we split trusted device into high-value vs not,
+      or **7** if we consider the step-up flag a modifier rather than a separate scenario.
+  q2:
+    answer: No. Authentication is never granted when requires_mfa=true and totp_correct=false.
+    reasoning: >-
+      - When requires_mfa=True, the code enters the MFA-required branch.
+
+      - If totp_correct=False, the function immediately returns AuthDecision(granted=False,
+      requires_additional_factor=True, lock_account=False, step_up_auth_needed=False).
+
+      - The granted field is explicitly set to False.
+
+      - There is no alternative path that bypasses this check — the totp_correct check
+      is the very next condition after entering the requires_mfa=True branch (assuming
+      password was correct; if password was wrong, granted is also False).
+
+      - Therefore, it is impossible for authentication to be granted when requires_mfa=True
+      and totp_correct=False.
+  q3:
+    answer: No. lock_account does not always trigger when failed_attempts equals max_failed_attempts
+      exactly. It depends on the user status and whether the password is incorrect.
+    reasoning: >-
+      - The lock_account flag is set via should_lock_account() which checks `failed_attempts
+      >= max_attempts`.
+
+      - However, should_lock_account is only called in one specific path: when the
+      user is ACTIVE and the password is INCORRECT. In that case, it checks `failed_attempts
+      + 1 >= max_failed_attempts`.
+
+      - If failed_attempts == max_failed_attempts, then failed_attempts + 1 > max_failed_attempts,
+      so should_lock_account returns True — but ONLY if we reach that code path.
+
+      - If the user is LOCKED, the function returns lock_account=True regardless (but
+      for a different reason — the account is already locked).
+
+      - If the user is SUSPENDED, the function returns lock_account=False regardless
+      of failed_attempts.
+
+      - If the user is ACTIVE and the password is CORRECT, the lockout check is never
+      performed, and lock_account=False is returned in all subsequent branches — even
+      if failed_attempts == max_failed_attempts.
+
+      - Therefore, lock_account does NOT always trigger when failed_attempts == max_failed_attempts.
+      For example: ACTIVE user, correct password, failed_attempts == max_failed_attempts
+      → lock_account=False.
+
+      - Another example: SUSPENDED user with failed_attempts == max_failed_attempts
+      → lock_account=False.

@@ -4705,8 +4705,7 @@
         equal to 70%') but this is not a significant gap. METRICS ALIGNMENT: All seven
         metrics score perfectly or near-perfectly (1.0 across the board), indicating
         the LLM answer demonstrates comprehensive understanding of the system logic,
-        accurate reasoning, and complete coverage of decision scenarios."
-        }
+        accurate reasoning, and complete coverage of decision scenarios." }
     q3:
       state_space_estimation_accuracy:
         n_llm_estimated_scenarios: unknown
@@ -4828,3 +4827,717 @@
         presents this as formal property violation with explicit refutation scenarios,
         while the LLM uses structured narrative explanation. Both approaches are valid
         for this type of query.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: google/gemini-2.5-flash
+  timestamp: '2026-02-09 17:52:16'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM initially states 4, then corrects to 5, and the decomposition
+          shows 13. The LLM missed scenarios related to the interaction of the throttle
+          zone and the tiers.
+        score: -2.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: partial
+        override_logic: correct
+        reasoning: The LLM correctly identifies the billing override logic, but partially
+          understands how the throttle zone interacts with the GracePeriod logic (it
+          states the throttle zone is preempted by the 70% rule, but it is a distinct
+          condition that can lead to denial), leading to an incomplete branching analysis
+          leading to the partial rating. The LLM identifies the 70% denial before
+          tier checks, indicating some understanding of precedence. However, the LLM
+          inaccurately applies short-circuiting in the throttle zone pre-emption argument.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - usage_pct at 70%
+        - usage_pct at 75%
+        - usage_pct at 85%
+        - usage_pct at 60%
+        - usage_pct at 90%
+        total_edge_cases: 8
+        reasoning: The LLM identifies several key thresholds as edge cases (70%, 75%,
+          85%, 60%, 90%) but misses the edge cases related to the exact boundaries
+          of the throttle zone (74.99%, 85.01%) and the specific interactions when
+          a tier threshold is met.
+        edge_case_count: 5
+        score: 0.625
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 70%
+        - 60%
+        - 75%
+        - 90%
+        - 75%-85%
+        thresholds_from_decomp:
+        - 70%
+        - 75%
+        - 85%
+        - 60%
+        - 90%
+        reasoning: The LLM identifies all numeric thresholds from the decomposition
+          (70%, 75%, 85% for usage_pct, and 60%, 75%, 90% for tier thresholds). It
+          also correctly identifies the range of 75-85% as a throttle zone. However,
+          it incorrectly groups '75%-85%' as a single threshold instead of distinct
+          75% and 85% thresholds.
+        score: 1.0
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM successfully identifies outcome values such as DENIED,
+          FULLY_APPROVED, and PARTIALLY_APPROVED and associates them with various
+          conditions. However, the precision is impacted by the incomplete scenario
+          enumeration and the misunderstanding of some control flow interactions (e.g.,
+          throttle zone vs. GracePeriod conflict), leading to outcomes that do not
+          precisely match all decomposition results. For example, it misses the throttle
+          zone being a distinct denial condition irrespective of billing override.
+          The final list of 5 scenarios has some correct outcomes, but they are not
+          exhaustively precise for all 13 scenarios.
+      direction_accuracy:
+        score: 0.6
+        reasoning: The LLM correctly identifies the direction of the impact of the
+          GracePeriod billing status and the tier-dependent thresholds. It accurately
+          states that usage_pct >= 70% leads to DENIED and that different tiers have
+          different approval thresholds. While the overall direction is accurate,
+          the incompleteness in scenario identification and the nuanced interaction
+          of the throttle zone with other conditions reduces the score, as some 'directions'
+          (e.g., how the throttle zone independently leads to denial) are missed or
+          misinterpreted. The LLM accurately describes how 'FULLY_APPROVED' can be
+          downgraded to 'PARTIALLY_APPROVED' and 'PARTIALLY_APPROVED' can become 'DENIED',
+          which is correct in terms of directional change.
+      coverage_completeness:
+        score: 0.38
+        reasoning: The LLM identifies 5 distinct final-outcome scenarios, while the
+          decomposition reveals 13. This yields a coverage score of 5/13 = 0.38. The
+          LLM's scenario generation is incomplete primarily due to not fully accounting
+          for the independent impact and interaction of the throttle zone with the
+          GracePeriod billing logic and the different tier thresholds creating more
+          unique state combinations.
+      overall_summary: The LLM provides a partial but insightful analysis of the GracePeriod
+        billing status. It correctly identifies the core billing override logic's
+        branching and its precedence over tier-specific thresholds. The LLM correctly
+        lists all the individual numeric thresholds that influence the decision. However,
+        its understanding of the interaction between the throttle zone and the GracePeriod
+        logic is incomplete, leading to an underestimation of the total number of
+        distinct scenarios (5 vs. 13). The LLM's explanations for individual outcomes,
+        while largely correct for the scenarios it considers, are not exhaustive,
+        which impacts outcome precision and overall coverage. The LLM's identification
+        of edge cases is good, but specific boundary interactions are missed due to
+        the incomplete scenario understanding.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: Both the LLM and ImandraX correctly identified that there are 0
+          scenarios where Basic tier can achieve FullyApproved status when billing_status
+          is GracePeriod.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly understood the precedence of conditions, branching
+          structure, short-circuit behavior, and override logic within the `apply_billing_override`
+          function and the main function. It accurately deduced how the billing override
+          interacts with the tier-specific thresholds and how `PARTIALLY_APPROVED`
+          cannot be upgraded to `FULLY_APPROVED`.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: There are no edge cases to be considered for this specific question,
+          as the core logic is about a direct outcome. Both LLM and ImandraX correctly
+          identified no such cases.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - usage_pct >= 70%
+        - new_usage_pct <= 60%
+        thresholds_from_decomp:
+        - usage_pct >= 70%
+        - new_usage_pct <= 60%
+        reasoning: The LLM explicitly identified the key thresholds `usage_pct >=
+          70%` and `new_usage_pct <= 60%` that govern the decision logic for GracePeriod
+          and Basic tier. These align with the implicit thresholds from the decomposition.
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM precisely identified the possible outcomes for Basic tier
+          under GracePeriod as `PARTIALLY_APPROVED` (best case) or `DENIED` (worst
+          case), and correctly concluded that `FULLY_APPROVED` is impossible. This
+          aligns perfectly with the ImandraX answer.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion that 'No, Basic tier can NEVER achieve FullyApproved
+          status when billing_status is GracePeriod' is completely correct and directly
+          matches the ImandraX answer. The reasoning provided is sound and accurate.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM explored all relevant conditions for the given question,
+          specifically the `apply_billing_override` function with `GracePeriod` and
+          the subsequent logic for Basic tier. It comprehensively covered the decision
+          scenarios that lead to the impossibility of `FULLY_APPROVED` status. The
+          rubric applied is a scenario-based assessment, and all relevant scenarios
+          were considered.
+      overall_summary: The LLM demonstrated excellent understanding of the core logic,
+        control flow, and specific conditions. It accurately determined the impossibility
+        of a FullyApproved status for Basic tier under GracePeriod, matching the precise
+        conclusions of ImandraX. Its reasoning was detailed, logical, and covered
+        all necessary aspects of the problem. It performed perfectly across all evaluation
+        metrics.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 7
+        reasoning: The LLM does not explicitly enumerate the total number of scenarios
+          it considers. The ImandraX answer implies 7 regions based on the conditions
+          provided for the refutation scenario and the mention of precedence for different
+          checks.
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM correctly identifies the precedence of the throttle zone
+          and tenant status checks, which short-circuit the control flow. It also
+          correctly understands that 'Enterprise' billing overrides will always return
+          FULLY_APPROVED. However, it misses the branching for GracePeriod billing,
+          which is mentioned in the core logic description, though not directly relevant
+          to this specific question, it suggests a partial understanding of the overall
+          branching structure.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Throttle zone (75-85% usage)
+        - Tenant status not ACTIVE (SUSPENDED or QUOTA_EXCEEDED)
+        - New usage exceeding tier threshold (Enterprise > 90%)
+        total_edge_cases: 3
+        reasoning: 'The LLM correctly identifies all three edge cases that can prevent
+          ''FullyApproved'' for Enterprise tier with Current billing: the throttle
+          zone, non-active tenant status, and exceeding the 90% usage threshold for
+          Enterprise tier. All of these are also identified by ImandraX, although
+          ImandraX''s initial property does not include the tenant_status check as
+          a condition.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 75%
+        - 85%
+        - 90%
+        - 60%
+        - 75%
+        thresholds_from_decomp:
+        - 75%
+        - 85%
+        - 90%
+        reasoning: 'The LLM identifies the critical numeric thresholds: 75% and 85%
+          for the throttle zone, and 90% for the Enterprise tier. It also correctly
+          infers other thresholds (60% and 75%) from the problem description, even
+          though they are not directly relevant to the ''Enterprise'' tier query.
+          The ImandraX answer focuses only on the relevant thresholds for the refutation
+          (75-85% and >90%).'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM's explanation of outcomes (DENIED, PARTIALLY_APPROVED,
+          FULLY_APPROVED) is precise and aligns perfectly with the ImandraX output
+          for the given scenario.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM correctly answers 'No' to the question and accurately identifies
+          all conditions that can prevent a 'FullyApproved' result. This matches ImandraX's
+          'REFUTED' and its explanation of the blocking conditions and refutation
+          scenario.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM covers all relevant aspects and scenarios that could lead
+          to outcomes other than 'FullyApproved' for an Enterprise tier with Current
+          billing. It addresses both system-level overrides (throttle zone, tenant
+          status) and tier-specific thresholds. The coverage is complete relative
+          to the ImandraX output for this specific question.
+      overall_summary: The LLM demonstrates a strong understanding of the system's
+        logic for the given scenario. It correctly identifies all conditions that
+        prevent a 'FullyApproved' status for Enterprise tier with Current billing,
+        including critical precedence considerations like the throttle zone and tenant
+        status. Its explanation of numeric thresholds and various outcomes is precise.
+        While it inferred some additional thresholds not directly relevant to the
+        question, this shows a broader understanding. The core control flow understanding
+        is excellent, demonstrating that it grasps short-circuiting and override logic.
+        Overall, the LLM's answer is accurate and comprehensive for the specific query.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: openai/gpt-4o-mini
+  timestamp: '2026-02-09 17:52:17'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM estimated 5 distinct outcomes based on its understanding
+          of the allocation scenarios under GracePeriod, but the decomposition revealed
+          that there are actually 13 scenarios when considering the various ranges
+          of usage percentages and tiers.
+        score: -2.0
+      control_flow_understanding:
+        precedence_of_conditions: incorrect
+        branching_structure: correct
+        short_circuit_behavior: incorrect
+        override_logic: partial
+        reasoning: The LLM partially understood the structure of branches and guards
+          in the logic but missed some nuances. Specifically, it did not capture the
+          precedence and interplay between usage percentages and tier categorizations
+          accurately.
+        score: 0.375
+      edge_case_detection:
+        edge_cases_found:
+        - usage_pct between 75-85% (throttle zone)
+        - new_usage_pct > threshold causing downgrade to DENIED
+        total_edge_cases: 2
+        reasoning: The LLM identified certain scenarios but missed more nuanced edge
+          cases related to overlapping thresholds and unexpected downgrades that arise
+          from tiers and new_usage_pct calculations.
+        edge_case_count: 2
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 70%
+        - 60%
+        - 75%
+        - 90%
+        thresholds_from_decomp:
+        - 70%
+        - 75%
+        - 85%
+        - 60%
+        - 75%
+        - 90%
+        reasoning: The LLM identified the main thresholds but failed to recognize
+          the additional throttle zone thresholds (75-85%) and thus did not capture
+          the complete set of decision boundaries.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.5
+        reasoning: The LLM's outcomes were only partially precise as it did not accurately
+          capture all distinct allocation scenarios or their associated outcomes.
+      direction_accuracy:
+        score: 0.2
+        reasoning: The conclusions drawn by the LLM regarding the distinct number
+          of allocation scenarios were significantly off (5 vs. 13), indicating a
+          poor understanding of the directionality of decision outcomes.
+      coverage_completeness:
+        score: 0.25
+        reasoning: The LLM covers only a small fraction of the actual decision scenarios,
+          missing key cases and misestimating the scenario count.
+      overall_summary: The LLM's performance shows several weaknesses, particularly
+        in accurately estimating the number of allocation scenarios and understanding
+        the detailed control flow and decision boundaries within the system.
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM confirmed that Basic tier can never achieve FullyApproved
+          status, estimating 0 scenarios, which matches the decomposition that also
+          identifies 0 scenarios.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: The LLM accurately described how the billing status dictates resource
+          allocation decisions. All the aspects of condition precedence, branching
+          structure, short-circuit behaviors, and override logic presented were correctly
+          understood according to the provided context.
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found: []
+        total_edge_cases: 0
+        reasoning: Both answers identified 0 edge cases, and the LLM did not recognize
+          any potential scenarios outside the expected outcomes of the Basic tier
+          under GracePeriod.
+        edge_case_count: 0
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 60%
+        thresholds_from_decomp:
+        - 60%
+        - 70%
+        - 75%
+        - 90%
+        reasoning: The LLM identified a threshold of 60% relevant to the Basic tier
+          but missed other critical thresholds (70%, 75%, and 90%) from the decomposition.
+          However, it did recognize the main decision boundary for the Basic tier.
+        score: 0.25
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provided precise reasoning about the outcomes related to
+          resource allocation statuses directly tied to the conditions described.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The conclusion that Basic tier cannot achieve FullyApproved status
+          under GracePeriod is correct and aligns with the known logic, thus resulting
+          in a perfect score.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The LLM correctly captured all relevant scenarios for the Basic
+          tier under the specified conditions, confirming that there are no pathways
+          to FullyApproved status.
+      overall_summary: The LLM provided a thorough answer with accurate logic, reasoning,
+        and scenario understanding. There were a few missed thresholds in decision
+        boundaries, but overall performance was strong.
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 3
+        n_decomposition_exact_scenarios: 2
+        reasoning: The LLM estimated three scenarios (throttle zone denial, tenant
+          suspended denial, and new usage exceeding threshold) while the decomposition
+          identifies two scenarios (throttle zone denial and new usage exceeding threshold).
+          The discrepancy arises from the tenant status scenario which the LLM incorrectly
+          lists.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: The LLM captures the essential structure of the checks. It understands
+          the precedence between throttle zone checks and billing overrides. However,
+          it does not fully capture that the throttle zone check operates before assessing
+          the billing override, leading to an incomplete understanding of how these
+          control flows interact.
+        score: 0.875
+      edge_case_detection:
+        edge_cases_found:
+        - Throttle zone denial
+        - Exceeding usage threshold leading to PartiallyApproved
+        total_edge_cases: 3
+        reasoning: The LLM identified two edge cases related to throttle zone and
+          exceeding usage. However, it did not consider the potential edge case related
+          to tenant status and its combination with the usage checks.
+        edge_case_count: 2
+        score: 0.6666666666666666
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 70% usage
+        - 90% threshold
+        thresholds_from_decomp:
+        - 60% threshold
+        - 75% threshold
+        - 90% threshold
+        reasoning: The LLM identified two key thresholds relevant to the scenario,
+          but did not consider the threshold for Basic and Professional tiers, yielding
+          a lack of clarity regarding other thresholds that affect decision making.
+        score: 0.6666666666666666
+      outcome_precision:
+        score: 0.8
+        reasoning: The LLM's precision reflects its ability to articulate outcomes
+          under certain conditions; however, it lacks completeness in addressing all
+          possible outcomes, such as tenant status.
+      direction_accuracy:
+        score: 0.9
+        reasoning: The conclusion that Enterprise tier does not always result in FullyApproved
+          is accurate, though the scenarios presented are not exhaustive, which somewhat
+          impacts the score.
+      coverage_completeness:
+        score: 0.6
+        reasoning: The LLM's identified scenarios covered only a fraction of the possible
+          decision scenarios available, missing the combination of tenant status with
+          usage.
+      overall_summary: The LLM provides a reasonably accurate response but falls short
+        in comprehensively capturing the control flow and decision-making nuances
+        of the model. While it understands edge cases and the characteristics of various
+        thresholds, it lacks complete precision regarding tenant status and additional
+        edge cases.
+- answer_model: anthropic/claude-opus-4.6
+  eval_model: x-ai/grok-4-fast
+  timestamp: '2026-02-09 17:52:37'
+  metrics:
+    q1:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 5
+        n_decomposition_exact_scenarios: 13
+        reasoning: The LLM initially estimates 4 scenarios but refines to 5 distinct
+          final-outcome scenarios after expanding. This is extracted from the 'That
+          gives 5 distinct final-outcome scenarios' statement. The decomposition from
+          ImandraX provides 13 exact scenarios, indicating the LLM significantly underestimates
+          the state space.
+        score: -2.0
+      control_flow_understanding:
+        precedence_of_conditions: partial
+        branching_structure: partial
+        short_circuit_behavior: correct
+        override_logic: partial
+        reasoning: Precedence of conditions is partial because the LLM correctly notes
+          that usage_pct >=70% is checked before tier for Enterprise in billing override,
+          but it partially integrates the pre-emptive throttle zone (75-85%) without
+          fully accounting for its impact on GracePeriod paths. Branching structure
+          is partial as the LLM outlines the three branches in apply_billing_override
+          and the refinements in determine_allocation_decision, but misses finer splits
+          in usage ranges (e.g., 70-75 vs 75-85 vs 85+) that lead to the 13 scenarios.
+          Short-circuit behavior is correct, as the LLM accurately describes how DENIED
+          from billing override or throttle halts further checks, and throttle precedes
+          billing. Override logic is partial because it captures the GracePeriod override
+          granting FULLY_APPROVED for Enterprise or PARTIALLY_APPROVED otherwise (when
+          <70%), but underplays how throttle creates additional denial paths before
+          overrides are applied, affecting the overall scenario count.
+        score: 0.625
+      edge_case_detection:
+        edge_cases_found:
+        - usage_pct exactly 70% (denial threshold)
+        - new_usage_pct exactly at tier thresholds (60%,75%,90%)
+        - usage_pct in 75-85% throttle zone overlapping with GracePeriod denial
+        total_edge_cases: 5
+        reasoning: The LLM identifies a few edge cases implicitly through scenarios,
+          such as the 70% cutoff, tier threshold boundaries, and the overlap between
+          75-85% throttle and >=70% GracePeriod denial. However, it does not explicitly
+          list many rare cases, and misses others like the exact 75% and 85% boundaries
+          for throttle dead zones or 85+% where GracePeriod denial applies without
+          throttle. Assuming the decomposition has 5 key edge cases (boundaries at
+          60,70,75,85,90 plus overlaps), the LLM finds 3, under-detecting nuanced
+          edges like post-85% paths or precise tier interactions.
+        edge_case_count: 3
+        score: 0.6
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 70% (GracePeriod cutoff)
+        - 60% (Basic)
+        - 75% (Professional)
+        - 90% (Enterprise)
+        - 75-85% (throttle zone)
+        thresholds_from_decomp:
+        - 70%
+        - 75%
+        - 85% (usage_pct)
+        - 60% (Basic)
+        - 75% (Professional)
+        - 90% (Enterprise)
+        reasoning: 'The LLM identifies the core thresholds: 70% for GracePeriod denial,
+          tier-specific 60%,75%,90%, and mentions the 75-85% throttle range. It misses
+          explicitly listing 75% and 85% as separate boundaries, treating the throttle
+          as an overlapping range rather than distinct splits (e.g., 70-75 reaches
+          GracePeriod denial, 75-85 denied by throttle, 85+ reaches GracePeriod denial).
+          All tier thresholds are correctly identified, but the usage_pct boundaries
+          are incompletely granular compared to decomposition which splits at 70,75,85.'
+        score: 0.8333333333333334
+      outcome_precision:
+        score: 0.3
+        reasoning: The LLM provides scenario counts (4-5) and lists outcomes like
+          DENIED, FULLY_APPROVED, PARTIALLY_APPROVED without probabilistic distributions,
+          but the precision is low as it conflates ranges and misses splits (e.g.,
+          no separate handling of 70-75 vs 85+), leading to undercounting vs the 13
+          verified scenarios. No exact numeric distributions are given, only qualitative
+          outcomes, scoring moderately low for failing to precisely delineate all
+          boundary-driven outcomes.
+      direction_accuracy:
+        score: 0.4
+        reasoning: The LLM's conclusions are directionally correct in identifying
+          key GracePeriod behaviors (e.g., >=70% denial overrides Enterprise leniency,
+          <70% allows partial/full based on tier and new_usage), and thresholds align
+          broadly with decomposition. However, it underestimates scenario count (5
+          vs 13) by not fully incorporating throttle-induced splits and post-85% paths,
+          leading to incomplete coverage of denial paths. Score reflects partial correctness
+          in direction but inaccuracy in scope.
+      coverage_completeness:
+        score: 0.38
+        reasoning: Using the scenario count rubric, the LLM covers 5 out of 13 decomposition
+          scenarios (e.g., captures <70% tier branches and >=70% denial, but misses
+          distinct 70-75 denial via GracePeriod, 75-85 throttle denial, and 85+ GracePeriod
+          denial as separate cases, plus finer tier combinations). Assessment based
+          on proportion of usage ranges and outcomes explicitly or implicitly described.
+      overall_summary: '"The LLM demonstrates a solid but incomplete understanding
+        of the GracePeriod logic, correctly capturing the billing override branches
+        and tier dependencies but underestimating the total scenarios by not fully
+        integrating the pre-emptive throttle zone splits (70-75,75-85,85+). It identifies
+        most key thresholds but lacks granularity in usage_pct boundaries, leading
+        to partial control flow grasp and low coverage. Strengths include accurate
+        override precedence and outcome directions; weaknesses are in state space
+        estimation and edge case detection, resulting in only ~38% coverage of the
+        decomposed scenarios."'
+    q2:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: 0
+        n_decomposition_exact_scenarios: 0
+        reasoning: The LLM explicitly states that Basic tier can NEVER achieve FullyApproved
+          status under GracePeriod, implying 0 scenarios where this occurs. This matches
+          the ImandraX decomposition, which confirms 0 scenarios and states it is
+          impossible.
+        score: 1.0
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'The LLM correctly identifies that the billing override (apply_billing_override)
+          is applied first, with precedence given to its outcome. It accurately describes
+          the branching in apply_billing_override for GracePeriod: denial if usage_pct
+          >=70%, FullyApproved only for Enterprise if <70%, and PartiallyApproved
+          otherwise. In the main function, it correctly outlines the branching for
+          PartiallyApproved inputs: denial if new_usage_pct >60% for Basic, else PartiallyApproved.
+          No short-circuit behavior is misidentified, and the override logic is precisely
+          captured, noting no path upgrades PartiallyApproved to FullyApproved for
+          Basic.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - usage_pct >=70% leading to DENIED
+        - usage_pct <70% and new_usage_pct >60% leading to DENIED
+        - usage_pct <70% and new_usage_pct <=60% leading to PARTIALLY_APPROVED
+        total_edge_cases: 3
+        reasoning: The LLM identifies all relevant edge cases around the boundaries
+          for Basic tier under GracePeriod, explaining how different combinations
+          of usage_pct (threshold 70%) and new_usage_pct (threshold 60%) lead to DENIED
+          or PARTIALLY_APPROVED outcomes, none resulting in FullyApproved. These match
+          the decomposition's key insight that no FullyApproved path exists, covering
+          the full set of possible outcomes as edge cases for this specific query.
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 70% (usage_pct for GracePeriod denial)
+        - 60% (new_usage_pct threshold for Basic tier)
+        thresholds_from_decomp:
+        - 70% (usage_pct >=70% triggers DENIED in GracePeriod override, regardless
+          of tier)
+        - 60% (Basic tier threshold for PartiallyApproved vs DENIED in main function)
+        reasoning: 'The LLM correctly identifies the key thresholds: 70% for the GracePeriod
+          billing override denial and 60% as the Basic tier limit in the main function.
+          It misses no thresholds relevant to the query, as these are the exact boundaries
+          from the decomposition that prevent FullyApproved for Basic in GracePeriod.
+          The Enterprise exception is noted but not a numeric threshold per se.'
+        score: 1.0
+      outcome_precision:
+        score: 1.0
+        reasoning: The LLM provides precise numeric outcomes by stating exactly 0
+          scenarios for FullyApproved, with clear conditions for the alternative outcomes
+          (PARTIALLY_APPROVED when usage_pct <70% and new_usage_pct <=60%, else DENIED).
+          This matches the ImandraX's '0 scenarios' exactly, with no vagueness in
+          distributions or probabilities.
+      direction_accuracy:
+        score: 1.0
+        reasoning: The LLM's conclusion ('No, Basic tier can NEVER achieve FullyApproved
+          status') is entirely correct and aligns perfectly with ImandraX's 'NO -
+          Basic never gets FullyApproved in GracePeriod (0 scenarios)'. The reasoning
+          traces the exact code paths, confirming impossibility without errors.
+      coverage_completeness:
+        score: 1.0
+        reasoning: The query focuses on a binary decision (can Basic achieve FullyApproved
+          in GracePeriod?) with sub-conditions for alternatives. The LLM covers all
+          possible paths (billing override outcomes and main function handling), identifying
+          the full scenario space (0 successful, with precise conditions for partial/denied),
+          matching the decomposition's complete coverage of why it's impossible.
+      overall_summary: '"The LLM answer demonstrates excellent understanding and accuracy,
+        fully aligning with the ImandraX decomposition. It correctly concludes impossibility
+        with detailed, precise reasoning on control flow and boundaries, identifying
+        all relevant conditions and thresholds without missing any paths. Strengths
+        include clear tracing of override logic and outcome conditions; no weaknesses
+        noted, as it matches the verified 0 scenarios perfectly."'
+    q3:
+      state_space_estimation_accuracy:
+        n_llm_estimated_scenarios: unknown
+        n_decomposition_exact_scenarios: 4
+        reasoning: 'The LLM answer does not provide an explicit numerical estimate
+          of the total number of decision scenarios or regions in the state space
+          for the given conditions (Enterprise tier, Current billing). It qualitatively
+          describes conditions leading to different outcomes but does not count them
+          (e.g., no mention of ''3 scenarios'' or similar). From the decomposition
+          implied in the ImandraX answer and core logic description, there are at
+          least 4 distinct regions for Enterprise + Current (assuming Active tenant_status
+          as per question focus): 1) throttle zone (75-85% usage) → Denied; 2) outside
+          throttle, new_usage >90% → PartiallyApproved; 3) outside throttle, new_usage
+          ≤90%, but other blocks like invalid inputs (edge); 4) all favorable → FullyApproved.
+          The exact decomposition likely identifies these 4 regions based on usage_pct
+          ranges and new_usage thresholds.'
+        score: unknown
+      control_flow_understanding:
+        precedence_of_conditions: correct
+        branching_structure: correct
+        short_circuit_behavior: correct
+        override_logic: correct
+        reasoning: 'Precedence of conditions: Correct - LLM accurately describes the
+          sequential checks: throttle zone first (lines implied as early), then tenant_status,
+          then billing override, and finally new_usage check, matching the core logic
+          flow (throttle at start, billing at step 3, usage override last). Branching
+          structure: Correct - LLM outlines the if-else branches clearly, including
+          immediate returns for throttle and status, and the downgrade in the final
+          step. Short-circuit behavior: Correct - Explicitly notes that throttle zone
+          check ''runs first'' and ''return DENIED immediately'' before billing, and
+          tenant_status also short-circuits universally. Override logic: Correct -
+          Describes how billing override always gives FULLY_APPROVED for Current,
+          but the final new_usage check can override/downgrade to PARTIALLY_APPROVED,
+          and early checks override everything.'
+        score: 1.0
+      edge_case_detection:
+        edge_cases_found:
+        - Throttle zone (75-85% usage) leading to Denied
+        - Suspended or QUOTA_EXCEEDED tenant_status leading to Denied
+        - Excessive requested_amount pushing new_usage_pct >90% leading to PartiallyApproved
+        total_edge_cases: 3
+        reasoning: 'The LLM identifies all three key edge cases mentioned in the ImandraX
+          answer and core logic: the throttle zone denial (pre-billing short-circuit),
+          tenant_status non-Active denial, and the post-override new_usage exceeding
+          threshold leading to partial approval instead of full. No additional edge
+          cases (e.g., invalid inputs or zero usage) are missed in this context, as
+          the question focuses on blocking full approval for Enterprise+Current. Total
+          from decomposition: 3, as ImandraX highlights throttle and excessive usage,
+          with tenant_status as a universal block.'
+        edge_case_count: 3
+        score: 1.0
+      decision_boundary_clarity:
+        thresholds_identified_by_llm:
+        - 75% (throttle zone lower)
+        - 85% (throttle zone upper)
+        - 90% (Enterprise new_usage threshold)
+        thresholds_from_decomp:
+        - 75% (throttle zone lower)
+        - 85% (throttle zone upper)
+        - 90% (Enterprise usage threshold)
+        - 70% (GracePeriod denial, but not applicable here)
+        reasoning: 'The LLM correctly identifies the key numeric thresholds relevant
+          to Enterprise+Current: the 75-85% throttle zone (explicitly inclusive) and
+          the 90% Enterprise threshold for new_usage_pct. It misses no relevant ones
+          for this query but does not mention the 70% GracePeriod threshold (irrelevant
+          for Current billing). Decomposition includes all system thresholds, but
+          for this case, LLM covers the pertinent 75%, 85%, and 90% exactly, with
+          clear description of their impact (e.g., ''between 75% and 85% inclusive'').'
+        score: 0.75
+      outcome_precision:
+        score: 1.0
+        reasoning: 'The LLM provides precise, exact outcomes for each scenario without
+          any ambiguity or probabilistic distributions: Denied for throttle/tenant_status,
+          PartiallyApproved for new_usage >90%, and FullyApproved only when all conditions
+          are met. Since the system is deterministic (no randomness mentioned), the
+          LLM''s numeric thresholds and condition-based outcomes match the decomposition
+          exactly, achieving full precision. No approximations or ranges for outcomes
+          are used incorrectly.'
+      direction_accuracy:
+        score: 1.0
+        reasoning: 'The LLM''s conclusion is fully correct and aligns with ImandraX:
+          Enterprise + Current does NOT always result in FullyApproved; it can be
+          blocked by throttle zone (Denied), tenant_status (Denied), or new_usage
+          >90% (PartiallyApproved). The direction (refuting ''always FullyApproved'')
+          is accurate, with examples and reasoning tracing the exact flow to support
+          it, matching the refutation scenario and key insight in ImandraX.'
+      coverage_completeness:
+        score: 1.0
+        reasoning: 'Using the scenario-based rubric from core logic and ImandraX decomposition,
+          the LLM covers all decision scenarios for the query: throttle denial (100%
+          covered), tenant_status denial (explicitly added, though query implies Active),
+          new_usage partial (fully detailed with example), and the favorable full
+          approval case (conditions stated). Proportion: 4/4 regions identified qualitatively,
+          with no misses in the focused state space (Enterprise + Current). Assessment
+          based on branching paths in the function flow.'
+      overall_summary: '"The LLM answer demonstrates strong performance, accurately
+        capturing control flow, identifying all relevant edge cases and thresholds,
+        and reaching correct conclusions with precise outcomes. It covers the full
+        scope of scenarios that block full approval, closely aligning with the ImandraX
+        decomposition. Minor weakness: lacks a quantitative state space estimate,
+        relying on qualitative conditions instead. Overall, excellent qualitative
+        reasoning without verification tools, equivalent to decomposed insight in
+        depth and accuracy."'

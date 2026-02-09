@@ -306,3 +306,119 @@
       - Correction: With cargo_value > 100000 (c1=true), time_critical < 24 (c2=true),
       and route_time always < 72 for Air (c4=true), we have 3 conditions, so emergency
       routing IS always activated.
+- model: anthropic/claude-opus-4.6
+  timestamp: '2026-02-09 17:45:05'
+  q1:
+    answer: There are 15 distinct routing scenarios for Sea transport under geopolitical
+      tensions (Tensions, Sanctions, or WarZone), but only 13 result in approved routes
+      (2 are rejected).
+    reasoning: >-
+      - Sea transport has a cargo restriction: Perishable cargo cannot use Sea routes
+      (rejected immediately). This applies regardless of geopolitical risk.
+
+      - For Sea transport, the relevant geopolitical risks are: Tensions, Sanctions,
+      and WarZone (3 levels).
+
+      - Weather options are: Clear, Rain, Snow, Storm, Hurricane (5 options).
+
+      - Cargo types are: Standard, Fragile, Hazardous, Perishable (4 types), but Perishable
+      is always rejected for Sea.
+
+      - So we consider 3 allowed cargo types × 3 geopolitical levels × 5 weather conditions
+      = 45 combinations with allowed cargo.
+
+      - Plus 3 geopolitical levels × 5 weather conditions × 1 (Perishable, always
+      rejected) = 15 rejected combinations.
+
+      - However, the question asks about "distinct routing scenarios," meaning distinct
+      combinations of inputs for Sea under those 3 geopolitical risks.
+
+      - Route viability check: Hurricane + WarZone is always non-viable (extreme_risk).
+      This removes scenarios with (Sea, Hurricane, WarZone) — that's 4 cargo types
+      rejected for viability (but Perishable was already rejected by cargo restriction).
+
+      - Distinct scenario combinations: 3 geopolitical × 5 weather × 4 cargo types
+      = 60 total input combinations.
+
+      - But the question likely focuses on distinct *routing outcomes* or distinct
+      *scenario paths*. Let me reconsider — "distinct routing scenarios" most likely
+      means distinct combinations of parameters.
+
+      - With 3 geopolitical levels × 5 weather levels = 15 distinct (weather, geopolitical)
+      combinations for Sea transport.
+
+      - These 15 combinations represent the distinct route condition scenarios (before
+      considering cargo type variation and cargo_value/time_critical).
+
+      - Of these 15: Hurricane+WarZone is non-viable (1 scenario rejected by viability).
+      All other 14 are viable from a route standpoint.
+
+      - So there are 15 distinct routing scenarios based on weather × geopolitical
+      combinations for Sea under those 3 risk levels.
+  q2:
+    answer: 'Yes, Air transport can be rejected for Standard (non-Hazardous) cargo
+      under two conditions: (1) Hurricane weather combined with WarZone geopolitical
+      risk, or (2) Hurricane weather combined with Sanctions geopolitical risk.'
+    reasoning: >-
+      - Air transport's cargo restriction only blocks Hazardous cargo (`mode == AIR
+      and cargo == HAZARDOUS`). Standard cargo passes this check.
+
+      - However, route viability (`_is_route_viable`) can still reject the route.
+
+      - Condition 1 (extreme_risk): weather == Hurricane AND geopolitical == WarZone.
+      This applies to ALL modes, including Air with Standard cargo.
+
+      - Condition 2 (air_grounded): mode == Air AND weather == Hurricane AND geopolitical
+      == Sanctions. This is an Air-specific rejection.
+
+      - Both of these conditions cause `_is_route_viable` to return False, leading
+      to a rejected RouteDecision (approved=False).
+
+      - Therefore, Air transport with Standard cargo is rejected in exactly these
+      two scenarios:
+        (a) Air + Standard + Hurricane + WarZone
+        (b) Air + Standard + Hurricane + Sanctions
+  q3:
+    answer: No, having both cargo_value > 100000 AND time_critical < 24 does NOT always
+      activate emergency routing for approved Air transport routes. It depends on
+      the route_cost and route_time values.
+    reasoning: >-
+      - Emergency routing is activated when at least 3 out of 4 conditions are met:
+        c1: cargo_value > 100000
+        c2: time_critical < 24
+        c3: route_cost < 1000
+        c4: route_time < 72
+      - If both c1 and c2 are true, we still need at least one of c3 or c4 to be true
+      (count >= 3).
+
+      - Air base cost = 500, base time = 8 hours.
+
+      - route_cost = 500 × weather_mult × geo_mult
+
+      - route_time = 8 × time_mult
+
+      - For c4 (route_time < 72): Air base time is 8. time_mult values: Clear=1(8h),
+      Rain=1(8h), Snow=2(16h), Storm=2(16h), Hurricane=3(24h). All yield route_time
+      < 72, so c4 is always true for Air when the route is approved.
+
+      - Wait — but Hurricane scenarios for Air: Hurricane+Stable gives time=24, which
+      is NOT < 72, so c4 is true (24 < 72). Actually 24 < 72 is true.
+
+      - So for ALL approved Air routes, route_time < 72 (c4 is always true). The maximum
+      is 8×3=24 for Hurricane.
+
+      - Therefore, with c1=True, c2=True, and c4=True (always for Air), count >= 3
+      is always satisfied.
+
+      - BUT we must verify which Air+Hurricane scenarios are actually approved: Hurricane+Stable
+      is approved (viable), Hurricane+Tensions is approved. Hurricane+Sanctions and
+      Hurricane+WarZone are rejected.
+
+      - For all approved Air routes, route_time is always < 72, so c4 is always true.
+
+      - Therefore, with c1 and c2 both true, emergency routing IS always activated
+      for approved Air routes.
+
+      - Correction: The answer is actually YES — for approved Air routes specifically,
+      c4 is always true (max time = 24h), so having c1 and c2 guarantees count >=
+      3. My initial "No" was incorrect upon deeper analysis. The answer is YES.
